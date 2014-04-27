@@ -1,8 +1,12 @@
 name := "solrs"
 
+description := "A solr client for scala, providing a query interface like SolrJ, just asynchronously / non-blocking"
+
 organization := "io.ino"
 
-version := "1.0.0-SNAPSHOT"
+version := "1.0.0-RC1"
+
+licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.html"))
 
 scalaVersion := "2.10.4"
 
@@ -23,4 +27,24 @@ libraryDependencies ++= Seq(
   "commons-logging" % "commons-logging" % "1.1.1"
 )
 
+// Fork tests so that SolrRunner's shutdown hook kicks in
 fork in Test := true
+
+// Publish settings
+seq(bintrayPublishSettings:_*)
+
+publishTo := Some("bintray-magro-maven-solrs"  at "https://api.bintray.com/maven/magro/maven/solrs")
+
+pomExtra := (
+  <url>https://github.com/inoio/solrs</url>
+  <scm>
+    <url>git@github.com:inoio/solrs.git</url>
+    <connection>scm:git:git@github.com:inoio/solrs.git</connection>
+  </scm>
+  <developers>
+    <developer>
+      <id>martin.grotzke</id>
+      <name>Martin Grotzke</name>
+      <url>https://github.com/magro</url>
+    </developer>
+  </developers>)

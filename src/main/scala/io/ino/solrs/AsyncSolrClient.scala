@@ -21,6 +21,7 @@ import scala.util.control.NonFatal
 import scala.concurrent.Future
 import scala.util.Try
 import org.apache.solr.common.SolrException
+import org.apache.solr.client.solrj.impl.BinaryResponseParser
 
 /**
  * Async, non-blocking Solr Server that just allows to {@link #query(SolrQuery)}.
@@ -29,13 +30,9 @@ import org.apache.solr.common.SolrException
  *
  * @author <a href="martin.grotzke@inoio.de">Martin Grotzke</a>
  */
-class AsyncSolrClient(val baseUrl: String, val httpClient: AsyncHttpClient, responseParser: ResponseParser, val responseParserExecutor: ExecutorService) {
-
-  def this(baseUrl: String, httpClient: AsyncHttpClient, responseParser: ResponseParser) = {
-    this(baseUrl, httpClient, responseParser, Executors.newFixedThreadPool(
-      Math.max(Runtime.getRuntime().availableProcessors() - 1, 1)))
-    shutdownExecutor = true
-  }
+class AsyncSolrClient(val baseUrl: String,
+                      val httpClient: AsyncHttpClient = new AsyncHttpClient(),
+                      responseParser: ResponseParser = new BinaryResponseParser) {
 
   private var shutdownExecutor = false
   private val UTF_8 = "UTF-8"
@@ -47,16 +44,6 @@ class AsyncSolrClient(val baseUrl: String, val httpClient: AsyncHttpClient, resp
   val AGENT = "Solr[" + classOf[AsyncSolrClient].getName() + "] 1.0"
 
   private val logger = LoggerFactory.getLogger(getClass())
-
-  def shutdown(): Unit = {
-    if (shutdownExecutor) {
-      try {
-        responseParserExecutor.shutdownNow()
-      } catch {
-        case NonFatal(e) => logger.warn(e.getMessage(), e)
-      }
-    }
-  }
 
   private def sanitize(baseUrl: String): String = {
     if (baseUrl.endsWith("/")) {

@@ -7,7 +7,7 @@ import org.apache.solr.client.solrj.response.QueryResponse
 import com.ning.http.client.AsyncHttpClient
 import org.apache.solr.client.solrj.SolrQuery.SortClause
 import org.apache.solr.client.solrj.SolrQuery
-import org.apache.solr.client.solrj.impl.XMLResponseParser
+import org.apache.solr.client.solrj.impl.{BinaryResponseParser, XMLResponseParser}
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
@@ -37,8 +37,7 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
 
   describe("Solr") {
 
-    lazy val solr = new AsyncSolrClient(s"http://localhost:${solrRunner.port}/solr",
-      new AsyncHttpClient(), new XMLResponseParser())
+    lazy val solr = new AsyncSolrClient(s"http://localhost:${solrRunner.port}/solr")
 
     it("should query async with SolrQuery") {
 
@@ -64,6 +63,24 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
       val response: Future[List[String]] = solr.query(new SolrQuery("cat:cat1"), getIds)
 
       await(response) should contain theSameElementsAs Vector("id1", "id2")
+    }
+
+    it("should allow to set the http client") {
+
+      val solr = new AsyncSolrClient(s"http://localhost:${solrRunner.port}/solr", new AsyncHttpClient())
+
+      val response = solr.query(new SolrQuery("cat:cat1"))
+
+      await(response).getResults.getNumFound should be (2)
+    }
+
+    it("should allow to set the response parser") {
+
+      val solr = new AsyncSolrClient(s"http://localhost:${solrRunner.port}/solr", responseParser = new XMLResponseParser())
+
+      val response = solr.query(new SolrQuery("cat:cat1"))
+
+      await(response).getResults.getNumFound should be (2)
     }
 
     it("should return failed future on wrong request") {

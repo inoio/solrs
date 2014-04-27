@@ -29,8 +29,7 @@ class AsyncSolrClientSpec extends FunSpec with Matchers with FutureAwaits {
 
     it("should return failed future on connection refused") {
 
-      val solr = new AsyncSolrClient("http://localhost:12345/solr",
-        new AsyncHttpClient(), new XMLResponseParser())
+      val solr = new AsyncSolrClient("http://localhost:12345/solr")
 
       val response: Future[QueryResponse] = solr.query(query)
 

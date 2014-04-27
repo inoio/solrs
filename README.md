@@ -1,10 +1,10 @@
-# solrs - solr client for scala
+# solrs - async solr client for scala
 
 [![Build Status](https://travis-ci.org/inoio/solrs.png?branch=master)](https://travis-ci.org/inoio/solrs)
 
 This is a solr client for scala providing a query interface like SolrJ, just asynchronously / non-blocking.
 
-# Usage
+## Usage
 
 At first an instance of `AsyncSolrClient` must be created with the url to the Solr server, an `AsyncHttpClient`
 instance and the response parser to use.
@@ -31,6 +31,6 @@ response.onSuccess {
 }
 ```
 
-# License
+## License
 
 The license is Apache 2.0, see LICENSE.txt.

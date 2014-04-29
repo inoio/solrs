@@ -4,7 +4,7 @@ description := "A solr client for scala, providing a query interface like SolrJ,
 
 organization := "io.ino"
 
-version := "1.0.0-RC2"
+version := "1.0.0-RC3"
 
 licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.html"))
 

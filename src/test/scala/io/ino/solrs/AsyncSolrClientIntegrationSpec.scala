@@ -7,7 +7,7 @@ import org.apache.solr.client.solrj.response.QueryResponse
 import com.ning.http.client.AsyncHttpClient
 import org.apache.solr.client.solrj.SolrQuery.SortClause
 import org.apache.solr.client.solrj.SolrQuery
-import org.apache.solr.client.solrj.impl.{BinaryResponseParser, XMLResponseParser}
+import org.apache.solr.client.solrj.impl.XMLResponseParser
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
@@ -35,6 +35,11 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
     doc
   }
 
+  private def getIds(resp: QueryResponse): List[String] = {
+    import scala.collection.JavaConversions._
+    resp.getResults.toList.map(_.getFieldValue("id").toString)
+  }
+
   describe("Solr") {
 
     lazy val solr = new AsyncSolrClient(s"http://localhost:${solrRunner.port}/solr")
@@ -55,11 +60,6 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
     }
 
     it("should allow to transform the response") {
-
-      def getIds(resp: QueryResponse): List[String] = {
-        import scala.collection.JavaConversions._
-        resp.getResults.toList.map(_.getFieldValue("id").toString)
-      }
       val response: Future[List[String]] = solr.query(new SolrQuery("cat:cat1"), getIds)
 
       await(response) should contain theSameElementsAs Vector("id1", "id2")
@@ -83,9 +83,18 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
       await(response).getResults.getNumFound should be (2)
     }
 
-    it("should return failed future on wrong request") {
+    it("should return failed future on request with bad query") {
 
       val response: Future[QueryResponse] = solr.query(new SolrQuery("fieldDoesNotExist:foo"))
+
+      awaitReady(response)
+      a [RemoteSolrException] should be thrownBy await(response)
+    }
+
+    it("should return failed future on wrong request path") {
+      val solr = new AsyncSolrClient(s"http://localhost:${solrRunner.port}/")
+
+      val response = solr.query(new SolrQuery("*:*"), getIds)
 
       awaitReady(response)
       a [RemoteSolrException] should be thrownBy await(response)

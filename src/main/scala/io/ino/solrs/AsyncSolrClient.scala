@@ -1,8 +1,6 @@
 package io.ino.solrs
 
 import java.io.IOException
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
 
 import org.apache.solr.client.solrj.ResponseParser
 import org.apache.solr.client.solrj.SolrQuery
@@ -22,6 +20,9 @@ import scala.concurrent.Future
 import scala.util.Try
 import org.apache.solr.common.SolrException
 import org.apache.solr.client.solrj.impl.BinaryResponseParser
+import java.util.Locale
+import org.apache.commons.io.IOUtils
+import HttpUtils._
 
 /**
  * Async, non-blocking Solr Server that just allows to {@link #query(SolrQuery)}.
@@ -103,10 +104,13 @@ class AsyncSolrClient(val baseUrl: String,
   protected def toQueryResponse(response: Response, url: String, startTime: Long): QueryResponse = {
     var rsp: NamedList[Object] = null
 
+    validateResponse(response, responseParser)
+
     val httpStatus = response.getStatusCode()
 
     try {
-      rsp = responseParser.processResponse(response.getResponseBodyAsStream(), UTF_8)
+      val charset = getContentCharSet(response.getContentType).orNull
+      rsp = responseParser.processResponse(response.getResponseBodyAsStream(), charset)
     } catch {
       case NonFatal(e) => throw new RemoteSolrException(httpStatus, e.getMessage(), e)
     }
@@ -119,6 +123,39 @@ class AsyncSolrClient(val baseUrl: String,
     val res = new QueryResponse(rsp, null)
     res.setElapsedTime(System.currentTimeMillis() - startTime)
     res
+  }
+
+  @throws[RemoteSolrException]
+  private def validateResponse(response: Response, responseParser: ResponseParser) {
+    validateMimeType(responseParser.getContentType, response)
+
+    val httpStatus = response.getStatusCode
+    if(httpStatus >= 400) {
+      throw new RemoteSolrException(httpStatus, s"Server at $baseUrl returned non ok status:$httpStatus, message:${response.getStatusText}", null)
+    }
+  }
+
+  def validateMimeType(expectedContentType: String, response: Response) {
+    if (expectedContentType != null) {
+      val expectedMimeType = getMimeType(expectedContentType).map(_.toLowerCase(Locale.ROOT)).getOrElse("")
+      val actualMimeType = getMimeType(response.getContentType).map(_.toLowerCase(Locale.ROOT)).getOrElse("")
+      if (expectedMimeType != actualMimeType) {
+        var msg = s"Expected mime type [$expectedMimeType] but got [$actualMimeType]."
+        var encoding = response.getHeader("Content-Encoding")
+        if (encoding == null) {
+          encoding = "UTF-8"
+        }
+        try {
+          msg = msg + "\n" + IOUtils.toString(response.getResponseBodyAsStream, encoding)
+        }
+        catch {
+          case e: IOException => {
+            throw new RemoteSolrException(response.getStatusCode, s"Could not parse response with encoding $encoding", e)
+          }
+        }
+        throw new RemoteSolrException(response.getStatusCode, msg, null)
+      }
+    }
   }
 
   protected def getErrorReason(url: String, rsp: NamedList[_], response: Response): String = {

@@ -4,6 +4,14 @@
 
 This is a solr client for scala providing a query interface like SolrJ, just asynchronously / non-blocking.
 
+## Installation
+
+You must add the library to the dependencies of the build file, e.g. add to `build.sbt`:
+
+    libraryDependencies += "io.ino" %% "solrs" % "1.0.0-RC4"
+
+solrs is published to maven central for both scala 2.10 and 2.11.
+
 ## Usage
 
 At first an instance of `AsyncSolrClient` must be created with the url to the Solr server, an `AsyncHttpClient`

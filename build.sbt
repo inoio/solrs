@@ -13,11 +13,11 @@ scalaVersion := "2.10.4"
 resolvers += "JCenter" at "http://jcenter.bintray.com/"
 
 libraryDependencies ++= Seq(
-  "org.apache.solr" % "solr-solrj" % "4.7.1" exclude("org.apache.zookeeper", "zookeeper"),
-  "com.ning" % "async-http-client" % "1.8.6",
+  "org.apache.solr" % "solr-solrj" % "4.8.1" exclude("org.apache.zookeeper", "zookeeper"),
+  "com.ning" % "async-http-client" % "1.8.8",
   "org.slf4j" % "slf4j-api" % "1.7.5",
   "org.slf4j" % "slf4j-simple" % "1.7.5" % "test",
-  "org.scalatest" %% "scalatest" % "2.1.0" % "test",
+  "org.scalatest" %% "scalatest" % "2.2.0" % "test",
   "org.mockito" % "mockito-core" % "1.9.5" % "test",
   "org.clapper" %% "grizzled-scala" % "1.1.6" % "test",
   // tomcat

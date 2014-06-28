@@ -19,6 +19,7 @@ resolvers += "JCenter" at "http://jcenter.bintray.com/"
 libraryDependencies ++= Seq(
   "org.apache.solr" % "solr-solrj" % "4.8.1" exclude("org.apache.zookeeper", "zookeeper"),
   "com.ning" % "async-http-client" % "1.8.8",
+  "com.codahale.metrics" % "metrics-core" % "3.0.2" % "optional",
   "org.slf4j" % "slf4j-api" % "1.7.5",
   "org.slf4j" % "slf4j-simple" % "1.7.5" % "test",
   "org.scalatest" %% "scalatest" % "2.2.0" % "test",

@@ -17,7 +17,7 @@ import com.ning.http.client.{AsyncCompletionHandler, AsyncHttpClient, Response}
 
 import scala.util.control.NonFatal
 import scala.concurrent.Future
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 import org.apache.solr.common.SolrException
 import org.apache.solr.client.solrj.impl.BinaryResponseParser
 import java.util.Locale
@@ -33,7 +33,8 @@ import HttpUtils._
  */
 class AsyncSolrClient(val baseUrl: String,
                       val httpClient: AsyncHttpClient = new AsyncHttpClient(),
-                      responseParser: ResponseParser = new BinaryResponseParser) {
+                      responseParser: ResponseParser = new BinaryResponseParser,
+                      val metrics: Metrics = NoopMetrics) {
 
   private var shutdownExecutor = false
   private val UTF_8 = "UTF-8"
@@ -79,17 +80,30 @@ class AsyncSolrClient(val baseUrl: String,
       val request = httpClient.prepareGet(url).addHeader("User-Agent", AGENT).build()
       httpClient.executeRequest(request, new AsyncCompletionHandler[Response]() {
         override def onCompleted(response: Response): Response = {
-          promise.complete(Try(transformResponse(toQueryResponse(response, url, startTime))))
+          promise.complete(tryTransformResponse(toQueryResponse(response, url, startTime), transformResponse))
           response
         }
         override def onThrowable(t: Throwable) {
+          metrics.countException
           promise.failure(t)
         }
       })
 
       promise.future
     } catch {
-      case e: IOException => throw new SolrServerException("IOException occured when talking to server at: " + baseUrl, e)
+      case e: IOException =>
+        metrics.countIOException
+        throw new SolrServerException("IOException occured when talking to server at: " + baseUrl, e)
+    }
+  }
+
+  private def tryTransformResponse[T](response: QueryResponse, transformResponse: (QueryResponse) => T): Try[T] with Product with Serializable = {
+    try {
+      Success(transformResponse(response))
+    } catch {
+      case NonFatal(e) =>
+        metrics.countTransformResponseException
+        Failure(e)
     }
   }
 
@@ -112,16 +126,21 @@ class AsyncSolrClient(val baseUrl: String,
       val charset = getContentCharSet(response.getContentType).orNull
       rsp = responseParser.processResponse(response.getResponseBodyAsStream(), charset)
     } catch {
-      case NonFatal(e) => throw new RemoteSolrException(httpStatus, e.getMessage(), e)
+      case NonFatal(e) =>
+        metrics.countRemoteException
+        throw new RemoteSolrException(httpStatus, e.getMessage(), e)
     }
 
     if (httpStatus != 200) {
+      metrics.countRemoteException
       val reason = getErrorReason(url, rsp, response)
       throw new RemoteSolrException(httpStatus, reason, null)
     }
 
     val res = new QueryResponse(rsp, null)
-    res.setElapsedTime(System.currentTimeMillis() - startTime)
+    val elapsedTime = System.currentTimeMillis() - startTime
+    res.setElapsedTime(elapsedTime)
+    metrics.requestTime(elapsedTime)
     res
   }
 
@@ -131,6 +150,7 @@ class AsyncSolrClient(val baseUrl: String,
 
     val httpStatus = response.getStatusCode
     if(httpStatus >= 400) {
+      metrics.countRemoteException
       throw new RemoteSolrException(httpStatus, s"Server at $baseUrl returned non ok status:$httpStatus, message:${response.getStatusText}", null)
     }
   }
@@ -150,9 +170,11 @@ class AsyncSolrClient(val baseUrl: String,
         }
         catch {
           case e: IOException => {
-            throw new RemoteSolrException(response.getStatusCode, s"Could not parse response with encoding $encoding", e)
+            metrics.countRemoteException
+            throw new RemoteSolrException(response.getStatusCode, s"$msg Unfortunately could not parse response (for debugging) with encoding $encoding", e)
           }
         }
+        metrics.countRemoteException
         throw new RemoteSolrException(response.getStatusCode, msg, null)
       }
     }

@@ -1,6 +1,9 @@
 package io.ino.solrs
 
+import org.scalatest.mock.MockitoSugar
 import org.scalatest.{Matchers, BeforeAndAfterEach, FunSpec}
+import org.mockito.Mockito.verify
+import org.mockito.Matchers.anyLong
 import org.apache.solr.common.SolrInputDocument
 import java.util.Arrays.asList
 import org.apache.solr.client.solrj.response.QueryResponse
@@ -14,7 +17,7 @@ import scala.concurrent.duration._
 /**
  * Created by magro on 4/27/14.
  */
-class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with BeforeAndAfterEach with Matchers with FutureAwaits {
+class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with BeforeAndAfterEach with Matchers with FutureAwaits with MockitoSugar {
 
   private implicit val timeout = 1.second
 
@@ -42,7 +45,8 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
 
   describe("Solr") {
 
-    lazy val solr = new AsyncSolrClient(s"http://localhost:${solrRunner.port}/solr")
+    lazy val solrUrl = s"http://localhost:${solrRunner.port}/solr"
+    lazy val solr = new AsyncSolrClient(solrUrl)
 
     it("should query async with SolrQuery") {
 
@@ -67,7 +71,7 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
 
     it("should allow to set the http client") {
 
-      val solr = new AsyncSolrClient(s"http://localhost:${solrRunner.port}/solr", new AsyncHttpClient())
+      val solr = new AsyncSolrClient(solrUrl, new AsyncHttpClient())
 
       val response = solr.query(new SolrQuery("cat:cat1"))
 
@@ -76,7 +80,7 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
 
     it("should allow to set the response parser") {
 
-      val solr = new AsyncSolrClient(s"http://localhost:${solrRunner.port}/solr", responseParser = new XMLResponseParser())
+      val solr = new AsyncSolrClient(solrUrl, responseParser = new XMLResponseParser())
 
       val response = solr.query(new SolrQuery("cat:cat1"))
 
@@ -99,6 +103,16 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
       awaitReady(response)
       a [RemoteSolrException] should be thrownBy await(response)
     }
+
+    it("should gather request time metrics") {
+      val metrics = mock[Metrics]
+      val solr = new AsyncSolrClient(solrUrl, metrics = metrics)
+
+      await(solr.query(new SolrQuery("*:*")))
+
+      verify(metrics).requestTime(anyLong())
+    }
+
   }
 
 }

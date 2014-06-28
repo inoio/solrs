@@ -39,6 +39,23 @@ response.onSuccess {
 }
 ```
 
+### Metrics
+
+There's basic metrics support for request timings and number of exceptions. You can provide your own
+implementation of `io.ino.solrs.Metrics` or use the `CodaHaleMetrics` class shipped with solrs if you're
+happy with this great [metrics library](http://metrics.codahale.com/) :-)
+
+To configure solrs with the `Metrics` implementation just pass an initialized instance like this:
+
+```scala
+val solr = new AsyncSolrClient("http://localhost:8983/solr",
+      metrics = new CodaHaleMetrics())
+```
+
+If you're using Coda Hale's Metrics library and you want to reuse an existing `MetricsRegistry`,
+just pass it to the `CodaHaleMetrics` class: `new CodaHaleMetrics(registry)`.
+
+
 ## License
 
 The license is Apache 2.0, see LICENSE.txt.

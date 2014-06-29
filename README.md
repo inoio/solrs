@@ -8,7 +8,7 @@ This is a solr client for scala providing a query interface like SolrJ, just asy
 
 You must add the library to the dependencies of the build file, e.g. add to `build.sbt`:
 
-    libraryDependencies += "io.ino" %% "solrs" % "1.0.0-RC4"
+    libraryDependencies += "io.ino" %% "solrs" % "1.0.0-RC6"
 
 solrs is published to maven central for both scala 2.10 and 2.11.
 
@@ -48,8 +48,7 @@ happy with this great [metrics library](http://metrics.codahale.com/) :-)
 To configure solrs with the `Metrics` implementation just pass an initialized instance like this:
 
 ```scala
-val solr = new AsyncSolrClient("http://localhost:8983/solr",
-      metrics = new CodaHaleMetrics())
+val solr = new AsyncSolrClient("http://localhost:8983/solr", metrics = new CodaHaleMetrics())
 ```
 
 If you're using Coda Hale's Metrics library and you want to reuse an existing `MetricsRegistry`,

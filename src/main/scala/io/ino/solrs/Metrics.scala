@@ -36,19 +36,19 @@ class CodaHaleMetrics(val registry: MetricRegistry = new MetricRegistry()) exten
 
   private val requestTimer = registry.timer(name(classOf[AsyncSolrClient], "requests"))
 
-  private val ioExceptionCounter = registry.counter(name(classOf[AsyncSolrClient], "io-exceptions"))
-  private val remoteSolrExceptionCounter = registry.counter(name(classOf[AsyncSolrClient], "remote-exceptions"))
-  private val transformResponseExceptionCounter = registry.counter(name(classOf[AsyncSolrClient], "transform-response-exceptions"))
-  private val exceptionCounter = registry.counter(name(classOf[AsyncSolrClient], "other-exceptions"))
+  private val ioExceptionCounter = registry.meter(name(classOf[AsyncSolrClient], "io-exceptions"))
+  private val remoteSolrExceptionCounter = registry.meter(name(classOf[AsyncSolrClient], "remote-exceptions"))
+  private val transformResponseExceptionCounter = registry.meter(name(classOf[AsyncSolrClient], "transform-response-exceptions"))
+  private val exceptionCounter = registry.meter(name(classOf[AsyncSolrClient], "other-exceptions"))
 
   override def requestTime(timeInMillis: Long) = requestTimer.update(timeInMillis, MILLISECONDS)
 
-  override def countIOException = ioExceptionCounter.inc()
+  override def countIOException = ioExceptionCounter.mark()
 
-  override def countRemoteException = remoteSolrExceptionCounter.inc()
+  override def countRemoteException = remoteSolrExceptionCounter.mark()
 
-  override def countTransformResponseException = transformResponseExceptionCounter.inc()
+  override def countTransformResponseException = transformResponseExceptionCounter.mark()
 
-  override def countException = exceptionCounter.inc()
+  override def countException = exceptionCounter.mark()
 
 }

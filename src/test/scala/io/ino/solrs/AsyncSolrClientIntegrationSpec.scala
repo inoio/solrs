@@ -46,7 +46,7 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
   describe("Solr") {
 
     lazy val solrUrl = s"http://localhost:${solrRunner.port}/solr"
-    lazy val solr = new AsyncSolrClient(solrUrl)
+    lazy val solr = AsyncSolrClient(solrUrl)
 
     it("should query async with SolrQuery") {
 
@@ -71,7 +71,7 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
 
     it("should allow to set the http client") {
 
-      val solr = new AsyncSolrClient(solrUrl, new AsyncHttpClient())
+      val solr = AsyncSolrClient.Builder(solrUrl).withHttpClient(new AsyncHttpClient()).build
 
       val response = solr.query(new SolrQuery("cat:cat1"))
 
@@ -80,7 +80,7 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
 
     it("should allow to set the response parser") {
 
-      val solr = new AsyncSolrClient(solrUrl, responseParser = new XMLResponseParser())
+      val solr = AsyncSolrClient.Builder(solrUrl).withResponseParser(new XMLResponseParser()).build
 
       val response = solr.query(new SolrQuery("cat:cat1"))
 
@@ -96,7 +96,7 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
     }
 
     it("should return failed future on wrong request path") {
-      val solr = new AsyncSolrClient(s"http://localhost:${solrRunner.port}/")
+      val solr = AsyncSolrClient(s"http://localhost:${solrRunner.port}/")
 
       val response = solr.query(new SolrQuery("*:*"), getIds)
 
@@ -106,7 +106,7 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
 
     it("should gather request time metrics") {
       val metrics = mock[Metrics]
-      val solr = new AsyncSolrClient(solrUrl, metrics = metrics)
+      val solr = AsyncSolrClient.Builder(solrUrl).withMetrics(metrics).build
 
       await(solr.query(new SolrQuery("*:*")))
 

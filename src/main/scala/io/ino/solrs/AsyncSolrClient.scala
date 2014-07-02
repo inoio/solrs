@@ -24,6 +24,53 @@ import java.util.Locale
 import org.apache.commons.io.IOUtils
 import HttpUtils._
 
+object AsyncSolrClient {
+
+  def apply(baseUrl: String) = new Builder(baseUrl).build
+
+  object Builder {
+    def apply(baseUrl: String) = new Builder(baseUrl)
+  }
+
+  case class Builder private (baseUrl: String,
+                              httpClient: Option[AsyncHttpClient],
+                              shutdownHttpClient: Boolean,
+                              responseParser: Option[ResponseParser],
+                              metrics: Option[Metrics]) {
+
+    def this(baseUrl: String) = this(baseUrl, None, true, None, None)
+
+    def withHttpClient(httpClient: AsyncHttpClient): Builder = {
+      copy(httpClient = Some(httpClient), shutdownHttpClient = false)
+    }
+
+    def withResponseParser(responseParser: ResponseParser): Builder = {
+      copy(responseParser = Some(responseParser))
+    }
+
+    def withMetrics(metrics: Metrics): Builder = {
+      copy(metrics = Some(metrics))
+    }
+
+    protected def createHttpClient: AsyncHttpClient = new AsyncHttpClient()
+
+    protected def createResponseParser: ResponseParser = new BinaryResponseParser
+
+    protected def createMetrics: Metrics = NoopMetrics
+
+    def build: AsyncSolrClient = {
+      new AsyncSolrClient(
+        baseUrl,
+        httpClient.getOrElse(createHttpClient),
+        shutdownHttpClient,
+        responseParser.getOrElse(createResponseParser),
+        metrics.getOrElse(createMetrics)
+      )
+    }
+  }
+
+}
+
 /**
  * Async, non-blocking Solr Server that just allows to {@link #query(SolrQuery)}.
  * The usage shall be similar to the <a href="https://wiki.apache.org/solr/Solrj">solrj SolrServer</a>,
@@ -31,12 +78,12 @@ import HttpUtils._
  *
  * @author <a href="martin.grotzke@inoio.de">Martin Grotzke</a>
  */
-class AsyncSolrClient(val baseUrl: String,
-                      val httpClient: AsyncHttpClient = new AsyncHttpClient(),
-                      responseParser: ResponseParser = new BinaryResponseParser,
-                      val metrics: Metrics = NoopMetrics) {
+class AsyncSolrClient private (val baseUrl: String,
+                               val httpClient: AsyncHttpClient,
+                               shutdownHttpClient: Boolean,
+                               responseParser: ResponseParser = new BinaryResponseParser,
+                               val metrics: Metrics = NoopMetrics) {
 
-  private var shutdownExecutor = false
   private val UTF_8 = "UTF-8"
   private val DEFAULT_PATH = "/select"
 
@@ -56,6 +103,15 @@ class AsyncSolrClient(val baseUrl: String,
     }
     else
       baseUrl
+  }
+
+  /**
+   * Closes the http client (asynchronously) if it was not provided but created by this class.
+   */
+  def shutdown = {
+    if(shutdownHttpClient) {
+      httpClient.closeAsynchronously()
+    }
   }
 
   @throws[SolrServerException]
@@ -155,7 +211,8 @@ class AsyncSolrClient(val baseUrl: String,
     }
   }
 
-  def validateMimeType(expectedContentType: String, response: Response) {
+  @throws[RemoteSolrException]
+  protected def validateMimeType(expectedContentType: String, response: Response) {
     if (expectedContentType != null) {
       val expectedMimeType = getMimeType(expectedContentType).map(_.toLowerCase(Locale.ROOT)).getOrElse("")
       val actualMimeType = getMimeType(response.getContentType).map(_.toLowerCase(Locale.ROOT)).getOrElse("")

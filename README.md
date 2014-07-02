@@ -21,15 +21,13 @@ This client can then be used to query solr and process future responses.
 A complete example:
 
 ```scala
-import com.ning.http.client.AsyncHttpClient
 import io.ino.solrs.AsyncSolrClient
 import org.apache.solr.client.solrj.response.QueryResponse
 import org.apache.solr.client.solrj.SolrQuery
-import org.apache.solr.client.solrj.impl.XMLResponseParser
+import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
-val solr = new AsyncSolrClient("http://localhost:8983/solr",
-      new AsyncHttpClient(), new XMLResponseParser())
+val solr = AsyncSolrClient("http://localhost:8983/solr")
 
 val query = new SolrQuery("scala")
 val response: Future[QueryResponse] = solr.query(query)
@@ -37,6 +35,23 @@ val response: Future[QueryResponse] = solr.query(query)
 response.onSuccess {
   case qr => println(s"found ${qr.getResults.getNumFound} docs")
 }
+
+solr.shutdown
+```
+
+The `AsyncSolrClient` can further be configured with an `AsyncHttpClient` instance, the response parser to use
+and metrics (more details below), using the `AsyncSolrClient.Builder`:
+
+```scala
+import com.ning.http.client.AsyncHttpClient
+import io.ino.solrs.{CodaHaleMetrics, AsyncSolrClient}
+import org.apache.solr.client.solrj.impl.XMLResponseParser
+
+val solr = AsyncSolrClient.Builder("http://localhost:8983/solr")
+            .withHttpClient(new AsyncHttpClient())
+            .withResponseParser(new XMLResponseParser())
+            .withMetrics(new CodaHaleMetrics())
+            .build
 ```
 
 ### Metrics
@@ -48,7 +63,7 @@ happy with this great [metrics library](http://metrics.codahale.com/) :-)
 To configure solrs with the `Metrics` implementation just pass an initialized instance like this:
 
 ```scala
-val solr = new AsyncSolrClient("http://localhost:8983/solr", metrics = new CodaHaleMetrics())
+val solr = AsyncSolrClient.Builder("http://localhost:8983/solr").withMetrics(new CodaHaleMetrics()).build
 ```
 
 If you're using Coda Hale's Metrics library and you want to reuse an existing `MetricsRegistry`,

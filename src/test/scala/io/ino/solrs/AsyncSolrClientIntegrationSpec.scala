@@ -69,6 +69,12 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
       await(response) should contain theSameElementsAs Vector("id1", "id2")
     }
 
+    it("should be built with LoadBalancer") {
+      val solr = AsyncSolrClient.Builder(new SingleServerLB(solrUrl)).build
+      val response = solr.query(new SolrQuery("cat:cat1"))
+      await(response).getResults.getNumFound should be (2)
+    }
+
     it("should allow to set the http client") {
 
       val solr = AsyncSolrClient.Builder(solrUrl).withHttpClient(new AsyncHttpClient()).build

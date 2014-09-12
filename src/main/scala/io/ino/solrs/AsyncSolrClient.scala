@@ -26,19 +26,22 @@ import HttpUtils._
 
 object AsyncSolrClient {
 
-  def apply(baseUrl: String) = new Builder(baseUrl).build
+  def apply(baseUrl: String) = new Builder(new SingleServerLB(baseUrl)).build
+  def apply(loadBalancer: LoadBalancer) = new Builder(loadBalancer).build
 
   object Builder {
     def apply(baseUrl: String) = new Builder(baseUrl)
+    def apply(loadBalancer: LoadBalancer) = new Builder(loadBalancer)
   }
 
-  case class Builder private (baseUrl: String,
+  case class Builder private (loadBalancer: LoadBalancer,
                               httpClient: Option[AsyncHttpClient],
                               shutdownHttpClient: Boolean,
                               responseParser: Option[ResponseParser],
                               metrics: Option[Metrics]) {
 
-    def this(baseUrl: String) = this(baseUrl, None, true, None, None)
+    def this(loadBalancer: LoadBalancer) = this(loadBalancer, None, true, None, None)
+    def this(baseUrl: String) = this(new SingleServerLB(baseUrl))
 
     def withHttpClient(httpClient: AsyncHttpClient): Builder = {
       copy(httpClient = Some(httpClient), shutdownHttpClient = false)
@@ -60,7 +63,7 @@ object AsyncSolrClient {
 
     def build: AsyncSolrClient = {
       new AsyncSolrClient(
-        baseUrl,
+        loadBalancer,
         httpClient.getOrElse(createHttpClient),
         shutdownHttpClient,
         responseParser.getOrElse(createResponseParser),
@@ -78,7 +81,7 @@ object AsyncSolrClient {
  *
  * @author <a href="martin.grotzke@inoio.de">Martin Grotzke</a>
  */
-class AsyncSolrClient private (val baseUrl: String,
+class AsyncSolrClient private (val loadBalancer: LoadBalancer,
                                val httpClient: AsyncHttpClient,
                                shutdownHttpClient: Boolean,
                                responseParser: ResponseParser = new BinaryResponseParser,
@@ -128,7 +131,8 @@ class AsyncSolrClient private (val baseUrl: String,
       wparams.set(CommonParams.VERSION, responseParser.getVersion())
     }
 
-    val url = baseUrl + getPath(q) + ClientUtils.toQueryString(wparams, false)
+    implicit val solrServer = loadBalancer.solrServer()
+    val url = solrServer.baseUrl + getPath(q) + ClientUtils.toQueryString(wparams, false)
     try {
       val promise = scala.concurrent.promise[T]
       val startTime = System.currentTimeMillis()
@@ -149,7 +153,7 @@ class AsyncSolrClient private (val baseUrl: String,
     } catch {
       case e: IOException =>
         metrics.countIOException
-        throw new SolrServerException("IOException occured when talking to server at: " + baseUrl, e)
+        throw new SolrServerException("IOException occured when talking to server at: " + solrServer.baseUrl, e)
     }
   }
 
@@ -171,7 +175,7 @@ class AsyncSolrClient private (val baseUrl: String,
     return DEFAULT_PATH
   }
 
-  protected def toQueryResponse(response: Response, url: String, startTime: Long): QueryResponse = {
+  protected def toQueryResponse(response: Response, url: String, startTime: Long)(implicit server: SolrServer): QueryResponse = {
     var rsp: NamedList[Object] = null
 
     validateResponse(response, responseParser)
@@ -201,13 +205,13 @@ class AsyncSolrClient private (val baseUrl: String,
   }
 
   @throws[RemoteSolrException]
-  private def validateResponse(response: Response, responseParser: ResponseParser) {
+  private def validateResponse(response: Response, responseParser: ResponseParser)(implicit server: SolrServer) {
     validateMimeType(responseParser.getContentType, response)
 
     val httpStatus = response.getStatusCode
     if(httpStatus >= 400) {
       metrics.countRemoteException
-      throw new RemoteSolrException(httpStatus, s"Server at $baseUrl returned non ok status:$httpStatus, message:${response.getStatusText}", null)
+      throw new RemoteSolrException(httpStatus, s"Server at ${server.baseUrl} returned non ok status:$httpStatus, message:${response.getStatusText}", null)
     }
   }
 

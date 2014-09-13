@@ -1155,7 +1155,7 @@
          the PingRequestHandler.
          relative paths are resolved against the data dir 
       -->
-    <!-- <str name="healthcheckFile">server-enabled.txt</str> -->
+    <str name="healthcheckFile">server-enabled.txt</str>
   </requestHandler>
 
   <!-- Echo the request contents back to the client -->

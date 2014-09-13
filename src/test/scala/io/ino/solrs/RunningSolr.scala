@@ -5,7 +5,6 @@ import org.scalatest.ConfigMap
 import org.scalatest.Suite
 import org.scalatest.mock.MockitoSugar
 import org.apache.solr.client.solrj.impl.HttpSolrServer
-import org.apache.solr.client.solrj.SolrServer
 
 trait RunningSolr extends BeforeAndAfterAll with MockitoSugar {
   this: Suite =>

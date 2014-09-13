@@ -2,6 +2,7 @@ package io.ino.solrs
 
 import java.io.IOException
 
+import akka.actor.ActorSystem
 import org.apache.solr.client.solrj.ResponseParser
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.SolrServerException
@@ -15,8 +16,10 @@ import org.slf4j.LoggerFactory
 
 import com.ning.http.client.{AsyncCompletionHandler, AsyncHttpClient, Response}
 
+import scala.concurrent.duration._
+import scala.language.postfixOps
 import scala.util.control.NonFatal
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 import org.apache.solr.common.SolrException
 import org.apache.solr.client.solrj.impl.BinaryResponseParser
@@ -37,10 +40,11 @@ object AsyncSolrClient {
   case class Builder private (loadBalancer: LoadBalancer,
                               httpClient: Option[AsyncHttpClient],
                               shutdownHttpClient: Boolean,
-                              responseParser: Option[ResponseParser],
-                              metrics: Option[Metrics]) {
+                              responseParser: Option[ResponseParser] = None,
+                              metrics: Option[Metrics] = None,
+                              serverStateObservation: Option[ServerStateObservation] = None) {
 
-    def this(loadBalancer: LoadBalancer) = this(loadBalancer, None, true, None, None)
+    def this(loadBalancer: LoadBalancer) = this(loadBalancer, None, true)
     def this(baseUrl: String) = this(new SingleServerLB(baseUrl))
 
     def withHttpClient(httpClient: AsyncHttpClient): Builder = {
@@ -55,6 +59,15 @@ object AsyncSolrClient {
       copy(metrics = Some(metrics))
     }
 
+    /**
+     * Configures server state observation using the given observer and the provided interval.
+     */
+    def withServerStateObservation(serverStateObserver: ServerStateObserver,
+                              checkInterval: FiniteDuration,
+                              actorSystem: ActorSystem)(implicit ec: ExecutionContext): Builder = {
+      copy(serverStateObservation = Some(ServerStateObservation(serverStateObserver, checkInterval, actorSystem, ec)))
+    }
+
     protected def createHttpClient: AsyncHttpClient = new AsyncHttpClient()
 
     protected def createResponseParser: ResponseParser = new BinaryResponseParser
@@ -67,7 +80,8 @@ object AsyncSolrClient {
         httpClient.getOrElse(createHttpClient),
         shutdownHttpClient,
         responseParser.getOrElse(createResponseParser),
-        metrics.getOrElse(createMetrics)
+        metrics.getOrElse(createMetrics),
+        serverStateObservation
       )
     }
   }
@@ -85,7 +99,8 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
                                val httpClient: AsyncHttpClient,
                                shutdownHttpClient: Boolean,
                                responseParser: ResponseParser = new BinaryResponseParser,
-                               val metrics: Metrics = NoopMetrics) {
+                               val metrics: Metrics = NoopMetrics,
+                               serverStateObservation: Option[ServerStateObservation] = None) {
 
   private val UTF_8 = "UTF-8"
   private val DEFAULT_PATH = "/select"
@@ -96,6 +111,12 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
   val AGENT = "Solr[" + classOf[AsyncSolrClient].getName() + "] 1.0"
 
   private val logger = LoggerFactory.getLogger(getClass())
+
+  private val cancellableObservation = serverStateObservation.map { observation =>
+    observation.actorSystem.scheduler.schedule(0 seconds, observation.checkInterval) {
+      observation.serverStateObserver.checkServerStatus()(observation.ec)
+    }(observation.ec)
+  }
 
   private def sanitize(baseUrl: String): String = {
     if (baseUrl.endsWith("/")) {
@@ -112,6 +133,7 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
    * Closes the http client (asynchronously) if it was not provided but created by this class.
    */
   def shutdown = {
+    cancellableObservation.foreach(_.cancel())
     if(shutdownHttpClient) {
       httpClient.closeAsynchronously()
     }

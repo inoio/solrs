@@ -1,11 +1,13 @@
 package io.ino.solrs
 
+import akka.actor.ActorSystem
 import com.ning.http.client.{Response, AsyncCompletionHandler, AsyncHttpClient}
-import org.apache.solr.common.params.CommonParams
 import org.slf4j.LoggerFactory
 
-import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Success
+import scala.concurrent.duration._
+import scala.language.postfixOps
+import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.util.{Failure, Success}
 import scala.xml.XML
 
 /**
@@ -14,6 +16,19 @@ import scala.xml.XML
 trait ServerStateObserver {
   def checkServerStatus()(implicit ec: ExecutionContext): Future[Unit]
 }
+
+/**
+ * Configuration for scheduled server state observation.
+ * @param serverStateObserver the observer that checks server state
+ * @param checkInterval the interval to check server state
+ * @param actorSystem used for scheduling
+ * @param ec used for running the scheduled observation
+ */
+case class ServerStateObservation(serverStateObserver: ServerStateObserver,
+                                  checkInterval: FiniteDuration,
+                                  actorSystem: ActorSystem,
+                                  ec: ExecutionContext)
+
 
 /**
  * A ServerStateObserver that uses the ping status to enable/disable SolrServers.

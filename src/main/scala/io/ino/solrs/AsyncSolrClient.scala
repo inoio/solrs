@@ -139,11 +139,10 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
     }
   }
 
-  @throws[SolrServerException]
   def query(q: SolrQuery): Future[QueryResponse] = {
     query(q, identity)
   }
-  @throws[SolrServerException]
+
   def query[T](q: SolrQuery, transformResponse: QueryResponse => T): Future[T] = {
     loadBalancer.solrServer() match {
       case Some(solrServer) => query(solrServer, q, transformResponse)
@@ -151,7 +150,6 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
     }
   }
 
-  @throws[SolrServerException]
   private def query[T](solrServer: SolrServer, q: SolrQuery, transformResponse: QueryResponse => T): Future[T] = {
 
     val wparams = new ModifiableSolrParams(q)
@@ -162,32 +160,27 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
 
     implicit val s = solrServer
 
+    val promise = scala.concurrent.promise[T]
+    val startTime = System.currentTimeMillis()
+
     val url = solrServer.baseUrl + getPath(q) + ClientUtils.toQueryString(wparams, false)
-    try {
-      val promise = scala.concurrent.promise[T]
-      val startTime = System.currentTimeMillis()
+    val request = httpClient.prepareGet(url).addHeader("User-Agent", AGENT).build()
+    httpClient.executeRequest(request, new AsyncCompletionHandler[Response]() {
+      override def onCompleted(response: Response): Response = {
+        val tryQueryResponse = Try(toQueryResponse(response, url, startTime))
+        promise.complete(tryTransformResponse(tryQueryResponse, transformResponse))
+        response
+      }
+      override def onThrowable(t: Throwable) {
+        metrics.countException
+        promise.failure(t)
+      }
+    })
 
-      val request = httpClient.prepareGet(url).addHeader("User-Agent", AGENT).build()
-      httpClient.executeRequest(request, new AsyncCompletionHandler[Response]() {
-        override def onCompleted(response: Response): Response = {
-          promise.complete(tryTransformResponse(toQueryResponse(response, url, startTime), transformResponse))
-          response
-        }
-        override def onThrowable(t: Throwable) {
-          metrics.countException
-          promise.failure(t)
-        }
-      })
-
-      promise.future
-    } catch {
-      case e: IOException =>
-        metrics.countIOException
-        throw new SolrServerException("IOException occured when talking to server at: " + solrServer.baseUrl, e)
-    }
+    promise.future
   }
 
-  private def tryTransformResponse[T](response: QueryResponse, transformResponse: (QueryResponse) => T): Try[T] with Product with Serializable = {
+  private def tryTransformResponse[T](tryResponse: Try[QueryResponse], transformResponse: (QueryResponse) => T): Try[T] = tryResponse flatMap { response =>
     try {
       Success(transformResponse(response))
     } catch {
@@ -205,6 +198,7 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
     return DEFAULT_PATH
   }
 
+  @throws[RemoteSolrException]
   protected def toQueryResponse(response: Response, url: String, startTime: Long)(implicit server: SolrServer): QueryResponse = {
     var rsp: NamedList[Object] = null
 

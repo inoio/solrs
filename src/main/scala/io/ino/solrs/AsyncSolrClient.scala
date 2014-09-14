@@ -143,9 +143,16 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
   def query(q: SolrQuery): Future[QueryResponse] = {
     query(q, identity)
   }
-
   @throws[SolrServerException]
   def query[T](q: SolrQuery, transformResponse: QueryResponse => T): Future[T] = {
+    loadBalancer.solrServer() match {
+      case Some(solrServer) => query(solrServer, q, transformResponse)
+      case None => Future.failed(new SolrServerException("No solr server available."))
+    }
+  }
+
+  @throws[SolrServerException]
+  private def query[T](solrServer: SolrServer, q: SolrQuery, transformResponse: QueryResponse => T): Future[T] = {
 
     val wparams = new ModifiableSolrParams(q)
     if (responseParser != null) {
@@ -153,7 +160,8 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
       wparams.set(CommonParams.VERSION, responseParser.getVersion())
     }
 
-    implicit val solrServer = loadBalancer.solrServer()
+    implicit val s = solrServer
+
     val url = solrServer.baseUrl + getPath(q) + ClientUtils.toQueryString(wparams, false)
     try {
       val promise = scala.concurrent.promise[T]

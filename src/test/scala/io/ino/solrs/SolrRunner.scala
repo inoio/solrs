@@ -7,7 +7,6 @@ import java.net.URL
 import org.apache.commons.io.FileUtils
 import java.util.logging.Level
 import org.apache.catalina.LifecycleState
-import java.nio.file.Files
 
 class SolrRunner(val port: Int, private val solrHome: File, private val solrWar: File) {
 
@@ -17,7 +16,7 @@ class SolrRunner(val port: Int, private val solrHome: File, private val solrWar:
   import SolrRunner._
 
   val url = s"http://localhost:$port/solr"
-  private var tomcat: Tomcat = null
+  private[solrs] var tomcat: Tomcat = null
 
   def this(port: Int) {
     this(port, SolrRunner.getDefaultSolrHome, SolrRunner.checkOrGetSolrWar)
@@ -45,12 +44,18 @@ class SolrRunner(val port: Int, private val solrHome: File, private val solrWar:
   }
 
   def isStarted: Boolean = tomcat != null && tomcat.getServer.getState == LifecycleState.STARTED
+  def isStopped: Boolean = tomcat != null && tomcat.getServer.getState == LifecycleState.STOPPED
+  def isDestroyed: Boolean = tomcat == null
 
   def stop() {
-    logger.info("Stopping solr/tomcat running on port {}", port)
-    tomcat.stop()
-    tomcat.destroy()
+    if(isStarted) {
+      logger.info("Stopping solr/tomcat running on port {}", port)
+      tomcat.stop()
+      tomcat.destroy()
+      tomcat = null
+    }
   }
+
 }
 
 object RunSolr extends App {

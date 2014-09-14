@@ -14,6 +14,7 @@ import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.impl.XMLResponseParser
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
+import scala.language.postfixOps
 import org.scalatest.concurrent.Eventually._
 
 /**

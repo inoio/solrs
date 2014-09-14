@@ -1,7 +1,7 @@
 package io.ino.solrs
 
 import akka.actor.ActorSystem
-import com.ning.http.client.{Response, AsyncCompletionHandler, AsyncHttpClient}
+import com.ning.http.client.{RequestBuilder, Response, AsyncCompletionHandler, AsyncHttpClient}
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration._
@@ -53,7 +53,10 @@ class PingStatusObserver(solrServers: Seq[SolrServer], httpClient: AsyncHttpClie
           response
         }
         override def onThrowable(t: Throwable): Unit = {
-          logger.error(s"An error occurred when trying to get ping status from $url", t)
+          if(server.status != Failed) {
+            logger.error(s"An error occurred when trying to get ping status from $url, changing status to Failed.", t)
+            server.status = Failed
+          }
           promise.failure(t)
         }
       })
@@ -64,16 +67,22 @@ class PingStatusObserver(solrServers: Seq[SolrServer], httpClient: AsyncHttpClie
 
   private def updateServerStatus(server: SolrServer, response: Response, url: String) {
     if (response.getStatusCode != 200) {
-      logger.warn(s"Got ping response status != 200 from $url, with response ${new String(response.getResponseBodyAsBytes)}")
+      logger.warn(s"Got ping response status != 200 (${response.getStatusCode}) from $url, with response '${new String(response.getResponseBodyAsBytes)}'")
       server.status = Failed
     } else {
       val xml = XML.load(response.getResponseBodyAsStream)
       (xml \\ "response" \ "str").find(node => (node \ "@name").text == "status") match {
         case None =>
-          logger.warn(s"Could not find status in ping response from $url. Response: $xml")
-          server.status = Failed
+          if(server.status != Failed) {
+            logger.warn(s"Could not find status in ping response from $url, changing status to Failed. Response:\n$xml")
+            server.status = Failed
+          }
         case Some(statusNode) =>
-          server.status = if (statusNode.text == "enabled") Enabled else Disabled
+          val status = if (statusNode.text == "enabled") Enabled else Disabled
+          if(server.status != status) {
+            logger.info(s"Changing status for server ${server.baseUrl} from ${server.status} to $status.")
+            server.status = status
+          }
       }
     }
   }

@@ -12,12 +12,12 @@ licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.
 
 scalaVersion := "2.10.4"
 
-crossScalaVersions := Seq("2.10.4", "2.11.1")
+crossScalaVersions := Seq("2.10.4", "2.11.2")
 
 resolvers += "JCenter" at "http://jcenter.bintray.com/"
 
 libraryDependencies ++= Seq(
-  "org.apache.solr" % "solr-solrj" % "4.8.1" exclude("org.apache.zookeeper", "zookeeper"),
+  "org.apache.solr" % "solr-solrj" % "4.10.1" exclude("org.apache.zookeeper", "zookeeper"),
   "com.ning" % "async-http-client" % "1.8.8",
   "com.codahale.metrics" % "metrics-core" % "3.0.2" % "optional",
   "org.slf4j" % "slf4j-api" % "1.7.5",

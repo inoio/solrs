@@ -71,7 +71,7 @@ object RunSolr extends App {
 
 object SolrRunner {
 
-  private final val solrVersion: String = "4.6.0"
+  private final val solrVersion: String = "4.10.1"
   private val logger: Logger = LoggerFactory.getLogger(classOf[SolrRunner])
   private var solrRunner: Option[SolrRunner] = None
 

@@ -1,9 +1,8 @@
 package io.ino.solrs
 
-import org.scalatest.mock.MockitoSugar
 import org.scalatest.{Matchers, FunSpec}
 
-class RoundRobinLBSpec extends FunSpec with Matchers with FutureAwaits with MockitoSugar {
+class RoundRobinLBSpec extends FunSpec with Matchers {
 
   describe("RoundRobinLB") {
 
@@ -17,7 +16,7 @@ class RoundRobinLBSpec extends FunSpec with Matchers with FutureAwaits with Mock
 
     it("should only return active solr servers") {
       val servers = Seq(SolrServer("host1"), SolrServer("host2"))
-      val cut = new RoundRobinLB(servers)
+      val cut = new RoundRobinLB(new StaticSolrServers(servers))
 
       cut.solrServer() should be (Some(SolrServer("host1")))
       cut.solrServer() should be (Some(SolrServer("host2")))

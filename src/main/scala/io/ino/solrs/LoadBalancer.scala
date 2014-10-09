@@ -16,8 +16,8 @@ class SingleServerLB(val server: SolrServer) extends LoadBalancer {
   override val solrServer = Some(server)
 }
 
-class RoundRobinLB(val solrServers: Seq[SolrServer]) extends LoadBalancer {
-  private val ringIterator = Stream.continually(solrServers).flatten.iterator
+class RoundRobinLB(val solrServers: SolrServers) extends LoadBalancer {
+  private val ringIterator = solrServers.iterator
 
   @tailrec
   private def findAvailable(round: Int): Option[SolrServer] = {
@@ -36,5 +36,6 @@ class RoundRobinLB(val solrServers: Seq[SolrServer]) extends LoadBalancer {
   }
 }
 object RoundRobinLB {
-  def apply(baseUrls: Seq[String]): RoundRobinLB = new RoundRobinLB(baseUrls.map(SolrServer(_)))
+  def apply(solrServers: SolrServers): RoundRobinLB = new RoundRobinLB(solrServers)
+  def apply(baseUrls: Seq[String]): RoundRobinLB = new RoundRobinLB(StaticSolrServers(baseUrls))
 }

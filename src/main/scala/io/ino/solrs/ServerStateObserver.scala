@@ -38,12 +38,14 @@ case class ServerStateObservation(serverStateObserver: ServerStateObserver,
  * &lt;str name="healthcheckFile"&gt;server-enabled.txt&lt;/str&gt;
  * </pre></code>
  */
-class PingStatusObserver(solrServers: Seq[SolrServer], httpClient: AsyncHttpClient) extends ServerStateObserver {
+class PingStatusObserver(solrServers: SolrServers, httpClient: AsyncHttpClient) extends ServerStateObserver {
+
+  def this(solrServers: Seq[SolrServer], httpClient: AsyncHttpClient) = this(new StaticSolrServers(solrServers), httpClient)
 
   private val logger = LoggerFactory.getLogger(getClass())
 
   override def checkServerStatus()(implicit ec: ExecutionContext): Future[Unit] = {
-    val futures = solrServers.map { server =>
+    val futures = solrServers.all.map { server =>
       val url = server.baseUrl + "/admin/ping?action=status"
       val promise = scala.concurrent.promise[Unit]
       httpClient.prepareGet(url).execute(new AsyncCompletionHandler[Response]() {

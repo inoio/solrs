@@ -1,12 +1,13 @@
 package io.ino.solrs
 
+import java.net.URL
+import java.util.logging.Level
 import org.slf4j.{LoggerFactory, Logger}
 import java.io.{IOException, File}
+import java.nio.file.{Files, Paths}
 import org.apache.catalina.startup.Tomcat
-import java.net.URL
-import org.apache.commons.io.FileUtils
-import java.util.logging.Level
 import org.apache.catalina.LifecycleState
+import org.apache.commons.io.FileUtils
 
 class SolrRunner(val port: Int, private val solrHome: File, private val solrWar: File) {
 
@@ -29,15 +30,20 @@ class SolrRunner(val port: Int, private val solrHome: File, private val solrWar:
     logger.info("Starting solr on port {} with solr home {}", port, solrHome.getAbsolutePath)
     System.setProperty("solr.solr.home", solrHome.getAbsolutePath)
     System.setProperty("solr.lock.type", "single")
+    System.setProperty("solr.directoryFactory", "solr.RAMDirectoryFactory")
     java.util.logging.Logger.getLogger("org.apache.catalina.util.LifecycleMBeanBase").setLevel(Level.SEVERE)
     tomcat = new Tomcat
     tomcat.setPort(port)
-    val baseDir: File = new File(System.getProperty("java.io.tmpdir"), "solrs-tc-basedir")
+    val baseDir = Paths.get(System.getProperty("java.io.tmpdir"), s"solrs-tc-basedir.$port")
 
+    Files.createDirectories(baseDir)
+    Files.createDirectories(baseDir.resolve("webapps"))
 
-    FileUtils.forceMkdir(baseDir)
-    FileUtils.forceMkdir(new File(baseDir, "webapps"))
-    tomcat.setBaseDir(baseDir.getAbsolutePath)
+    // maybe we already had solr expanded, so let's remove this because we might have
+    // downloaded a new solr version
+    FileUtils.deleteDirectory(baseDir.resolve("webapps").resolve("solr").toFile)
+
+    tomcat.setBaseDir(baseDir.toAbsolutePath.toString)
     tomcat.addWebapp("/solr", solrWar.getAbsolutePath)
     tomcat.start()
     this
@@ -73,7 +79,7 @@ object SolrRunner {
 
   private final val solrVersion: String = "4.10.1"
   private val logger: Logger = LoggerFactory.getLogger(classOf[SolrRunner])
-  private var solrRunner: Option[SolrRunner] = None
+  private var solrRunners: Map[Int,SolrRunner] = Map.empty
 
   def start(port: Int): SolrRunner = new SolrRunner(port).start
 
@@ -82,16 +88,17 @@ object SolrRunner {
    * Also registers a shutdown hook to shutdown tomcat when the jvm exits.
    */
   def startOnce(port: Int): SolrRunner = {
-    solrRunner.getOrElse {
-      solrRunner = Some(start(port))
+    solrRunners.get(port).getOrElse {
+      val solrRunner = start(port)
+      solrRunners += port -> solrRunner
 
       Runtime.getRuntime().addShutdownHook(new Thread() {
         override def run() {
-          solrRunner.map(_.stop())
+          solrRunner.stop()
         }
       })
 
-      solrRunner.get
+      solrRunner
     }
   }
 
@@ -101,12 +108,12 @@ object SolrRunner {
 
   def checkOrGetSolrWar: File = {
     try {
-      val solrWar: File = new File("./.solr/solr.war")
+      val solrWar: File = new File(s"./.solr/solr-$solrVersion.war")
       if (!solrWar.exists) {
         logger.info(s"Downloading solr.war to ${solrWar.getAbsolutePath}")
         val source: URL = new URL(s"http://repo1.maven.org/maven2/org/apache/solr/solr/$solrVersion/solr-$solrVersion.war")
         FileUtils.copyURLToFile(source, solrWar)
-        logger.info("Finished downloading solr.war")
+        logger.info(s"Finished downloading solr-$solrVersion.war")
       }
       solrWar
     }

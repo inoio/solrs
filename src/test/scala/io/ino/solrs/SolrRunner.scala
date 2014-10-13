@@ -2,6 +2,8 @@ package io.ino.solrs
 
 import java.net.URL
 import java.util.logging.Level
+import org.apache.curator.test.TestingServer
+import org.apache.solr.common.cloud.ZkStateReader
 import org.slf4j.{LoggerFactory, Logger}
 import java.io.{IOException, File}
 import java.nio.file.{Files, Paths}
@@ -9,7 +11,12 @@ import org.apache.catalina.startup.Tomcat
 import org.apache.catalina.LifecycleState
 import org.apache.commons.io.FileUtils
 
-class SolrRunner(val port: Int, private val solrHome: File, private val solrWar: File) {
+case class ZooKeeperOptions(zkHost: String, bootstrapConfig: Option[String] = None)
+
+class SolrRunner(val port: Int,
+                 private val solrHome: File,
+                 private val solrWar: File,
+                 maybeZkOptions: Option[ZooKeeperOptions] = None) {
 
   require(solrHome.exists, s"The solrHome ${solrHome.getAbsolutePath} does not exist.")
   require(solrWar.exists, s"The solrWar ${solrWar.getAbsolutePath} does not exist.")
@@ -19,8 +26,8 @@ class SolrRunner(val port: Int, private val solrHome: File, private val solrWar:
   val url = s"http://localhost:$port/solr"
   private[solrs] var tomcat: Tomcat = null
 
-  def this(port: Int) {
-    this(port, SolrRunner.getDefaultSolrHome, SolrRunner.checkOrGetSolrWar)
+  def this(port: Int, zkOptions: Option[ZooKeeperOptions] = None) {
+    this(port, SolrRunner.initSolrHome(port), SolrRunner.checkOrGetSolrWar, zkOptions)
   }
 
   def start: SolrRunner = {
@@ -30,8 +37,30 @@ class SolrRunner(val port: Int, private val solrHome: File, private val solrWar:
     logger.info("Starting solr on port {} with solr home {}", port, solrHome.getAbsolutePath)
     System.setProperty("solr.solr.home", solrHome.getAbsolutePath)
     System.setProperty("solr.lock.type", "single")
-    System.setProperty("solr.directoryFactory", "solr.RAMDirectoryFactory")
     java.util.logging.Logger.getLogger("org.apache.catalina.util.LifecycleMBeanBase").setLevel(Level.SEVERE)
+
+    // ZooKeeper / SolrCloud support
+    maybeZkOptions.foreach { zkOptions =>
+
+      zkOptions.bootstrapConfig.map { conf =>
+
+        val bootstrapConfDir = solrHome.toPath.toAbsolutePath.resolve(conf).resolve("conf").toString
+        logger.info(s"Starting with bootstrap confdir $bootstrapConfDir")
+
+        /* Since we don't yet have a config in zookeeper, this parameter causes the local configuration directory ./solr/conf to be
+         * uploaded as the "myconf" config. The name "myconf" is taken from the "collection.configName" param below. */
+        System.setProperty("bootstrap_confdir", bootstrapConfDir)
+        /* sets the config to use for the new collection. Omitting this param will cause the config name to default to "configuration1". */
+        System.setProperty("collection.configName", s"${conf}Conf")
+
+      }
+      /*  points to the Zookeeper ensemble containing the cluster state. */
+      System.setProperty("zkHost", zkOptions.zkHost)
+      /* Set host port used for zookeeper registration, as specified in solr.xml */
+      System.setProperty("host.port", port.toString)
+
+    }
+
     tomcat = new Tomcat
     tomcat.setPort(port)
     val baseDir = Paths.get(System.getProperty("java.io.tmpdir"), s"solrs-tc-basedir.$port")
@@ -44,8 +73,20 @@ class SolrRunner(val port: Int, private val solrHome: File, private val solrWar:
     FileUtils.deleteDirectory(baseDir.resolve("webapps").resolve("solr").toFile)
 
     tomcat.setBaseDir(baseDir.toAbsolutePath.toString)
-    tomcat.addWebapp("/solr", solrWar.getAbsolutePath)
+    val context = tomcat.addWebapp("/solr", solrWar.getAbsolutePath)
+    // context.asInstanceOf[StandardContext].setClearReferencesStopThreads(true)
     tomcat.start()
+
+    /* Reset optional zk system properties, so that they do not affect other SolrRunners started later
+     */
+    maybeZkOptions.foreach{ zkOptions =>
+      System.clearProperty("zkHost")
+      zkOptions.bootstrapConfig.foreach { _ =>
+        System.clearProperty("bootstrap_confdir")
+        System.clearProperty("collection.configName")
+      }
+    }
+
     this
   }
 
@@ -62,6 +103,19 @@ class SolrRunner(val port: Int, private val solrHome: File, private val solrWar:
     }
   }
 
+  def canEqual(other: Any): Boolean = other.isInstanceOf[SolrRunner]
+
+  override def equals(other: Any): Boolean = other match {
+    case that: SolrRunner =>
+      (that canEqual this) &&
+        url == that.url
+    case _ => false
+  }
+
+  override def hashCode(): Int = {
+    val state = Seq(url)
+    state.map(_.hashCode()).foldLeft(0)((a, b) => 31 * a + b)
+  }
 }
 
 object RunSolr extends App {
@@ -75,21 +129,60 @@ object RunSolr extends App {
   }
 }
 
+
+object RunSolrCloud extends App {
+
+  val testServer = new TestingServer()
+  println("Connection: " + testServer.getConnectString)
+  testServer.start()
+  println("Started ZooKeeper on port " + testServer.getPort)
+
+  val solrRunner1 = SolrRunner.start(8888, Some(ZooKeeperOptions(testServer.getConnectString, bootstrapConfig = Some("collection1"))))
+  val solrRunner2 = SolrRunner.start(8889, Some(ZooKeeperOptions(testServer.getConnectString)))
+
+  val zk: ZkStateReader = new ZkStateReader(testServer.getConnectString, /*zkClientTimeout =*/ 1000, /*zkConnectTimeout =*/ 1000)
+  try {
+    zk.createClusterStateWatchersAndUpdate
+  } catch {
+    case e: Throwable => println("Caught " + e)
+  }
+
+  import scala.collection.JavaConversions._
+  println("Started ZkStateReader, read cluster props: " + zk.getClusterProps.mkString(", ") + ", cluster state: " + zk.getClusterState)
+
+  /*
+  solrRunner1.stop()
+
+  Thread.sleep(2000)
+  println("Started ZkStateReader, read cluster props: " + zk.getClusterProps.mkString(", ") + ", cluster state: " + zk.getClusterState)
+
+  val solrRunner3 = SolrRunner.start(8888, Some(ZooKeeperOptions(testServer.getConnectString)))
+
+  Thread.sleep(2000)
+  println("Started ZkStateReader, read cluster props: " + zk.getClusterProps.mkString(", ") + ", cluster state: " + zk.getClusterState)
+
+  val solrRunner4 = SolrRunner.start(8890, Some(ZooKeeperOptions(testServer.getConnectString)))
+
+  Thread.sleep(2000)
+  println("Started ZkStateReader, read cluster props: " + zk.getClusterProps.mkString(", ") + ", cluster state: " + zk.getClusterState)
+*/
+}
+
 object SolrRunner {
 
   private final val solrVersion: String = "4.10.1"
   private val logger: Logger = LoggerFactory.getLogger(classOf[SolrRunner])
   private var solrRunners: Map[Int,SolrRunner] = Map.empty
 
-  def start(port: Int): SolrRunner = new SolrRunner(port).start
+  def start(port: Int, zkOptions: Option[ZooKeeperOptions] = None): SolrRunner = new SolrRunner(port, zkOptions).start
 
   /**
    * Starts tomcat with solr, or returns a previously started instance.
    * Also registers a shutdown hook to shutdown tomcat when the jvm exits.
    */
-  def startOnce(port: Int): SolrRunner = {
+  def startOnce(port: Int, zkOptions: Option[ZooKeeperOptions] = None): SolrRunner = {
     solrRunners.get(port).getOrElse {
-      val solrRunner = start(port)
+      val solrRunner = start(port, zkOptions)
       solrRunners += port -> solrRunner
 
       Runtime.getRuntime().addShutdownHook(new Thread() {
@@ -102,8 +195,11 @@ object SolrRunner {
     }
   }
 
-  def getDefaultSolrHome: File = {
-    new File(classOf[SolrRunner].getResource("/solr-home").toURI())
+  def initSolrHome(port: Int): File = {
+    val template = new File(classOf[SolrRunner].getResource("/solr-home").toURI())
+    val solrHome = new File(template.getParentFile, s"solr-home_$port")
+    FileUtils.copyDirectory(template, solrHome)
+    solrHome
   }
 
   def checkOrGetSolrWar: File = {

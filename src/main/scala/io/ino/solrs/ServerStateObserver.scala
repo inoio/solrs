@@ -1,13 +1,13 @@
 package io.ino.solrs
 
 import akka.actor.ActorSystem
-import com.ning.http.client.{RequestBuilder, Response, AsyncCompletionHandler, AsyncHttpClient}
+import com.ning.http.client.{Response, AsyncCompletionHandler, AsyncHttpClient}
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
-import scala.concurrent.{Await, ExecutionContext, Future}
-import scala.util.{Failure, Success}
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Success
 import scala.xml.XML
 
 /**
@@ -40,7 +40,7 @@ case class ServerStateObservation(serverStateObserver: ServerStateObserver,
  */
 class PingStatusObserver(solrServers: SolrServers, httpClient: AsyncHttpClient) extends ServerStateObserver {
 
-  def this(solrServers: Seq[SolrServer], httpClient: AsyncHttpClient) = this(new StaticSolrServers(solrServers), httpClient)
+  def this(solrServers: Seq[SolrServer], httpClient: AsyncHttpClient) = this(new StaticSolrServers(solrServers.toIndexedSeq), httpClient)
 
   private val logger = LoggerFactory.getLogger(getClass())
 

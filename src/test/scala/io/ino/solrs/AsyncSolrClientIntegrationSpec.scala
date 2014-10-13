@@ -17,13 +17,12 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 import org.scalatest.concurrent.Eventually._
 
-/**
- * Created by magro on 4/27/14.
- */
 class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with BeforeAndAfterEach with Matchers with FutureAwaits with MockitoSugar {
 
   private implicit val timeout = 1.second
   private val httpClient = new AsyncHttpClient()
+
+  import SolrUtils._
 
   override def beforeEach() {
     solr.deleteByQuery("*:*")
@@ -31,20 +30,6 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
     val doc2 = newInputDoc("id2", "doc2", "cat1", 20)
     solr.add(asList(doc1, doc2))
     solr.commit()
-  }
-
-  private def newInputDoc(id: String, name: String, category: String, price: Float): SolrInputDocument = {
-    val doc = new SolrInputDocument()
-    doc.addField("id", id)
-    doc.addField("name", name)
-    doc.addField("cat", category)
-    doc.addField("price", price)
-    doc
-  }
-
-  private def getIds(resp: QueryResponse): List[String] = {
-    import scala.collection.JavaConversions._
-    resp.getResults.toList.map(_.getFieldValue("id").toString)
   }
 
   describe("Solr") {

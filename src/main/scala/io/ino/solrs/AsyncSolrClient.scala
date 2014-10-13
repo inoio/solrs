@@ -3,14 +3,14 @@ package io.ino.solrs
 import java.io.IOException
 
 import akka.actor.ActorSystem
+import io.ino.solrs.RetryDecision.Result
 import org.apache.solr.client.solrj.ResponseParser
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.SolrServerException
 import org.apache.solr.client.solrj.response.QueryResponse
 
 import org.apache.solr.client.solrj.util.ClientUtils
-import org.apache.solr.common.params.CommonParams
-import org.apache.solr.common.params.ModifiableSolrParams
+import org.apache.solr.common.params.{CommonParams, ModifiableSolrParams}
 import org.apache.solr.common.util.NamedList
 import org.slf4j.LoggerFactory
 
@@ -42,7 +42,8 @@ object AsyncSolrClient {
                               shutdownHttpClient: Boolean,
                               responseParser: Option[ResponseParser] = None,
                               metrics: Option[Metrics] = None,
-                              serverStateObservation: Option[ServerStateObservation] = None) {
+                              serverStateObservation: Option[ServerStateObservation] = None,
+                              retryPolicy: RetryPolicy = RetryPolicy.TryOnce) {
 
     def this(loadBalancer: LoadBalancer) = this(loadBalancer, None, true)
     def this(baseUrl: String) = this(new SingleServerLB(baseUrl))
@@ -68,6 +69,13 @@ object AsyncSolrClient {
       copy(serverStateObservation = Some(ServerStateObservation(serverStateObserver, checkInterval, actorSystem, ec)))
     }
 
+    /**
+     * Configure the retry policy to apply for failed requests.
+     */
+    def withRetryPolicy(retryPolicy: RetryPolicy): Builder = {
+      copy(retryPolicy = retryPolicy)
+    }
+
     protected def createHttpClient: AsyncHttpClient = new AsyncHttpClient()
 
     protected def createResponseParser: ResponseParser = new BinaryResponseParser
@@ -81,7 +89,8 @@ object AsyncSolrClient {
         shutdownHttpClient,
         responseParser.getOrElse(createResponseParser),
         metrics.getOrElse(createMetrics),
-        serverStateObservation
+        serverStateObservation,
+        retryPolicy
       )
     }
   }
@@ -100,7 +109,8 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
                                shutdownHttpClient: Boolean,
                                responseParser: ResponseParser = new BinaryResponseParser,
                                val metrics: Metrics = NoopMetrics,
-                               serverStateObservation: Option[ServerStateObservation] = None) {
+                               serverStateObservation: Option[ServerStateObservation] = None,
+                               retryPolicy: RetryPolicy = RetryPolicy.TryOnce) {
 
   private val UTF_8 = "UTF-8"
   private val DEFAULT_PATH = "/select"
@@ -144,9 +154,36 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
   }
 
   def query[T](q: SolrQuery, transformResponse: QueryResponse => T): Future[T] = {
-    loadBalancer.solrServer() match {
-      case Some(solrServer) => query(solrServer, q, transformResponse)
-      case None => Future.failed(new SolrServerException("No solr server available."))
+    loadBalanceQuery(QueryContext(q), transformResponse)
+  }
+
+  private def loadBalanceQuery[T](queryContext: QueryContext, transformResponse: QueryResponse => T): Future[T] = {
+    loadBalancer.solrServer(queryContext.q) match {
+      case Some(solrServer) => queryWithRetries(solrServer, queryContext, transformResponse)
+      case None =>
+        val msg =
+          if(queryContext.failedRequests.isEmpty) "No solr server available."
+          else s"No next solr server available. These requests failed:\n- ${queryContext.failedRequests.mkString("\n- ")}"
+        Future.failed(new SolrServerException(msg))
+    }
+  }
+
+  private def queryWithRetries[T](server: SolrServer, queryContext: QueryContext, transformResponse: QueryResponse => T): Future[T] = {
+    import scala.concurrent.ExecutionContext.Implicits.global
+    val start = System.currentTimeMillis()
+    query(server, queryContext.q, transformResponse).recoverWith { case NonFatal(e) =>
+      val updatedContext = queryContext.failedRequest(server, (System.currentTimeMillis() - start) millis, e)
+      retryPolicy.shouldRetry(e, server, updatedContext, loadBalancer) match {
+        case RetryServer(s) =>
+          logger.warn(s"Query failed for server $server, trying next server $s. Exception was: $e")
+          queryWithRetries(s, updatedContext, transformResponse)
+        case StandardRetryDecision(Result.Retry) =>
+          logger.warn(s"Query failed for server $server, trying to get another server from loadBalancer for retry. Exception was: $e")
+          loadBalanceQuery(updatedContext, transformResponse)
+        case StandardRetryDecision(Result.Fail) =>
+          logger.warn(s"Query failed for server $server, not retrying. Exception was: $e")
+          Future.failed(e)
+      }
     }
   }
 

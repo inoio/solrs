@@ -14,6 +14,10 @@ scalaVersion := "2.10.4"
 
 crossScalaVersions := Seq("2.10.4", "2.11.2")
 
+// https://github.com/jrudolph/sbt-dependency-graph
+// E.g. adds dependency-graph task
+net.virtualvoid.sbt.graph.Plugin.graphSettings
+
 resolvers += "JCenter" at "http://jcenter.bintray.com/"
 
 libraryDependencies ++= Seq(

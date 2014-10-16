@@ -20,6 +20,17 @@ net.virtualvoid.sbt.graph.Plugin.graphSettings
 
 resolvers += "JCenter" at "http://jcenter.bintray.com/"
 
+// add scala-xml dependency when needed (for Scala 2.11 and newer)
+// this mechanism supports cross-version publishing
+libraryDependencies := {
+  CrossVersion.partialVersion(scalaVersion.value) match {
+    case Some((2, scalaMajor)) if scalaMajor >= 11 =>
+      libraryDependencies.value :+ "org.scala-lang.modules" %% "scala-xml" % "1.0.2"
+    case _ =>
+      libraryDependencies.value
+  }
+}
+
 libraryDependencies ++= Seq(
   "org.apache.solr" % "solr-solrj" % "4.10.1",
   "com.ning" % "async-http-client" % "1.8.8",

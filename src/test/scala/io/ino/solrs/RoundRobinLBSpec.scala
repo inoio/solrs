@@ -9,6 +9,16 @@ class RoundRobinLBSpec extends FunSpec with Matchers {
 
   describe("RoundRobinLB") {
 
+    it("should return None if no solr server matches") {
+      val nonMatchingServers = new SolrServers {
+        override def all: Seq[SolrServer] = Nil
+        override def matching(q: SolrQuery): IndexedSeq[SolrServer] = Vector.empty
+      }
+      val cut = RoundRobinLB(nonMatchingServers)
+
+      cut.solrServer(q) should be (None)
+    }
+
     it("should return consecutive solr servers") {
       val cut = RoundRobinLB(IndexedSeq("host1", "host2"))
 

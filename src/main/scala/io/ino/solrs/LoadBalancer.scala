@@ -47,11 +47,15 @@ class RoundRobinLB(override val solrServers: SolrServers) extends LoadBalancer {
 
   override def solrServer(q: SolrQuery): Option[SolrServer] = {
     val servers = solrServers.matching(q)
-    // idx + 1 might be > servers.length, so let's use % to get a valid start position
-    val startIndex = (idx + 1) % servers.length
-    val (newIndex, result) = findAvailable(servers, startIndex)
-    idx = newIndex
-    result
+    if(servers.isEmpty) {
+      None
+    } else {
+      // idx + 1 might be > servers.length, so let's use % to get a valid start position
+      val startIndex = (idx + 1) % servers.length
+      val (newIndex, result) = findAvailable(servers, startIndex)
+      idx = newIndex
+      result
+    }
   }
 
 }

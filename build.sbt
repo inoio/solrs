@@ -31,8 +31,10 @@ libraryDependencies := {
   }
 }
 
+val solrVersion = "4.10.2"
+
 libraryDependencies ++= Seq(
-  "org.apache.solr" % "solr-solrj" % "4.10.1",
+  "org.apache.solr" % "solr-solrj" % solrVersion,
   "com.ning" % "async-http-client" % "1.8.8",
   "com.codahale.metrics" % "metrics-core" % "3.0.2" % "optional",
   "org.slf4j" % "slf4j-api" % "1.7.5",
@@ -42,8 +44,8 @@ libraryDependencies ++= Seq(
   "org.mockito" % "mockito-core" % "1.9.5" % "test",
   "org.clapper" %% "grizzled-scala" % "1.1.6" % "test",
   // Cloud testing, solr-core for ZkController (upconfig), curator-test for ZK TestingServer
-  "org.apache.solr" % "solr-core" % "4.10.1" % "test" excludeAll(ExclusionRule(organization = "org.restlet.jee")),
-  "org.apache.curator" % "curator-test" % "2.6.0" % "test",
+  "org.apache.solr" % "solr-core" % solrVersion % "test" excludeAll(ExclusionRule(organization = "org.restlet.jee")),
+  "org.apache.curator" % "curator-test" % "2.7.0" % "test",
   // tomcat
   "org.apache.tomcat" % "tomcat-catalina" % "7.0.52" % "test",
   "org.apache.tomcat" % "tomcat-jasper" % "7.0.52" % "test",

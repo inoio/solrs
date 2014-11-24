@@ -19,7 +19,8 @@ import scala.language.postfixOps
 class CloudSolrServersIntegrationSpec extends FunSpec with BeforeAndAfterAll with BeforeAndAfterEach with Matchers with FutureAwaits with MockitoSugar {
 
   private implicit val awaitTimeout = 2 seconds
-  private implicit val patienceConfig = PatienceConfig(timeout = scaled(Span(2000, Millis)))
+  private implicit val patienceConfig = PatienceConfig(timeout = scaled(Span(20000, Millis)),
+                                                       interval = scaled(Span(1000, Millis)))
 
   private var zk: TestingServer = _
   private var solrRunners = List.empty[SolrRunner]
@@ -104,8 +105,7 @@ class CloudSolrServersIntegrationSpec extends FunSpec with BeforeAndAfterAll wit
       }
 
       solrRunners.head.start
-      // Transition down -> recovering -> active takes some more time, so we need to increase the time to wait
-      eventually(Timeout(15 seconds)) {
+      eventually {
         cut.all.map(_.status) should contain theSameElementsInOrderAs Seq(Enabled, Enabled)
       }
 

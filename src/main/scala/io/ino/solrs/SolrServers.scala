@@ -120,13 +120,13 @@ class CloudSolrServers(zkHost: String,
    * Updates the server list when the ZkStateReader clusterState changed
    */
   private def updateFromClusterState(zkStateReader: ZkStateReader): Unit = {
-    if(zkStateReader.getClusterState != lastClusterState) {
+    val clusterState = zkStateReader.getClusterState
+    if(clusterState != lastClusterState) {
 
       try {
         import scala.collection.JavaConversions._
 
-        val clusterState = zkStateReader.getClusterState
-        collectionToServers = (for {
+        val newCollectionToServers = (for {
           collectionName <- clusterState.getCollections
           collectionSlice = clusterState.getCollection(collectionName).getSlices
           replica <- collectionSlice.map(_.getReplicas)
@@ -137,12 +137,15 @@ class CloudSolrServers(zkHost: String,
 
         lastClusterState = clusterState
 
-        if(logger.isDebugEnabled) logger.debug(s"Updated server map: $collectionToServers from ClusterState $clusterState")
-        else logger.info(s"Updated server map: $collectionToServers")
+        if(newCollectionToServers != collectionToServers) {
+          collectionToServers = newCollectionToServers
+          if(logger.isDebugEnabled) logger.debug(s"Updated server map: $collectionToServers from ClusterState $clusterState")
+          else logger.info(s"Updated server map: $collectionToServers")
+        }
 
       } catch {
         case NonFatal(e) =>
-          logger.error(s"Could not process cluster state, server list might get outdated. Cluster state: ${zkStateReader.getClusterState}", e)
+          logger.error(s"Could not process cluster state, server list might get outdated. Cluster state: ${clusterState}", e)
       }
     }
   }

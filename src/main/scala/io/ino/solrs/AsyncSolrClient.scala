@@ -40,6 +40,7 @@ object AsyncSolrClient {
   case class Builder private (loadBalancer: LoadBalancer,
                               httpClient: Option[AsyncHttpClient],
                               shutdownHttpClient: Boolean,
+                              requestInterceptor: Option[RequestInterceptor] = None,
                               responseParser: Option[ResponseParser] = None,
                               metrics: Option[Metrics] = None,
                               serverStateObservation: Option[ServerStateObservation] = None,
@@ -50,6 +51,10 @@ object AsyncSolrClient {
 
     def withHttpClient(httpClient: AsyncHttpClient): Builder = {
       copy(httpClient = Some(httpClient), shutdownHttpClient = false)
+    }
+
+    def withRequestInterceptor(requestInterceptor: RequestInterceptor): Builder = {
+      copy(requestInterceptor = Some(requestInterceptor))
     }
 
     def withResponseParser(responseParser: ResponseParser): Builder = {
@@ -87,6 +92,7 @@ object AsyncSolrClient {
         loadBalancer,
         httpClient.getOrElse(createHttpClient),
         shutdownHttpClient,
+        requestInterceptor,
         responseParser.getOrElse(createResponseParser),
         metrics.getOrElse(createMetrics),
         serverStateObservation,
@@ -107,6 +113,7 @@ object AsyncSolrClient {
 class AsyncSolrClient private (val loadBalancer: LoadBalancer,
                                val httpClient: AsyncHttpClient,
                                shutdownHttpClient: Boolean,
+                               requestInterceptor: Option[RequestInterceptor] = None,
                                responseParser: ResponseParser = new BinaryResponseParser,
                                val metrics: Metrics = NoopMetrics,
                                serverStateObservation: Option[ServerStateObservation] = None,
@@ -184,6 +191,12 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
   }
 
   private def query(solrServer: SolrServer, q: SolrQuery): Future[QueryResponse] = {
+    requestInterceptor.map(ri =>
+      ri.interceptQuery(doQuery)(solrServer, q)
+    ).getOrElse(doQuery(solrServer, q))
+  }
+
+  private def doQuery(solrServer: SolrServer, q: SolrQuery): Future[QueryResponse] = {
 
     val wparams = new ModifiableSolrParams(q)
     if (responseParser != null) {

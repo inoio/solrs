@@ -4,14 +4,14 @@ import akka.actor.ActorSystem
 import org.scalatest.mock.MockitoSugar
 import org.scalatest.{Matchers, BeforeAndAfterEach, FunSpec}
 import org.mockito.Mockito.verify
-import org.mockito.Matchers.anyLong
+import org.mockito.Matchers._
 import java.util.Arrays.asList
 import org.apache.solr.client.solrj.response.QueryResponse
 import com.ning.http.client.AsyncHttpClient
 import org.apache.solr.client.solrj.SolrQuery.SortClause
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.impl.XMLResponseParser
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import org.scalatest.concurrent.Eventually._
@@ -128,6 +128,26 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
       await(solr.query(new SolrQuery("*:*")))
 
       verify(metrics).requestTime(anyLong())
+    }
+
+    it("should allow to intercept requests") {
+      var capturedServer: SolrServer = null
+      var capturedQuery: SolrQuery = null
+      val interceptor = new RequestInterceptor {
+        override def interceptQuery(f: (SolrServer, SolrQuery) => Future[QueryResponse])
+                                   (solrServer: SolrServer, q: SolrQuery): Future[QueryResponse] = {
+          capturedServer = solrServer
+          capturedQuery = q
+          f(solrServer, q)
+        }
+      }
+      val solr = AsyncSolrClient.Builder(solrUrl).withRequestInterceptor(interceptor).build
+
+      val q: SolrQuery = new SolrQuery("*:*")
+      await(solr.query(q))
+
+      capturedServer should be (SolrServer(solrUrl))
+      capturedQuery should be (q)
     }
 
   }

@@ -162,6 +162,29 @@ val solr = AsyncSolrClient.Builder(RoundRobinLB(new CloudSolrServers("host1:2181
 
 There's not yet support for delaying retries, raise an issue or submit a pull request for this if you need it.
 
+### Request Interception / Filtering
+
+Solrs allows to intercept queries sent to Solr, here's an example that shows how to log details about each request:
+
+```scala
+import io.ino.solrs._
+
+val loggingInterceptor = new RequestInterceptor {
+  override def interceptQuery(f: (SolrServer, SolrQuery) => Future[QueryResponse])
+                             (solrServer: SolrServer, q: SolrQuery): Future[QueryResponse] = {
+    val start = System.currentTimeMillis()
+    f(solrServer, q).map { qr =>
+      val requestTime = System.currentTimeMillis() - start
+      logger.info(s"Query $q to $solrServer took $requestTime ms (query time in solr: ${qr.getQTime} ms).")
+      qr
+    }
+  }
+}
+
+val solr = AsyncSolrClient.Builder("http://localhost:8983/solr")
+             .withRequestInterceptor(loggingInterceptor).build
+```
+
 ### Metrics
 
 There's basic metrics support for request timings and number of exceptions. You can provide your own
@@ -173,7 +196,8 @@ To configure solrs with the `Metrics` implementation just pass an initialized in
 ```scala
 import io.ino.solrs._
 
-val solr = AsyncSolrClient.Builder("http://localhost:8983/solr").withMetrics(new CodaHaleMetrics()).build
+val solr = AsyncSolrClient.Builder("http://localhost:8983/solr")
+             .withMetrics(new CodaHaleMetrics()).build
 ```
 
 If you're using Coda Hale's Metrics library and you want to reuse an existing `MetricsRegistry`,

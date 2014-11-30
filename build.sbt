@@ -12,7 +12,7 @@ licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.
 
 scalaVersion := "2.10.4"
 
-crossScalaVersions := Seq("2.10.4", "2.11.2")
+crossScalaVersions := Seq("2.10.4", "2.11.4")
 
 // https://github.com/jrudolph/sbt-dependency-graph
 // E.g. adds dependency-graph task
@@ -32,25 +32,27 @@ libraryDependencies := {
 }
 
 val solrVersion = "4.10.2"
+val slf4jVersion = "1.7.7"
+val tomcatVersion = "7.0.57"
 
 libraryDependencies ++= Seq(
   "org.apache.solr" % "solr-solrj" % solrVersion,
-  "com.ning" % "async-http-client" % "1.8.8",
+  "com.ning" % "async-http-client" % "1.8.15",
   "com.codahale.metrics" % "metrics-core" % "3.0.2" % "optional",
-  "org.slf4j" % "slf4j-api" % "1.7.5",
-  "com.typesafe.akka" %% "akka-actor" % "2.3.5",
-  "org.slf4j" % "slf4j-simple" % "1.7.5" % "test",
-  "org.scalatest" %% "scalatest" % "2.2.0" % "test",
-  "org.mockito" % "mockito-core" % "1.9.5" % "test",
-  "org.clapper" %% "grizzled-scala" % "1.1.6" % "test",
+  "org.slf4j" % "slf4j-api" % slf4jVersion,
+  "com.typesafe.akka" %% "akka-actor" % "2.3.7",
+  "org.slf4j" % "slf4j-simple" % slf4jVersion % "test",
+  "org.scalatest" %% "scalatest" % "2.2.2" % "test",
+  "org.mockito" % "mockito-core" % "1.10.13" % "test",
+  "org.clapper" %% "grizzled-scala" % "1.2" % "test",
   // Cloud testing, solr-core for ZkController (upconfig), curator-test for ZK TestingServer
   "org.apache.solr" % "solr-core" % solrVersion % "test" excludeAll(ExclusionRule(organization = "org.restlet.jee")),
   "org.apache.curator" % "curator-test" % "2.7.0" % "test",
   // tomcat
-  "org.apache.tomcat" % "tomcat-catalina" % "7.0.52" % "test",
-  "org.apache.tomcat" % "tomcat-jasper" % "7.0.52" % "test",
-  "org.apache.tomcat.embed" % "tomcat-embed-core" % "7.0.52" % "test",
-  "commons-logging" % "commons-logging" % "1.1.1"
+  "org.apache.tomcat" % "tomcat-catalina" % tomcatVersion % "test",
+  "org.apache.tomcat" % "tomcat-jasper" % tomcatVersion % "test",
+  "org.apache.tomcat.embed" % "tomcat-embed-core" % tomcatVersion % "test",
+  "commons-logging" % "commons-logging" % "1.2"
 )
 
 // Fork tests so that SolrRunner's shutdown hook kicks in

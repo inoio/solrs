@@ -20,7 +20,7 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.control.NonFatal
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 import org.apache.solr.common.SolrException
 import org.apache.solr.client.solrj.impl.BinaryResponseParser
 import java.util.Locale
@@ -150,16 +150,12 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
   }
 
   def query(q: SolrQuery): Future[QueryResponse] = {
-    query(q, identity)
+    loadBalanceQuery(QueryContext(q))
   }
 
-  def query[T](q: SolrQuery, transformResponse: QueryResponse => T): Future[T] = {
-    loadBalanceQuery(QueryContext(q), transformResponse)
-  }
-
-  private def loadBalanceQuery[T](queryContext: QueryContext, transformResponse: QueryResponse => T): Future[T] = {
+  private def loadBalanceQuery(queryContext: QueryContext): Future[QueryResponse] = {
     loadBalancer.solrServer(queryContext.q) match {
-      case Some(solrServer) => queryWithRetries(solrServer, queryContext, transformResponse)
+      case Some(solrServer) => queryWithRetries(solrServer, queryContext)
       case None =>
         val msg =
           if(queryContext.failedRequests.isEmpty) "No solr server available."
@@ -168,18 +164,18 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
     }
   }
 
-  private def queryWithRetries[T](server: SolrServer, queryContext: QueryContext, transformResponse: QueryResponse => T): Future[T] = {
+  private def queryWithRetries(server: SolrServer, queryContext: QueryContext): Future[QueryResponse] = {
     import scala.concurrent.ExecutionContext.Implicits.global
     val start = System.currentTimeMillis()
-    query(server, queryContext.q, transformResponse).recoverWith { case NonFatal(e) =>
+    query(server, queryContext.q).recoverWith { case NonFatal(e) =>
       val updatedContext = queryContext.failedRequest(server, (System.currentTimeMillis() - start) millis, e)
       retryPolicy.shouldRetry(e, server, updatedContext, loadBalancer) match {
         case RetryServer(s) =>
           logger.warn(s"Query failed for server $server, trying next server $s. Exception was: $e")
-          queryWithRetries(s, updatedContext, transformResponse)
+          queryWithRetries(s, updatedContext)
         case StandardRetryDecision(Result.Retry) =>
           logger.warn(s"Query failed for server $server, trying to get another server from loadBalancer for retry. Exception was: $e")
-          loadBalanceQuery(updatedContext, transformResponse)
+          loadBalanceQuery(updatedContext)
         case StandardRetryDecision(Result.Fail) =>
           logger.warn(s"Query failed for server $server, not retrying. Exception was: $e")
           Future.failed(e)
@@ -187,7 +183,7 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
     }
   }
 
-  private def query[T](solrServer: SolrServer, q: SolrQuery, transformResponse: QueryResponse => T): Future[T] = {
+  private def query(solrServer: SolrServer, q: SolrQuery): Future[QueryResponse] = {
 
     val wparams = new ModifiableSolrParams(q)
     if (responseParser != null) {
@@ -197,7 +193,7 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
 
     implicit val s = solrServer
 
-    val promise = scala.concurrent.promise[T]
+    val promise = scala.concurrent.promise[QueryResponse]
     val startTime = System.currentTimeMillis()
 
     val url = solrServer.baseUrl + getPath(q) + ClientUtils.toQueryString(wparams, false)
@@ -205,7 +201,7 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
     httpClient.executeRequest(request, new AsyncCompletionHandler[Response]() {
       override def onCompleted(response: Response): Response = {
         val tryQueryResponse = Try(toQueryResponse(response, url, startTime))
-        promise.complete(tryTransformResponse(tryQueryResponse, transformResponse))
+        promise.complete(tryQueryResponse)
         response
       }
       override def onThrowable(t: Throwable) {
@@ -215,16 +211,6 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
     })
 
     promise.future
-  }
-
-  private def tryTransformResponse[T](tryResponse: Try[QueryResponse], transformResponse: (QueryResponse) => T): Try[T] = tryResponse flatMap { response =>
-    try {
-      Success(transformResponse(response))
-    } catch {
-      case NonFatal(e) =>
-        metrics.countTransformResponseException
-        Failure(e)
-    }
   }
 
   protected def getPath(query: SolrQuery): String = {

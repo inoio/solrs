@@ -173,7 +173,7 @@ class AsyncSolrClientCloudIntegrationSpec extends FunSpec with BeforeAndAfterAll
   private def runQueries(q: SolrQuery, run: AtomicBoolean, res: List[Future[List[String]]] = Nil): List[Future[List[String]]] = run.get() match {
     case false => res
     case true =>
-      val response = cut.query(q, getIds)
+      val response = cut.query(q).map(getIds)
       response.onFailure {
         case NonFatal(e) => logger.error("Query failed.", e)
       }
@@ -182,7 +182,7 @@ class AsyncSolrClientCloudIntegrationSpec extends FunSpec with BeforeAndAfterAll
 
   private def queryAndCheckResponse: SolrQuery = {
     val q = new SolrQuery("*:*").setRows(Int.MaxValue)
-    val response: Future[List[String]] = cut.query(q, getIds)
+    val response: Future[List[String]] = cut.query(q).map(getIds)
     await(response) should contain theSameElementsAs someDocsIds
     q
   }

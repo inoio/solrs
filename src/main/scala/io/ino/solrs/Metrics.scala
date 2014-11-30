@@ -6,8 +6,6 @@ trait Metrics {
 
   def countRemoteException: Unit
 
-  def countTransformResponseException: Unit
-
   /**
    * Counter for other exceptions, e.g. from AsyncHandler.onThrowable:
    * <em>
@@ -22,7 +20,6 @@ object NoopMetrics extends Metrics {
   override def requestTime(timeInMillis: Long) = {}
   override def countException = {}
   override def countRemoteException = {}
-  override def countTransformResponseException = {}
 }
 
 import com.codahale.metrics.MetricRegistry
@@ -40,8 +37,6 @@ class CodaHaleMetrics(val registry: MetricRegistry = new MetricRegistry()) exten
   override def requestTime(timeInMillis: Long) = requestTimer.update(timeInMillis, MILLISECONDS)
 
   override def countRemoteException = remoteSolrExceptionCounter.mark()
-
-  override def countTransformResponseException = transformResponseExceptionCounter.mark()
 
   override def countException = exceptionCounter.mark()
 

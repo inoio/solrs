@@ -5,7 +5,6 @@ import org.scalatest.mock.MockitoSugar
 import org.scalatest.{Matchers, BeforeAndAfterEach, FunSpec}
 import org.mockito.Mockito.verify
 import org.mockito.Matchers.anyLong
-import org.apache.solr.common.SolrInputDocument
 import java.util.Arrays.asList
 import org.apache.solr.client.solrj.response.QueryResponse
 import com.ning.http.client.AsyncHttpClient
@@ -16,6 +15,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import org.scalatest.concurrent.Eventually._
+import scala.concurrent.ExecutionContext.Implicits.global
 
 class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with BeforeAndAfterEach with Matchers with FutureAwaits with MockitoSugar {
 
@@ -53,13 +53,12 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
     }
 
     it("should allow to transform the response") {
-      val response: Future[List[String]] = solr.query(new SolrQuery("cat:cat1"), getIds)
+      val response: Future[List[String]] = solr.query(new SolrQuery("cat:cat1")).map(getIds)
 
       await(response) should contain theSameElementsAs Vector("id1", "id2")
     }
 
     it("should allow to regularly observe the server status") {
-      implicit val ec = ExecutionContext.Implicits.global
       val solrServers = Seq(SolrServer(solrUrl))
 
       val solr = AsyncSolrClient.Builder(new SingleServerLB(solrUrl)).withServerStateObservation(
@@ -116,7 +115,7 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
     it("should return failed future on wrong request path") {
       val solr = AsyncSolrClient(s"http://localhost:${solrRunner.port}/")
 
-      val response = solr.query(new SolrQuery("*:*"), getIds)
+      val response = solr.query(new SolrQuery("*:*"))
 
       awaitReady(response)
       a [RemoteSolrException] should be thrownBy await(response)

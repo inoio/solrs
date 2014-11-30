@@ -88,7 +88,7 @@ class CloudSolrServersIntegrationSpec extends FunSpec with BeforeAndAfterAll wit
       }
 
       solrRunners.foreach { solrRunner =>
-        val response = solrs(solrRunner).query(new SolrQuery("*:*").setRows(Int.MaxValue), getIds)
+        val response = solrs(solrRunner).query(new SolrQuery("*:*").setRows(Int.MaxValue)).map(getIds)
         await(response) should contain theSameElementsAs someDocsIds
       }
     }

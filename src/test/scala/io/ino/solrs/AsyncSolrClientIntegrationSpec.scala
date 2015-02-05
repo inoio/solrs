@@ -110,6 +110,7 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
 
       awaitReady(response)
       a [RemoteSolrException] should be thrownBy await(response)
+      (the [RemoteSolrException] thrownBy await(response)).getMessage should include ("undefined field fieldDoesNotExist")
     }
 
     it("should return failed future on wrong request path") {
@@ -119,6 +120,7 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
 
       awaitReady(response)
       a [RemoteSolrException] should be thrownBy await(response)
+      (the [RemoteSolrException] thrownBy await(response)).getMessage should include ("parsing error")
     }
 
     it("should gather request time metrics") {

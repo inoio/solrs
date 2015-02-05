@@ -184,8 +184,10 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
           logger.warn(s"Query failed for server $server, trying to get another server from loadBalancer for retry. Exception was: $e")
           loadBalanceQuery(updatedContext)
         case StandardRetryDecision(Result.Fail) =>
-          logger.warn(s"Query failed for server $server, not retrying. Exception was: $e")
-          Future.failed(e)
+          logger.warn(s"Query failed for server $server, not retrying. Exception was: $e", e)
+          // Wrap SolrException with solrs RemoteSolrException
+          val ex = if(e.isInstanceOf[SolrException]) new RemoteSolrException(500, e.getMessage, e) else e
+          Future.failed(ex)
       }
     }
   }
@@ -271,7 +273,8 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
     val httpStatus = response.getStatusCode
     if(httpStatus >= 400) {
       metrics.countRemoteException
-      throw new RemoteSolrException(httpStatus, s"Server at ${server.baseUrl} returned non ok status:$httpStatus, message:${response.getStatusText}", null)
+      val msg = responseParser.processResponse(response.getResponseBodyAsStream, getResponseEncoding(response)).get("error").asInstanceOf[NamedList[_]].get("msg")
+      throw new RemoteSolrException(httpStatus, s"Server at ${server.baseUrl} returned non ok status:$httpStatus, message: ${response.getStatusText}, $msg", null)
     }
   }
 
@@ -282,11 +285,9 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
       val actualMimeType = getMimeType(response.getContentType).map(_.toLowerCase(Locale.ROOT)).getOrElse("")
       if (expectedMimeType != actualMimeType) {
         var msg = s"Expected mime type [$expectedMimeType] but got [$actualMimeType]."
-        var encoding = response.getHeader("Content-Encoding")
-        if (encoding == null) {
-          encoding = "UTF-8"
-        }
+        var encoding: String = getResponseEncoding(response)
         try {
+          // might be solved with responseParser.processResponse (like it's done for 4xx codes)
           msg = msg + "\n" + IOUtils.toString(response.getResponseBodyAsStream, encoding)
         }
         catch {
@@ -299,6 +300,11 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
         throw new RemoteSolrException(response.getStatusCode, msg, null)
       }
     }
+  }
+
+  protected def getResponseEncoding(response: Response): String = {
+    var encoding = response.getHeader("Content-Encoding")
+    if (encoding == null) "UTF-8" else encoding
   }
 
   protected def getErrorReason(url: String, rsp: NamedList[_], response: Response): String = {

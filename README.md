@@ -37,7 +37,7 @@ import org.apache.solr.client.solrj.SolrQuery
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
-val solr = AsyncSolrClient("http://localhost:8983/solr")
+val solr = AsyncSolrClient("http://localhost:8983/solr/collection1")
 
 val query = new SolrQuery("scala")
 val response: Future[QueryResponse] = solr.query(query)
@@ -57,7 +57,7 @@ import com.ning.http.client.AsyncHttpClient
 import io.ino.solrs.{CodaHaleMetrics, AsyncSolrClient}
 import org.apache.solr.client.solrj.impl.XMLResponseParser
 
-val solr = AsyncSolrClient.Builder("http://localhost:8983/solr")
+val solr = AsyncSolrClient.Builder("http://localhost:8983/solr/collection1")
             .withHttpClient(new AsyncHttpClient())
             .withResponseParser(new XMLResponseParser())
             .build
@@ -77,7 +77,7 @@ To run solrs with a load balancer you have to pass it to the `Builder`
 ```scala
 import io.ino.solrs._
 
-val lb = RoundRobinLB(IndexedSeq("http://localhost:8983/solr", "http://localhost:8984/solr"))
+val lb = RoundRobinLB(IndexedSeq("http://localhost:8983/solr/collection1", "http://localhost:8984/solr/collection1"))
 val solr = AsyncSolrClient.Builder(lb).build
 ```
 
@@ -181,7 +181,7 @@ val loggingInterceptor = new RequestInterceptor {
   }
 }
 
-val solr = AsyncSolrClient.Builder("http://localhost:8983/solr")
+val solr = AsyncSolrClient.Builder("http://localhost:8983/solr/collection1")
              .withRequestInterceptor(loggingInterceptor).build
 ```
 
@@ -196,7 +196,7 @@ To configure solrs with the `Metrics` implementation just pass an initialized in
 ```scala
 import io.ino.solrs._
 
-val solr = AsyncSolrClient.Builder("http://localhost:8983/solr")
+val solr = AsyncSolrClient.Builder("http://localhost:8983/solr/collection1")
              .withMetrics(new CodaHaleMetrics()).build
 ```
 

@@ -31,7 +31,7 @@ libraryDependencies := {
   }
 }
 
-val solrVersion = "4.10.2"
+val solrVersion = "5.0.0"
 val slf4jVersion = "1.7.7"
 val tomcatVersion = "7.0.57"
 
@@ -41,6 +41,7 @@ libraryDependencies ++= Seq(
   "com.codahale.metrics" % "metrics-core" % "3.0.2" % "optional",
   "org.slf4j" % "slf4j-api" % slf4jVersion,
   "com.typesafe.akka" %% "akka-actor" % "2.3.7",
+  "org.restlet.jee" % "org.restlet" % "2.1.1" % "test", // needed by o.a.s.rest.RestManager
   "org.slf4j" % "slf4j-simple" % slf4jVersion % "test",
   "org.scalatest" %% "scalatest" % "2.2.2" % "test",
   "org.mockito" % "mockito-core" % "1.10.13" % "test",

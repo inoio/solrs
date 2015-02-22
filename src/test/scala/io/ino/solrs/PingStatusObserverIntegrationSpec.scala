@@ -14,11 +14,11 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 class PingStatusObserverIntegrationSpec extends FunSpec with RunningSolr with BeforeAndAfterEach with Matchers with FutureAwaits with MockitoSugar {
 
-  private implicit val awaitTimeout = 500 millis
+  private implicit val awaitTimeout = 1000 millis
   private val httpClientTimeout = 300
   private val httpClient = new AsyncHttpClient()
 
-  private lazy val solrUrl = s"http://localhost:${solrRunner.port}/solr"
+  private lazy val solrUrl = s"http://localhost:${solrRunner.port}/solr/collection1"
 
   override def beforeEach() {
     enable(solrUrl)

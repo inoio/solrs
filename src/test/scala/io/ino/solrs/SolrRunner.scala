@@ -27,7 +27,7 @@ class SolrRunner(val port: Int,
   private[solrs] var tomcat: Tomcat = null
 
   def this(port: Int, zkOptions: Option[ZooKeeperOptions] = None) {
-    this(port, SolrRunner.initSolrHome(port), SolrRunner.checkOrGetSolrWar, zkOptions)
+    this(port, SolrRunner.initSolrHome(port), SolrRunner.solrWar, zkOptions)
   }
 
   def start: SolrRunner = {
@@ -170,7 +170,6 @@ object RunSolrCloud extends App {
 
 object SolrRunner {
 
-  private final val solrVersion: String = "4.10.1"
   private val logger: Logger = LoggerFactory.getLogger(classOf[SolrRunner])
   private var solrRunners: Map[Int,SolrRunner] = Map.empty
 
@@ -195,27 +194,13 @@ object SolrRunner {
     }
   }
 
-  def initSolrHome(port: Int): File = {
-    val template = new File(classOf[SolrRunner].getResource("/solr-home").toURI())
+  private def initSolrHome(port: Int): File = {
+    val template = new File(classOf[SolrRunner].getResource("/solr-home").toURI)
     val solrHome = new File(template.getParentFile, s"solr-home_$port")
     FileUtils.copyDirectory(template, solrHome)
     solrHome
   }
 
-  def checkOrGetSolrWar: File = {
-    try {
-      val solrWar: File = new File(s"./.solr/solr-$solrVersion.war")
-      if (!solrWar.exists) {
-        logger.info(s"Downloading solr.war to ${solrWar.getAbsolutePath}")
-        val source: URL = new URL(s"http://repo1.maven.org/maven2/org/apache/solr/solr/$solrVersion/solr-$solrVersion.war")
-        FileUtils.copyURLToFile(source, solrWar)
-        logger.info(s"Finished downloading solr-$solrVersion.war")
-      }
-      solrWar
-    }
-    catch {
-      case e: IOException => throw new RuntimeException(e)
-    }
-  }
+  private val solrWar = new File(classOf[SolrRunner].getResource("/solr.war").toURI)
 
 }

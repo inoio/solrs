@@ -1,28 +1,30 @@
 package io.ino.solrs
 
-import akka.actor.ActorSystem
-import org.scalatest.mock.MockitoSugar
-import org.scalatest.{Matchers, BeforeAndAfterEach, FunSpec}
-import org.mockito.Mockito.verify
-import org.mockito.Matchers._
 import java.util.Arrays.asList
-import org.apache.solr.client.solrj.response.QueryResponse
+
+import akka.actor.ActorSystem
 import com.ning.http.client.AsyncHttpClient
-import org.apache.solr.client.solrj.SolrQuery.SortClause
 import org.apache.solr.client.solrj.SolrQuery
+import org.apache.solr.client.solrj.SolrQuery.SortClause
 import org.apache.solr.client.solrj.impl.XMLResponseParser
+import org.apache.solr.client.solrj.response.QueryResponse
+import org.mockito.Matchers._
+import org.mockito.Mockito.verify
+import org.scalatest.concurrent.Eventually._
+import org.scalatest.mock.MockitoSugar
+import org.scalatest.{BeforeAndAfterEach, FunSpec, Matchers}
+
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.language.postfixOps
-import org.scalatest.concurrent.Eventually._
-import scala.concurrent.ExecutionContext.Implicits.global
 
 class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with BeforeAndAfterEach with Matchers with FutureAwaits with MockitoSugar {
 
   private implicit val timeout = 1.second
   private val httpClient = new AsyncHttpClient()
 
-  import SolrUtils._
+  import io.ino.solrs.SolrUtils._
 
   override def beforeEach() {
     solr.deleteByQuery("*:*")
@@ -34,7 +36,7 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
 
   describe("Solr") {
 
-    lazy val solrUrl = s"http://localhost:${solrRunner.port}/solr"
+    lazy val solrUrl = s"http://localhost:${solrRunner.port}/solr/collection1"
     lazy val solr = AsyncSolrClient(solrUrl)
 
     it("should query async with SolrQuery") {

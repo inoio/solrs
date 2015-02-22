@@ -2,11 +2,10 @@ package io.ino.solrs
 
 import org.apache.curator.test.TestingServer
 import org.apache.solr.client.solrj.SolrQuery
-import org.apache.solr.client.solrj.impl.CloudSolrServer
-import org.scalatest.concurrent.PatienceConfiguration.Timeout
-import org.scalatest.mock.MockitoSugar
+import org.apache.solr.client.solrj.impl.CloudSolrClient
 import org.scalatest._
 import org.scalatest.concurrent.Eventually._
+import org.scalatest.mock.MockitoSugar
 import org.scalatest.time.{Millis, Span}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -27,9 +26,9 @@ class CloudSolrServersIntegrationSpec extends FunSpec with BeforeAndAfterAll wit
   private var solrs = Map.empty[SolrRunner, AsyncSolrClient]
 
   private var cut: CloudSolrServers = _
-  private var cloudSolrServer: CloudSolrServer = _
+  private var cloudSolrServer: CloudSolrClient = _
 
-  import SolrUtils._
+  import io.ino.solrs.SolrUtils._
 
   override def beforeAll(configMap: ConfigMap) {
     zk = new TestingServer()
@@ -41,9 +40,9 @@ class CloudSolrServersIntegrationSpec extends FunSpec with BeforeAndAfterAll wit
     )
 
     solrs = solrRunners.foldLeft(Map.empty[SolrRunner, AsyncSolrClient])( (res, solrRunner) =>
-      res + (solrRunner -> AsyncSolrClient(s"http://$hostName:${solrRunner.port}/solr")))
+      res + (solrRunner -> AsyncSolrClient(s"http://$hostName:${solrRunner.port}/solr/collection1")))
 
-    cloudSolrServer = new CloudSolrServer(zk.getConnectString)
+    cloudSolrServer = new CloudSolrClient(zk.getConnectString)
     cloudSolrServer.setDefaultCollection("collection1")
 
     cut = new CloudSolrServers(zk.getConnectString, clusterStateUpdateInterval = 100 millis)

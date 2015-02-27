@@ -6,7 +6,7 @@ homepage := Some(url("https://github.com/inoio/solrs"))
 
 organization := "io.ino"
 
-version := "1.0.1"
+version := "1.0.2"
 
 licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.html"))
 
@@ -71,6 +71,9 @@ publishTo := {
 publishMavenStyle := true
 
 publishArtifact in Test := false
+
+// enable publishing the jar produced by `test:package`
+publishArtifact in (Test, packageBin) := true
 
 pomIncludeRepository := { _ => false }
 

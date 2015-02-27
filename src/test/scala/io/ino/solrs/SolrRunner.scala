@@ -1,34 +1,34 @@
 package io.ino.solrs
 
-import java.net.URL
+import java.io.File
+import java.nio.file.{Files, Paths}
 import java.util.logging.Level
+
+import org.apache.catalina.LifecycleState
+import org.apache.catalina.startup.Tomcat
+import org.apache.commons.io.FileUtils
 import org.apache.curator.test.TestingServer
 import org.apache.solr.common.cloud.ZkStateReader
-import org.slf4j.{LoggerFactory, Logger}
-import java.io.{IOException, File}
-import java.nio.file.{Files, Paths}
-import org.apache.catalina.startup.Tomcat
-import org.apache.catalina.LifecycleState
-import org.apache.commons.io.FileUtils
+import org.slf4j.{Logger, LoggerFactory}
 
 case class ZooKeeperOptions(zkHost: String, bootstrapConfig: Option[String] = None)
 
 class SolrRunner(val port: Int,
                  private val solrHome: File,
                  private val solrWar: File,
-                 maybeZkOptions: Option[ZooKeeperOptions] = None) {
-
-  require(solrHome.exists, s"The solrHome ${solrHome.getAbsolutePath} does not exist.")
-  require(solrWar.exists, s"The solrWar ${solrWar.getAbsolutePath} does not exist.")
-
-  import SolrRunner._
-
-  val url = s"http://localhost:$port/solr"
-  private[solrs] var tomcat: Tomcat = null
+                 maybeZkOptions: Option[ZooKeeperOptions]) {
 
   def this(port: Int, zkOptions: Option[ZooKeeperOptions] = None) {
     this(port, SolrRunner.initSolrHome(port), SolrRunner.solrWar, zkOptions)
   }
+
+  require(solrHome.exists, s"The solrHome ${solrHome.getAbsolutePath} does not exist.")
+  require(solrWar.exists, s"The solrWar ${solrWar.getAbsolutePath} does not exist.")
+
+  import io.ino.solrs.SolrRunner._
+
+  val url = s"http://localhost:$port/solr"
+  private[solrs] var tomcat: Tomcat = null
 
   def start: SolrRunner = {
     if (tomcat != null) {
@@ -39,6 +39,32 @@ class SolrRunner(val port: Int,
     System.setProperty("solr.lock.type", "single")
     java.util.logging.Logger.getLogger("org.apache.catalina.util.LifecycleMBeanBase").setLevel(Level.SEVERE)
 
+    // ZooKeeper / SolrCloud support
+    processZkOptionsBeforeStart()
+
+    tomcat = new Tomcat
+    tomcat.setPort(port)
+    val baseDir = Paths.get(System.getProperty("java.io.tmpdir"), s"solrs-tc-basedir.$port")
+
+    Files.createDirectories(baseDir)
+    Files.createDirectories(baseDir.resolve("webapps"))
+
+    // maybe we already had solr expanded, so let's remove this because we might have
+    // downloaded a new solr version
+    FileUtils.deleteDirectory(baseDir.resolve("webapps").resolve("solr").toFile)
+
+    tomcat.setBaseDir(baseDir.toAbsolutePath.toString)
+    val context = tomcat.addWebapp("/solr", solrWar.getAbsolutePath)
+    // context.asInstanceOf[StandardContext].setClearReferencesStopThreads(true)
+    tomcat.start()
+
+    // Cleanup Zk stuff
+    processZkOptionsAfterStart()
+
+    this
+  }
+
+  protected def processZkOptionsBeforeStart(): Unit = {
     // ZooKeeper / SolrCloud support
     maybeZkOptions.foreach { zkOptions =>
 
@@ -60,25 +86,11 @@ class SolrRunner(val port: Int,
       System.setProperty("host.port", port.toString)
 
     }
+  }
 
-    tomcat = new Tomcat
-    tomcat.setPort(port)
-    val baseDir = Paths.get(System.getProperty("java.io.tmpdir"), s"solrs-tc-basedir.$port")
-
-    Files.createDirectories(baseDir)
-    Files.createDirectories(baseDir.resolve("webapps"))
-
-    // maybe we already had solr expanded, so let's remove this because we might have
-    // downloaded a new solr version
-    FileUtils.deleteDirectory(baseDir.resolve("webapps").resolve("solr").toFile)
-
-    tomcat.setBaseDir(baseDir.toAbsolutePath.toString)
-    val context = tomcat.addWebapp("/solr", solrWar.getAbsolutePath)
-    // context.asInstanceOf[StandardContext].setClearReferencesStopThreads(true)
-    tomcat.start()
-
-    /* Reset optional zk system properties, so that they do not affect other SolrRunners started later
-     */
+  /* Reset optional zk system properties, so that they do not affect other SolrRunners started later
+   */
+  protected def processZkOptionsAfterStart(): Unit = {
     maybeZkOptions.foreach{ zkOptions =>
       System.clearProperty("zkHost")
       zkOptions.bootstrapConfig.foreach { _ =>
@@ -86,8 +98,6 @@ class SolrRunner(val port: Int,
         System.clearProperty("collection.configName")
       }
     }
-
-    this
   }
 
   def isStarted: Boolean = tomcat != null && tomcat.getServer.getState == LifecycleState.STARTED
@@ -170,6 +180,12 @@ object RunSolrCloud extends App {
 
 object SolrRunner {
 
+  /**
+   * The (downstripped) solr war, is the solr.war extracted from the solr distribution with
+   * WEB-INF/libs removed (because they should all be in the classpath).
+   */
+  val solrWar = new File(classOf[SolrRunner].getResource("/solr.war").toURI)
+
   private val logger: Logger = LoggerFactory.getLogger(classOf[SolrRunner])
   private var solrRunners: Map[Int,SolrRunner] = Map.empty
 
@@ -200,7 +216,5 @@ object SolrRunner {
     FileUtils.copyDirectory(template, solrHome)
     solrHome
   }
-
-  private val solrWar = new File(classOf[SolrRunner].getResource("/solr.war").toURI)
 
 }

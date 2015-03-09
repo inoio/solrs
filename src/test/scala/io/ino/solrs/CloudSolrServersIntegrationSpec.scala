@@ -46,6 +46,11 @@ class CloudSolrServersIntegrationSpec extends FunSpec with BeforeAndAfterAll wit
     cloudSolrServer.setDefaultCollection("collection1")
 
     cut = new CloudSolrServers(zk.getConnectString, clusterStateUpdateInterval = 100 millis)
+
+    cloudSolrServer.deleteByQuery("*:*")
+    import scala.collection.JavaConversions._
+    cloudSolrServer.add(someDocs)
+    cloudSolrServer.commit()
   }
 
   override def afterAll(configMap: ConfigMap) {
@@ -54,13 +59,6 @@ class CloudSolrServersIntegrationSpec extends FunSpec with BeforeAndAfterAll wit
     solrs.values.foreach(_.shutdown)
     solrRunners.foreach(_.stop())
     zk.close()
-  }
-
-  override def beforeEach(): Unit = {
-    cloudSolrServer.deleteByQuery("*:*")
-    import scala.collection.JavaConversions._
-    cloudSolrServer.add(someDocs)
-    cloudSolrServer.commit()
   }
 
   override def afterEach() {

@@ -1,7 +1,9 @@
 package io.ino.solrs
 
 import java.io.File
-import java.nio.file.{Files, Paths}
+import java.net.{URL, URLDecoder}
+import java.nio.file.{Files, Paths, Path}
+import java.util.jar.{Attributes, JarFile}
 import java.util.logging.Level
 
 import org.apache.catalina.LifecycleState
@@ -44,7 +46,7 @@ class SolrRunner(val port: Int,
 
     tomcat = new Tomcat
     tomcat.setPort(port)
-    val baseDir = Paths.get(System.getProperty("java.io.tmpdir"), s"solrs-tc-basedir.$port")
+    val baseDir = tmpDir.resolve(s"solrs-tc-basedir.$port")
 
     Files.createDirectories(baseDir)
     Files.createDirectories(baseDir.resolve("webapps"))
@@ -184,7 +186,33 @@ object SolrRunner {
    * The (downstripped) solr war, is the solr.war extracted from the solr distribution with
    * WEB-INF/libs removed (because they should all be in the classpath).
    */
-  val solrWar = new File(classOf[SolrRunner].getResource("/solr.war").toURI)
+  lazy val solrWar = {
+    // when loaded from a jar getResource("/solr.war") returns s.th. like
+    // jar:file:/home/magro/.ivy2/local/io.ino/solrs_2.11/1.0.2/jars/solrs_2.11-tests.jar!/solr.war
+    val warUrl = classOf[SolrRunner].getResource("/solr.war")
+    if(warUrl.getProtocol == "file") {
+      new File(warUrl.toURI)
+    } else if(warUrl.getProtocol == "jar") {
+      // copy the war file to tmp dir
+      val solrsVersion = getJarManifestVersion(warUrl)
+      val tmpWarFile = tmpDir.resolve("solrs").resolve(s"solr-$solrsVersion.war")
+      if(!tmpWarFile.toFile.exists()) {
+        if(!tmpWarFile.getParent.toFile.exists()) {
+          Files.createDirectories(tmpWarFile.getParent)
+        }
+        Files.copy(classOf[SolrRunner].getResourceAsStream("/solr.war"), tmpWarFile)
+      }
+      tmpWarFile.toFile
+    } else {
+      throw new UnsupportedOperationException(s"Cannot load solr war from URL $warUrl")
+    }
+  }
+
+  private def getJarManifestVersion(warUrl: URL): String = {
+    val jarPath = warUrl.getPath().substring(5, warUrl.getPath().indexOf("!"))
+    val jar = new JarFile(URLDecoder.decode(jarPath, "UTF-8"))
+    jar.getManifest.getMainAttributes.getValue(Attributes.Name.IMPLEMENTATION_VERSION)
+  }
 
   private val logger: Logger = LoggerFactory.getLogger(classOf[SolrRunner])
   private var solrRunners: Map[Int,SolrRunner] = Map.empty
@@ -216,5 +244,7 @@ object SolrRunner {
     FileUtils.copyDirectory(template, solrHome)
     solrHome
   }
+
+  private def tmpDir: Path = Paths.get(System.getProperty("java.io.tmpdir"))
 
 }

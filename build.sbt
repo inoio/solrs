@@ -18,7 +18,10 @@ crossScalaVersions := Seq("2.10.4", "2.11.4")
 // E.g. adds dependency-graph task
 net.virtualvoid.sbt.graph.Plugin.graphSettings
 
-resolvers += "JCenter" at "http://jcenter.bintray.com/"
+resolvers ++= Seq(
+  "JCenter" at "http://jcenter.bintray.com/",
+  "Restlet Repositories" at "http://maven.restlet.org"
+)
 
 // add scala-xml dependency when needed (for Scala 2.11 and newer)
 // this mechanism supports cross-version publishing
@@ -41,13 +44,12 @@ libraryDependencies ++= Seq(
   "com.codahale.metrics" % "metrics-core" % "3.0.2" % "optional",
   "org.slf4j" % "slf4j-api" % slf4jVersion,
   "com.typesafe.akka" %% "akka-actor" % "2.3.7",
-  "org.restlet.jee" % "org.restlet" % "2.1.1" % "test", // needed by o.a.s.rest.RestManager
   "org.slf4j" % "slf4j-simple" % slf4jVersion % "test",
   "org.scalatest" %% "scalatest" % "2.2.2" % "test",
   "org.mockito" % "mockito-core" % "1.10.13" % "test",
   "org.clapper" %% "grizzled-scala" % "1.2" % "test",
   // Cloud testing, solr-core for ZkController (upconfig), curator-test for ZK TestingServer
-  "org.apache.solr" % "solr-core" % solrVersion % "test" excludeAll(ExclusionRule(organization = "org.restlet.jee")),
+  "org.apache.solr" % "solr-core" % solrVersion % "test",
   "org.apache.curator" % "curator-test" % "2.7.0" % "test",
   // tomcat
   "org.apache.tomcat" % "tomcat-catalina" % tomcatVersion % "test",

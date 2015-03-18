@@ -30,7 +30,7 @@ class AsyncSolrClientCloudIntegrationSpec extends FunSpec with BeforeAndAfterAll
   private var zk: TestingServer = _
   private var solrRunners = List.empty[SolrRunner]
 
-  private var cut: AsyncSolrClient = _
+  private var cut: AsyncSolrClient[scala.concurrent.Future] = _
   private var cloudSolrServer: CloudSolrClient = _
 
   private val logger = LoggerFactory.getLogger(getClass)

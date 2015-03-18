@@ -7,7 +7,7 @@ import org.apache.solr.client.solrj.{SolrServerException, SolrQuery}
 import org.apache.solr.common.cloud._
 import org.slf4j.LoggerFactory
 
-import scala.concurrent.Future
+import io.ino.solrs.future.{Future, Factory, ScalaFactory}
 import scala.util.control.NonFatal
 
 /**
@@ -187,7 +187,7 @@ class CloudSolrServers(zkHost: String,
 
 }
 
-class ReloadingSolrServers(url: String, extractor: Array[Byte] => IndexedSeq[SolrServer], httpClient: AsyncHttpClient) extends SolrServers {
+class ReloadingSolrServers[F[_]](url: String, extractor: Array[Byte] => IndexedSeq[SolrServer], httpClient: AsyncHttpClient)(implicit futureFactory: Factory[F] = ScalaFactory) extends SolrServers {
 
   private val logger = LoggerFactory.getLogger(getClass())
 
@@ -205,8 +205,8 @@ class ReloadingSolrServers(url: String, extractor: Array[Byte] => IndexedSeq[Sol
    */
   override def matching(q: SolrQuery): IndexedSeq[SolrServer] = solrServers
 
-  def reload(): Future[IndexedSeq[SolrServer]] = {
-    import scala.concurrent.ExecutionContext.Implicits.global
+  def reload(): F[IndexedSeq[SolrServer]] = {
+    val f =
     loadUrl().map { data =>
       // TODO: check if solr servers actually changed, perhaps only add/remove changed stuff
       // or somehow preserve the status of servers
@@ -215,10 +215,11 @@ class ReloadingSolrServers(url: String, extractor: Array[Byte] => IndexedSeq[Sol
       logger.info(s"Changed solr servers from $oldServers to $solrServers")
       solrServers
     }
+    futureFactory.toBase(f)
   }
 
   protected def loadUrl(): Future[Array[Byte]] = {
-    val promise = scala.concurrent.promise[Array[Byte]]
+    val promise = futureFactory.newPromise[Array[Byte]]
     httpClient.prepareGet(url).execute(new AsyncCompletionHandler[Response]() {
       override def onCompleted(response: Response): Response = {
         promise.success(response.getResponseBodyAsBytes)

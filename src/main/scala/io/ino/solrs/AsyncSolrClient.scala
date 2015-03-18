@@ -19,7 +19,7 @@ import com.ning.http.client.{AsyncCompletionHandler, AsyncHttpClient, Response}
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.control.NonFatal
-import scala.concurrent.{ExecutionContext, Future}
+import io.ino.solrs.future.{Future, Factory, ScalaFactory}
 import scala.util.Try
 import org.apache.solr.common.SolrException
 import org.apache.solr.client.solrj.impl.BinaryResponseParser
@@ -29,55 +29,59 @@ import HttpUtils._
 
 object AsyncSolrClient {
 
-  def apply(baseUrl: String) = new Builder(new SingleServerLB(baseUrl)).build
-  def apply(loadBalancer: LoadBalancer) = new Builder(loadBalancer).build
+  def apply[F[_]](baseUrl: String)(implicit futureFactory: Factory[F] = ScalaFactory) = 
+    new Builder(new SingleServerLB(baseUrl)).build
+  def apply[F[_]](loadBalancer: LoadBalancer)(implicit futureFactory: Factory[F] = ScalaFactory) = 
+    new Builder(loadBalancer).build
 
   object Builder {
-    def apply(baseUrl: String) = new Builder(baseUrl)
-    def apply(loadBalancer: LoadBalancer) = new Builder(loadBalancer)
+    def apply[F[_]](baseUrl: String)(implicit futureFactory: Factory[F] = ScalaFactory) = 
+      new Builder(baseUrl)
+    def apply[F[_]](loadBalancer: LoadBalancer)(implicit futureFactory: Factory[F] = ScalaFactory) = 
+      new Builder(loadBalancer)
   }
 
-  case class Builder private (loadBalancer: LoadBalancer,
+  case class Builder[F[_]] private (loadBalancer: LoadBalancer,
                               httpClient: Option[AsyncHttpClient],
                               shutdownHttpClient: Boolean,
                               requestInterceptor: Option[RequestInterceptor] = None,
                               responseParser: Option[ResponseParser] = None,
                               metrics: Option[Metrics] = None,
-                              serverStateObservation: Option[ServerStateObservation] = None,
-                              retryPolicy: RetryPolicy = RetryPolicy.TryOnce) {
+                              serverStateObservation: Option[ServerStateObservation[F]] = None,
+                              retryPolicy: RetryPolicy = RetryPolicy.TryOnce)(implicit futureFactory: Factory[F]= ScalaFactory) {
 
-    def this(loadBalancer: LoadBalancer) = this(loadBalancer, None, true)
-    def this(baseUrl: String) = this(new SingleServerLB(baseUrl))
+    def this(loadBalancer: LoadBalancer)(implicit futureFactory: Factory[F]) = this(loadBalancer, None, true)
+    def this(baseUrl: String)(implicit futureFactory: Factory[F]) = this(new SingleServerLB(baseUrl))
 
-    def withHttpClient(httpClient: AsyncHttpClient): Builder = {
+    def withHttpClient(httpClient: AsyncHttpClient): Builder[F] = {
       copy(httpClient = Some(httpClient), shutdownHttpClient = false)
     }
 
-    def withRequestInterceptor(requestInterceptor: RequestInterceptor): Builder = {
+    def withRequestInterceptor(requestInterceptor: RequestInterceptor): Builder[F] = {
       copy(requestInterceptor = Some(requestInterceptor))
     }
 
-    def withResponseParser(responseParser: ResponseParser): Builder = {
+    def withResponseParser(responseParser: ResponseParser): Builder[F] = {
       copy(responseParser = Some(responseParser))
     }
 
-    def withMetrics(metrics: Metrics): Builder = {
+    def withMetrics(metrics: Metrics): Builder[F] = {
       copy(metrics = Some(metrics))
     }
 
     /**
      * Configures server state observation using the given observer and the provided interval.
      */
-    def withServerStateObservation(serverStateObserver: ServerStateObserver,
+    def withServerStateObservation(serverStateObserver: ServerStateObserver[F],
                               checkInterval: FiniteDuration,
-                              actorSystem: ActorSystem)(implicit ec: ExecutionContext): Builder = {
-      copy(serverStateObservation = Some(ServerStateObservation(serverStateObserver, checkInterval, actorSystem, ec)))
+                              actorSystem: ActorSystem): Builder[F] = {
+      copy(serverStateObservation = Some(ServerStateObservation[F](serverStateObserver, checkInterval, actorSystem, futureFactory)))
     }
 
     /**
      * Configure the retry policy to apply for failed requests.
      */
-    def withRetryPolicy(retryPolicy: RetryPolicy): Builder = {
+    def withRetryPolicy(retryPolicy: RetryPolicy): Builder[F] = {
       copy(retryPolicy = retryPolicy)
     }
 
@@ -87,8 +91,8 @@ object AsyncSolrClient {
 
     protected def createMetrics: Metrics = NoopMetrics
 
-    def build: AsyncSolrClient = {
-      new AsyncSolrClient(
+    def build: AsyncSolrClient[F] = {
+      new AsyncSolrClient[F](
         loadBalancer,
         httpClient.getOrElse(createHttpClient),
         shutdownHttpClient,
@@ -110,14 +114,14 @@ object AsyncSolrClient {
  *
  * @author <a href="martin.grotzke@inoio.de">Martin Grotzke</a>
  */
-class AsyncSolrClient private (val loadBalancer: LoadBalancer,
+class AsyncSolrClient[F[_]] private (val loadBalancer: LoadBalancer,
                                val httpClient: AsyncHttpClient,
                                shutdownHttpClient: Boolean,
                                requestInterceptor: Option[RequestInterceptor] = None,
                                responseParser: ResponseParser = new BinaryResponseParser,
                                val metrics: Metrics = NoopMetrics,
-                               serverStateObservation: Option[ServerStateObservation] = None,
-                               retryPolicy: RetryPolicy = RetryPolicy.TryOnce) {
+                               serverStateObservation: Option[ServerStateObservation[F]] = None,
+                               retryPolicy: RetryPolicy = RetryPolicy.TryOnce)(implicit futureFactory: Factory[F]) {
 
   private val UTF_8 = "UTF-8"
   private val DEFAULT_PATH = "/select"
@@ -125,14 +129,15 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
   /**
    * User-Agent String.
    */
-  val AGENT = "Solr[" + classOf[AsyncSolrClient].getName() + "] 1.0"
+  val AGENT = "Solr[" + classOf[AsyncSolrClient[F]].getName() + "] 1.0"
 
   private val logger = LoggerFactory.getLogger(getClass())
 
   private val cancellableObservation = serverStateObservation.map { observation =>
+    //Verifichiamo se è possibile schedulare senza akka... o in un altro modo...
     observation.actorSystem.scheduler.schedule(0 seconds, observation.checkInterval) {
-      observation.serverStateObserver.checkServerStatus()(observation.ec)
-    }(observation.ec)
+      observation.serverStateObserver.checkServerStatus()
+    }(scala.concurrent.ExecutionContext.global)
   }
 
   private def sanitize(baseUrl: String): String = {
@@ -156,49 +161,66 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
     }
   }
 
-  def query(q: SolrQuery): Future[QueryResponse] = {
-    loadBalanceQuery(QueryContext(q))
+  def query(q: SolrQuery): F[QueryResponse] = {
+    futureFactory.toBase(
+    loadBalanceQuery(QueryContext(q)))
   }
 
   private def loadBalanceQuery(queryContext: QueryContext): Future[QueryResponse] = {
+    val promise = futureFactory.newPromise[QueryResponse]
     loadBalancer.solrServer(queryContext.q) match {
-      case Some(solrServer) => queryWithRetries(solrServer, queryContext)
+      case Some(solrServer) =>
+        queryWithRetries(solrServer, queryContext).flatMap(qr => {promise.success(qr); promise.future})
       case None =>
         val msg =
           if(queryContext.failedRequests.isEmpty) "No solr server available."
           else s"No next solr server available. These requests failed:\n- ${queryContext.failedRequests.mkString("\n- ")}"
-        Future.failed(new SolrServerException(msg))
+        promise.failure(new SolrServerException(msg))
     }
+    promise.future
   }
 
+  
   private def queryWithRetries(server: SolrServer, queryContext: QueryContext): Future[QueryResponse] = {
-    import scala.concurrent.ExecutionContext.Implicits.global
     val start = System.currentTimeMillis()
-    query(server, queryContext.q).recoverWith { case NonFatal(e) =>
-      val updatedContext = queryContext.failedRequest(server, (System.currentTimeMillis() - start) millis, e)
-      retryPolicy.shouldRetry(e, server, updatedContext, loadBalancer) match {
-        case RetryServer(s) =>
-          logger.warn(s"Query failed for server $server, trying next server $s. Exception was: $e")
-          queryWithRetries(s, updatedContext)
-        case StandardRetryDecision(Result.Retry) =>
-          logger.warn(s"Query failed for server $server, trying to get another server from loadBalancer for retry. Exception was: $e")
-          loadBalanceQuery(updatedContext)
-        case StandardRetryDecision(Result.Fail) =>
-          logger.warn(s"Query failed for server $server, not retrying. Exception was: $e", e)
-          // Wrap SolrException with solrs RemoteSolrException
-          val ex = if(e.isInstanceOf[SolrException]) new RemoteSolrException(500, e.getMessage, e) else e
-          Future.failed(ex)
+    
+    val result = futureFactory.newPromise[QueryResponse]
+    for {
+      queryDone <- query(server, queryContext.q)
+    } yield {
+      queryDone match {
+        case (None, Some(err)) =>
+          err match {
+            case NonFatal(e) =>
+            	val updatedContext = queryContext.failedRequest(server, (System.currentTimeMillis() - start) millis, e)
+            	retryPolicy.shouldRetry(e, server, updatedContext, loadBalancer) match {
+            		case RetryServer(s) =>
+            			logger.warn(s"Query failed for server $server, trying next server $s. Exception was: $e")
+            			queryWithRetries(s, updatedContext).map(r => result.success(r))
+            		case StandardRetryDecision(Result.Retry) =>
+            			logger.warn(s"Query failed for server $server, trying to get another server from loadBalancer for retry. Exception was: $e")
+            			loadBalanceQuery(updatedContext).map(r => result.success(r))
+            		case StandardRetryDecision(Result.Fail) =>
+            			logger.warn(s"Query failed for server $server, not retrying. Exception was: $e", e)
+            			//Wrap SolrException with solrs RemoteSolrException
+            			val ex = if(e.isInstanceOf[SolrException]) new RemoteSolrException(500, e.getMessage, e) else e
+            			result.failure(ex)
+            	}
+          }
+        case (Some(done), _) => result.success(done)
+        case _ => result.failure(new Exception("Unmanageble"))
       }
     }
+    result.future  
   }
 
-  private def query(solrServer: SolrServer, q: SolrQuery): Future[QueryResponse] = {
+  private def query(solrServer: SolrServer, q: SolrQuery): Future[(Option[QueryResponse], Option[Throwable])] = {
     requestInterceptor.map(ri =>
       ri.interceptQuery(doQuery)(solrServer, q)
     ).getOrElse(doQuery(solrServer, q))
   }
 
-  private def doQuery(solrServer: SolrServer, q: SolrQuery): Future[QueryResponse] = {
+  private def doQuery(solrServer: SolrServer, q: SolrQuery): Future[(Option[QueryResponse], Option[Throwable])] = {
 
     val wparams = new ModifiableSolrParams(q)
     if (responseParser != null) {
@@ -208,20 +230,20 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
 
     implicit val s = solrServer
 
-    val promise = scala.concurrent.promise[QueryResponse]
+    val promise = futureFactory.newPromise[(Option[QueryResponse], Option[Throwable])]
     val startTime = System.currentTimeMillis()
 
     val url = solrServer.baseUrl + getPath(q) + ClientUtils.toQueryString(wparams, false)
     val request = httpClient.prepareGet(url).addHeader("User-Agent", AGENT).build()
     httpClient.executeRequest(request, new AsyncCompletionHandler[Response]() {
       override def onCompleted(response: Response): Response = {
-        val tryQueryResponse = Try(toQueryResponse(response, url, startTime))
-        promise.complete(tryQueryResponse)
+        val tqr = toQueryResponse(response, url, startTime)
+        promise.success(Some(tqr), None)
         response
       }
       override def onThrowable(t: Throwable) {
         metrics.countException
-        promise.failure(t)
+        promise.success(None, Some(t))
       }
     })
 

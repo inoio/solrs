@@ -2,10 +2,10 @@ package io.ino.solrs
 
 import org.apache.solr.client.solrj.SolrQuery
 import org.scalatest.{FunSpec, Matchers}
-
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.language.postfixOps
+import io.ino.solrs.future.ScalaFactory
 
 class SolrServersSpec extends FunSpec with Matchers with FutureAwaits {
 
@@ -33,7 +33,11 @@ class SolrServersSpec extends FunSpec with Matchers with FutureAwaits {
       var data = "host1,host2"
 
       val cut = new ReloadingSolrServers("http://some.url", parse, null) {
-        override def loadUrl() = Future.successful(data.getBytes)
+        override def loadUrl() = {
+          val promise = io.ino.solrs.future.ScalaFactory.newPromise[Array[Byte]]
+          promise.success(data.getBytes)
+          promise.future
+        }
       }
       cut.all should have size (0)
       val iterator = cut.matching(q)

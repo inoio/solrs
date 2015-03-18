@@ -3,7 +3,7 @@ package io.ino.solrs
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.response.QueryResponse
 
-import scala.concurrent.Future
+import io.ino.solrs.future.Future
 
 /**
  * Clients can intercept requests.
@@ -17,7 +17,7 @@ trait RequestInterceptor {
    * @param q the query to send to solr.
    * @return the query response.
    */
-  def interceptQuery(f: (SolrServer, SolrQuery) => Future[QueryResponse])
-                    (solrServer: SolrServer, q: SolrQuery): Future[QueryResponse]
+  def interceptQuery(f: (SolrServer, SolrQuery) => Future[(Option[QueryResponse], Option[Throwable])])
+                    (solrServer: SolrServer, q: SolrQuery): Future[(Option[QueryResponse], Option[Throwable])]
 
 }

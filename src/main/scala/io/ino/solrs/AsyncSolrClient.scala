@@ -167,17 +167,17 @@ class AsyncSolrClient[F[_]] private (val loadBalancer: LoadBalancer,
   }
 
   private def loadBalanceQuery(queryContext: QueryContext): Future[QueryResponse] = {
-    val promise = futureFactory.newPromise[QueryResponse]
     loadBalancer.solrServer(queryContext.q) match {
       case Some(solrServer) =>
-        queryWithRetries(solrServer, queryContext).flatMap(qr => {promise.success(qr); promise.future})
+        queryWithRetries(solrServer, queryContext)
       case None =>
+        val promise = futureFactory.newPromise[QueryResponse]
         val msg =
           if(queryContext.failedRequests.isEmpty) "No solr server available."
           else s"No next solr server available. These requests failed:\n- ${queryContext.failedRequests.mkString("\n- ")}"
         promise.failure(new SolrServerException(msg))
+        promise.future
     }
-    promise.future
   }
 
   
@@ -186,7 +186,7 @@ class AsyncSolrClient[F[_]] private (val loadBalancer: LoadBalancer,
     
     val result = futureFactory.newPromise[QueryResponse]
     for {
-      queryDone <- query(server, queryContext.q)
+      queryDone <- inner_query(server, queryContext.q)
     } yield {
       queryDone match {
         case (None, Some(err)) =>
@@ -214,10 +214,24 @@ class AsyncSolrClient[F[_]] private (val loadBalancer: LoadBalancer,
     result.future  
   }
 
-  private def query(solrServer: SolrServer, q: SolrQuery): Future[(Option[QueryResponse], Option[Throwable])] = {
+  private def inner_query(solrServer: SolrServer, q: SolrQuery): Future[(Option[QueryResponse], Option[Throwable])] = {
     requestInterceptor.map(ri =>
       ri.interceptQuery(doQuery)(solrServer, q)
     ).getOrElse(doQuery(solrServer, q))
+  }
+
+  private def query(solrServer: SolrServer, q: SolrQuery): Future[QueryResponse] = {
+    val result = futureFactory.newPromise[QueryResponse]
+    for {
+      queryDone <- inner_query(solrServer,q)
+    } yield {
+      queryDone match {
+        case (None, Some(err)) => result.failure(err)
+        case (Some(done), _) => result.success(done)
+        case _ => result.failure(new Exception("Unmanageble"))
+      }
+    }
+    result.future
   }
 
   private def doQuery(solrServer: SolrServer, q: SolrQuery): Future[(Option[QueryResponse], Option[Throwable])] = {

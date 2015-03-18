@@ -26,13 +26,13 @@ import com.codahale.metrics.MetricRegistry
 import com.codahale.metrics.MetricRegistry._
 import java.util.concurrent.TimeUnit._
 
-class CodaHaleMetrics(val registry: MetricRegistry = new MetricRegistry()) extends Metrics {
+class CodaHaleMetrics[F[_]](val registry: MetricRegistry = new MetricRegistry()) extends Metrics {
 
-  private val requestTimer = registry.timer(name(classOf[AsyncSolrClient], "requests"))
+  private val requestTimer = registry.timer(name(classOf[AsyncSolrClient[F]], "requests"))
 
-  private val remoteSolrExceptionCounter = registry.meter(name(classOf[AsyncSolrClient], "remote-exceptions"))
-  private val transformResponseExceptionCounter = registry.meter(name(classOf[AsyncSolrClient], "transform-response-exceptions"))
-  private val exceptionCounter = registry.meter(name(classOf[AsyncSolrClient], "other-exceptions"))
+  private val remoteSolrExceptionCounter = registry.meter(name(classOf[AsyncSolrClient[F]], "remote-exceptions"))
+  private val transformResponseExceptionCounter = registry.meter(name(classOf[AsyncSolrClient[F]], "transform-response-exceptions"))
+  private val exceptionCounter = registry.meter(name(classOf[AsyncSolrClient[F]], "other-exceptions"))
 
   override def requestTime(timeInMillis: Long) = requestTimer.update(timeInMillis, MILLISECONDS)
 

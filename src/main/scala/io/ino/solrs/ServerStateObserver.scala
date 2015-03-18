@@ -67,7 +67,7 @@ class PingStatusObserver[F[_]](solrServers: SolrServers, httpClient: AsyncHttpCl
     val unity = futureFactory.newPromise[Unit]
     unity.success()
     futureFactory.toBase(
-    futures.foldLeft(unity.future)((res,f) => res.flatMap(x => f)))
+    futures.fold(unity.future)((res,f) => f.flatMap(x => res)))
   }
 
   private def updateServerStatus(server: SolrServer, response: Response, url: String) {

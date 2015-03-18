@@ -1,3 +1,7 @@
 .idea
 .solr
 target
+project/target
+.classpath
+.cache
+.project

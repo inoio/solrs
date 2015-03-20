@@ -1,31 +1,28 @@
 package io.ino.solrs
 
 import java.io.IOException
+import java.util.Locale
 
 import akka.actor.ActorSystem
+import com.ning.http.client.{AsyncCompletionHandler, AsyncHttpClient, Response}
+import io.ino.concurrent.Execution
+import io.ino.solrs.HttpUtils._
 import io.ino.solrs.RetryDecision.Result
-import org.apache.solr.client.solrj.ResponseParser
-import org.apache.solr.client.solrj.SolrQuery
-import org.apache.solr.client.solrj.SolrServerException
+import org.apache.commons.io.IOUtils
+import org.apache.solr.client.solrj.impl.BinaryResponseParser
 import org.apache.solr.client.solrj.response.QueryResponse
-
 import org.apache.solr.client.solrj.util.ClientUtils
+import org.apache.solr.client.solrj.{ResponseParser, SolrQuery, SolrServerException}
+import org.apache.solr.common.SolrException
 import org.apache.solr.common.params.{CommonParams, ModifiableSolrParams}
 import org.apache.solr.common.util.NamedList
 import org.slf4j.LoggerFactory
 
-import com.ning.http.client.{AsyncCompletionHandler, AsyncHttpClient, Response}
-
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.language.postfixOps
-import scala.util.control.NonFatal
-import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
-import org.apache.solr.common.SolrException
-import org.apache.solr.client.solrj.impl.BinaryResponseParser
-import java.util.Locale
-import org.apache.commons.io.IOUtils
-import HttpUtils._
+import scala.util.control.NonFatal
 
 object AsyncSolrClient {
 
@@ -70,8 +67,8 @@ object AsyncSolrClient {
      */
     def withServerStateObservation(serverStateObserver: ServerStateObserver,
                               checkInterval: FiniteDuration,
-                              actorSystem: ActorSystem)(implicit ec: ExecutionContext): Builder = {
-      copy(serverStateObservation = Some(ServerStateObservation(serverStateObserver, checkInterval, actorSystem, ec)))
+                              actorSystem: ActorSystem): Builder = {
+      copy(serverStateObservation = Some(ServerStateObservation(serverStateObserver, checkInterval, actorSystem)))
     }
 
     /**
@@ -131,8 +128,8 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
 
   private val cancellableObservation = serverStateObservation.map { observation =>
     observation.actorSystem.scheduler.schedule(0 seconds, observation.checkInterval) {
-      observation.serverStateObserver.checkServerStatus()(observation.ec)
-    }(observation.ec)
+      observation.serverStateObserver.checkServerStatus()
+    }(Execution.Implicits.sameThreadContext)
   }
 
   private def sanitize(baseUrl: String): String = {
@@ -172,7 +169,7 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
   }
 
   private def queryWithRetries(server: SolrServer, queryContext: QueryContext): Future[QueryResponse] = {
-    import scala.concurrent.ExecutionContext.Implicits.global
+    import io.ino.concurrent.Execution.Implicits.sameThreadContext
     val start = System.currentTimeMillis()
     query(server, queryContext.q).recoverWith { case NonFatal(e) =>
       val updatedContext = queryContext.failedRequest(server, (System.currentTimeMillis() - start) millis, e)

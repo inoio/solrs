@@ -206,7 +206,7 @@ class ReloadingSolrServers(url: String, extractor: Array[Byte] => IndexedSeq[Sol
   override def matching(q: SolrQuery): IndexedSeq[SolrServer] = solrServers
 
   def reload(): Future[IndexedSeq[SolrServer]] = {
-    import scala.concurrent.ExecutionContext.Implicits.global
+    import io.ino.concurrent.Execution.Implicits.sameThreadContext
     loadUrl().map { data =>
       // TODO: check if solr servers actually changed, perhaps only add/remove changed stuff
       // or somehow preserve the status of servers

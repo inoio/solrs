@@ -1,12 +1,12 @@
 package io.ino.solrs
 
 import akka.actor.ActorSystem
-import com.ning.http.client.{Response, AsyncCompletionHandler, AsyncHttpClient}
+import com.ning.http.client.{AsyncCompletionHandler, AsyncHttpClient, Response}
 import org.slf4j.LoggerFactory
 
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.language.postfixOps
-import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Success
 import scala.xml.XML
 
@@ -14,7 +14,7 @@ import scala.xml.XML
  * Monitoring of solr server state (enabled/disabled/dead etc.)
  */
 trait ServerStateObserver {
-  def checkServerStatus()(implicit ec: ExecutionContext): Future[Unit]
+  def checkServerStatus(): Future[Unit]
 }
 
 /**
@@ -22,12 +22,10 @@ trait ServerStateObserver {
  * @param serverStateObserver the observer that checks server state
  * @param checkInterval the interval to check server state
  * @param actorSystem used for scheduling
- * @param ec used for running the scheduled observation
  */
 case class ServerStateObservation(serverStateObserver: ServerStateObserver,
                                   checkInterval: FiniteDuration,
-                                  actorSystem: ActorSystem,
-                                  ec: ExecutionContext)
+                                  actorSystem: ActorSystem)
 
 
 /**
@@ -44,7 +42,8 @@ class PingStatusObserver(solrServers: SolrServers, httpClient: AsyncHttpClient) 
 
   private val logger = LoggerFactory.getLogger(getClass())
 
-  override def checkServerStatus()(implicit ec: ExecutionContext): Future[Unit] = {
+  override def checkServerStatus(): Future[Unit] = {
+    import io.ino.concurrent.Execution.Implicits.sameThreadContext
     val futures = solrServers.all.map { server =>
       val url = server.baseUrl + "/admin/ping?action=status"
       val promise = scala.concurrent.promise[Unit]

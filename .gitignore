@@ -5,3 +5,6 @@ project/target
 .classpath
 .cache
 .project
+.idea_modules
+projectFilesBackup
+

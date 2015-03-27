@@ -15,6 +15,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 class PingStatusObserverIntegrationSpec extends FunSpec with RunningSolr with BeforeAndAfterEach with Matchers with FutureAwaits with MockitoSugar {
 
   private implicit val awaitTimeout = 1000 millis
+  private implicit val futureFactory = io.ino.solrs.future.ScalaFactory
   private val httpClientTimeout = 300
   private val httpClient = new AsyncHttpClient()
 

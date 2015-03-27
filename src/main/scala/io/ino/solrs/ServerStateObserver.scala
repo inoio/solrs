@@ -40,7 +40,7 @@ case class ServerStateObservation[F[_]](serverStateObserver: ServerStateObserver
  */
 class PingStatusObserver[F[_]](solrServers: SolrServers, httpClient: AsyncHttpClient)(implicit futureFactory: Factory[F] = ScalaFactory) extends ServerStateObserver[F] {
 
-  def this(solrServers: Seq[SolrServer], httpClient: AsyncHttpClient)(implicit futureFactory: Factory[F] = ScalaFactory) = this(new StaticSolrServers(solrServers.toIndexedSeq), httpClient)
+  def this(solrServers: Seq[SolrServer], httpClient: AsyncHttpClient)(implicit futureFactory: Factory[F]) = this(new StaticSolrServers(solrServers.toIndexedSeq), httpClient)
 
   private val logger = LoggerFactory.getLogger(getClass())
 

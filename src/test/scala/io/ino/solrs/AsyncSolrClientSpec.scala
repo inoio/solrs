@@ -15,6 +15,7 @@ class AsyncSolrClientSpec extends FunSpec with Matchers with FutureAwaits with M
 
   private val query = new SolrQuery("*:*")
   private implicit val timeout = 1.second
+  private implicit val futureFactory = io.ino.solrs.future.ScalaFactory
 
   describe("Solr") {
 

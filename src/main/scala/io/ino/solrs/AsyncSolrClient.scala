@@ -4,6 +4,7 @@ import java.io.IOException
 
 import akka.actor.ActorSystem
 import io.ino.solrs.RetryDecision.Result
+import io.ino.solrs.future.Promise
 import org.apache.solr.client.solrj.ResponseParser
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.SolrServerException
@@ -19,8 +20,7 @@ import com.ning.http.client.{AsyncCompletionHandler, AsyncHttpClient, Response}
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.control.NonFatal
-import io.ino.solrs.future.{Future, Factory, ScalaFactory}
-import scala.util.Try
+import io.ino.solrs.future._
 import org.apache.solr.common.SolrException
 import org.apache.solr.client.solrj.impl.BinaryResponseParser
 import java.util.Locale
@@ -29,15 +29,15 @@ import HttpUtils._
 
 object AsyncSolrClient {
 
-  def apply[F[_]](baseUrl: String)(implicit futureFactory: Factory[F] = ScalaFactory) = 
+  def apply[F[_]](baseUrl: String)(implicit futureFactory: Factory[F]) = 
     new Builder(new SingleServerLB(baseUrl)).build
-  def apply[F[_]](loadBalancer: LoadBalancer)(implicit futureFactory: Factory[F] = ScalaFactory) = 
+  def apply[F[_]](loadBalancer: LoadBalancer)(implicit futureFactory: Factory[F]) = 
     new Builder(loadBalancer).build
 
   object Builder {
-    def apply[F[_]](baseUrl: String)(implicit futureFactory: Factory[F] = ScalaFactory) = 
+    def apply[F[_]](baseUrl: String)(implicit futureFactory: Factory[F]) = 
       new Builder(baseUrl)
-    def apply[F[_]](loadBalancer: LoadBalancer)(implicit futureFactory: Factory[F] = ScalaFactory) = 
+    def apply[F[_]](loadBalancer: LoadBalancer)(implicit futureFactory: Factory[F]) = 
       new Builder(loadBalancer)
   }
 
@@ -48,10 +48,11 @@ object AsyncSolrClient {
                               responseParser: Option[ResponseParser] = None,
                               metrics: Option[Metrics] = None,
                               serverStateObservation: Option[ServerStateObservation[F]] = None,
-                              retryPolicy: RetryPolicy = RetryPolicy.TryOnce)(implicit futureFactory: Factory[F]= ScalaFactory) {
+                              retryPolicy: RetryPolicy = RetryPolicy.TryOnce)(implicit futureFactory: Factory[F] = ScalaFactory) {
 
-    def this(loadBalancer: LoadBalancer)(implicit futureFactory: Factory[F]) = this(loadBalancer, None, true)
-    def this(baseUrl: String)(implicit futureFactory: Factory[F]) = this(new SingleServerLB(baseUrl))
+    def this(loadBalancer: LoadBalancer)(implicit futureFactory: Factory[F]) = this(loadBalancer, None, true)(futureFactory)
+    def this(baseUrl: String)(implicit futureFactory: Factory[F]) = this(new SingleServerLB(baseUrl))(futureFactory)
+    
 
     def withHttpClient(httpClient: AsyncHttpClient): Builder[F] = {
       copy(httpClient = Some(httpClient), shutdownHttpClient = false)
@@ -180,61 +181,58 @@ class AsyncSolrClient[F[_]] private (val loadBalancer: LoadBalancer,
     }
   }
 
-  
-  private def queryWithRetries(server: SolrServer, queryContext: QueryContext): Future[QueryResponse] = {
-    val start = System.currentTimeMillis()
-    
-    val result = futureFactory.newPromise[QueryResponse]
-    for {
-      queryDone <- inner_query(server, queryContext.q)
-    } yield {
-      queryDone match {
-        case (None, Some(err)) =>
-          err match {
-            case NonFatal(e) =>
-            	val updatedContext = queryContext.failedRequest(server, (System.currentTimeMillis() - start) millis, e)
-            	retryPolicy.shouldRetry(e, server, updatedContext, loadBalancer) match {
-            		case RetryServer(s) =>
-            			logger.warn(s"Query failed for server $server, trying next server $s. Exception was: $e")
-            			queryWithRetries(s, updatedContext).map(r => result.success(r))
-            		case StandardRetryDecision(Result.Retry) =>
-            			logger.warn(s"Query failed for server $server, trying to get another server from loadBalancer for retry. Exception was: $e")
-            			loadBalanceQuery(updatedContext).map(r => result.success(r))
-            		case StandardRetryDecision(Result.Fail) =>
-            			logger.warn(s"Query failed for server $server, not retrying. Exception was: $e", e)
-            			//Wrap SolrException with solrs RemoteSolrException
-            			val ex = if(e.isInstanceOf[SolrException]) new RemoteSolrException(500, e.getMessage, e) else e
-            			result.failure(ex)
-            	}
-          }
-        case (Some(done), _) => result.success(done)
-        case _ => result.failure(new Exception("Unmanageble"))
-      }
-    }
-    result.future  
+  trait RecoverAction {
+    val start: Long = System.currentTimeMillis()
+
+    def recover(result: Promise[QueryResponse], err: Throwable): Unit
   }
 
-  private def inner_query(solrServer: SolrServer, q: SolrQuery): Future[(Option[QueryResponse], Option[Throwable])] = {
-    requestInterceptor.map(ri =>
-      ri.interceptQuery(doQuery)(solrServer, q)
-    ).getOrElse(doQuery(solrServer, q))
+  case class RetryRA(server: SolrServer, queryContext: QueryContext) extends RecoverAction {
+
+    def recover(result: Promise[QueryResponse], err: Throwable): Unit = {
+      err match {
+        case NonFatal(e) =>
+          val updatedContext = queryContext.failedRequest(server, (System.currentTimeMillis() - start) millis, e)
+          retryPolicy.shouldRetry(e, server, updatedContext, loadBalancer) match {
+            case RetryServer(s) =>
+              logger.warn(s"Query failed for server $server, trying next server $s. Exception was: $e")
+              queryWithRetries(s, updatedContext).map(r => result.success(r))
+            case StandardRetryDecision(Result.Retry) =>
+              logger.warn(s"Query failed for server $server, trying to get another server from loadBalancer for retry. Exception was: $e")
+              loadBalanceQuery(updatedContext).map(r => result.success(r))
+            case StandardRetryDecision(Result.Fail) =>
+              logger.warn(s"Query failed for server $server, not retrying. Exception was: $e", e)
+              //Wrap SolrException with solrs RemoteSolrException
+              val ex = if(e.isInstanceOf[SolrException]) new RemoteSolrException(500, e.getMessage, e) else e
+              result.failure(ex)
+          }
+      }
+    }
+  }
+  case class FailRA(_server: SolrServer) extends RecoverAction {
+    val server: SolrServer = _server
+
+    def recover(result: Promise[QueryResponse], err: Throwable): Unit = {
+      result.failure(err)
+    }
+  }
+
+  private def queryWithRetries(server: SolrServer, queryContext: QueryContext): Future[QueryResponse] = {
+      val recoverFailFun = FailRA(server)
+      val recoverFun = RetryRA(server, queryContext)
+      requestInterceptor.map(ri =>
+        ri.interceptQuery(doQuery(recoverFailFun.recover))(server, queryContext.q)
+      ).getOrElse(doQuery(recoverFun.recover)(server, queryContext.q))
   }
 
   private def query(solrServer: SolrServer, q: SolrQuery): Future[QueryResponse] = {
-    val result = futureFactory.newPromise[QueryResponse]
-    for {
-      queryDone <- inner_query(solrServer,q)
-    } yield {
-      queryDone match {
-        case (None, Some(err)) => result.failure(err)
-        case (Some(done), _) => result.success(done)
-        case _ => result.failure(new Exception("Unmanageble"))
-      }
-    }
-    result.future
+    val recoverFun = FailRA(solrServer)
+    requestInterceptor.map(ri =>
+      ri.interceptQuery(doQuery(recoverFun.recover))(solrServer, q)
+    ).getOrElse(query(solrServer, q))
   }
 
-  private def doQuery(solrServer: SolrServer, q: SolrQuery): Future[(Option[QueryResponse], Option[Throwable])] = {
+  private def doQuery(recoverWithAction: (Promise[QueryResponse], Throwable) => Unit)(solrServer: SolrServer, q: SolrQuery): Future[QueryResponse] = {
 
     val wparams = new ModifiableSolrParams(q)
     if (responseParser != null) {
@@ -244,7 +242,7 @@ class AsyncSolrClient[F[_]] private (val loadBalancer: LoadBalancer,
 
     implicit val s = solrServer
 
-    val promise = futureFactory.newPromise[(Option[QueryResponse], Option[Throwable])]
+    val promise = futureFactory.newPromise[QueryResponse]
     val startTime = System.currentTimeMillis()
 
     val url = solrServer.baseUrl + getPath(q) + ClientUtils.toQueryString(wparams, false)
@@ -252,17 +250,18 @@ class AsyncSolrClient[F[_]] private (val loadBalancer: LoadBalancer,
     httpClient.executeRequest(request, new AsyncCompletionHandler[Response]() {
       override def onCompleted(response: Response): Response = {
         val tqr = toQueryResponse(response, url, startTime)
-        promise.success(Some(tqr), None)
+        promise.success(tqr)
         response
       }
       override def onThrowable(t: Throwable) {
         metrics.countException
-        promise.success(None, Some(t))
+        recoverWithAction(promise, t)
       }
     })
 
     promise.future
   }
+
 
   protected def getPath(query: SolrQuery): String = {
     val qt = query.get(CommonParams.QT)

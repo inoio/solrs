@@ -26,6 +26,7 @@ import scala.util.control.NonFatal
 class AsyncSolrClientCloudIntegrationSpec extends FunSpec with BeforeAndAfterAll with BeforeAndAfterEach with Matchers with FutureAwaits with MockitoSugar {
 
   private implicit val timeout = 5.second
+  private implicit val futureFactory = io.ino.solrs.future.ScalaFactory
 
   private var zk: TestingServer = _
   private var solrRunners = List.empty[SolrRunner]

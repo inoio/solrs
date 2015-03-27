@@ -22,6 +22,7 @@ import scala.language.postfixOps
 class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with BeforeAndAfterEach with Matchers with FutureAwaits with MockitoSugar {
 
   private implicit val timeout = 1.second
+  private implicit val futureFactory = io.ino.solrs.future.ScalaFactory
   private val httpClient = new AsyncHttpClient()
 
   import io.ino.solrs.SolrUtils._
@@ -138,8 +139,8 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
       var capturedServer: SolrServer = null
       var capturedQuery: SolrQuery = null
       val interceptor = new RequestInterceptor {
-        override def interceptQuery(f: (SolrServer, SolrQuery) => Future[QueryResponse])
-                                   (solrServer: SolrServer, q: SolrQuery): Future[QueryResponse] = {
+        override def interceptQuery(f: (SolrServer, SolrQuery) => io.ino.solrs.future.Future[QueryResponse])
+                                   (solrServer: SolrServer, q: SolrQuery): io.ino.solrs.future.Future[QueryResponse] = {
           capturedServer = solrServer
           capturedQuery = q
           f(solrServer, q)

@@ -9,11 +9,13 @@ import scala.concurrent.Future
 import org.apache.solr.client.solrj.SolrQuery
 import java.net.ConnectException
 import scala.concurrent.duration._
+import io.ino.solrs.future.ScalaFactory
 
 class AsyncSolrClientSpec extends FunSpec with Matchers with FutureAwaits with MockitoSugar {
 
   private val query = new SolrQuery("*:*")
   private implicit val timeout = 1.second
+  private implicit val futureFactory = io.ino.solrs.future.ScalaFactory
 
   describe("Solr") {
 
@@ -29,7 +31,7 @@ class AsyncSolrClientSpec extends FunSpec with Matchers with FutureAwaits with M
 
     it("should shutdown http client if it was not provided") {
       val ahcMock = mock[AsyncHttpClient]
-      val solr = new AsyncSolrClient.Builder("http://localhost:12345/solr") {
+      val solr = new AsyncSolrClient.Builder("http://localhost:12345/solr")(ScalaFactory) {
         override def createHttpClient = ahcMock
       }.build
 

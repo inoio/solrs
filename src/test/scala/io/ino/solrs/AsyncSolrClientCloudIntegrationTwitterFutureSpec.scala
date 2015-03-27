@@ -12,9 +12,9 @@ import org.scalatest.mock.MockitoSugar
 import org.slf4j.LoggerFactory
 
 import scala.annotation.tailrec
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
-import scala.concurrent.duration._
+import io.ino.solrs.future.TwitterFactory
+import com.twitter.conversions.time._
+import com.twitter.util.{ Future, Promise, Await, Duration }
 import scala.language.postfixOps
 import scala.util.control.NonFatal
 
@@ -23,20 +23,33 @@ import scala.util.control.NonFatal
  * RetryPolicy.TryAvailableServers is needed because for a restarted server the status is not updated
  * fast enough.
  */
-class AsyncSolrClientCloudIntegrationSpec extends FunSpec with BeforeAndAfterAll with BeforeAndAfterEach with Matchers with FutureAwaits with MockitoSugar {
+class AsyncSolrClientCloudIntegrationTwitterFutureSpec extends FunSpec with BeforeAndAfterAll with BeforeAndAfterEach with Matchers with MockitoSugar {
+
+  def await[T](future: Future[T])(implicit timeout: Duration): T = Await.result(future, timeout)
+  def awaitReady[T](future: Future[T])(implicit timeout: Duration): Future[T] = Await.ready(future, timeout)
 
   private implicit val timeout = 5.second
-  private implicit val futureFactory = io.ino.solrs.future.ScalaFactory
 
   private var zk: TestingServer = _
   private var solrRunners = List.empty[SolrRunner]
 
-  private var cut: AsyncSolrClient[scala.concurrent.Future] = _
+  private var cut: AsyncSolrClient[com.twitter.util.Future] = _
   private var cloudSolrServer: CloudSolrClient = _
 
   private val logger = LoggerFactory.getLogger(getClass)
 
   import io.ino.solrs.SolrUtils._
+
+  def eventuallyTime = {
+    import org.scalatest.time.Span
+    import org.scalatest.time.Seconds
+    import org.scalatest.concurrent.Timeouts._
+    Timeout(Span(2, Seconds))
+  }
+
+  def clusterStateUpdateIntervalTime = {
+    scala.concurrent.duration.Duration(100, "millis")
+  }
 
   override def beforeAll(configMap: ConfigMap) {
     zk = new TestingServer()
@@ -52,11 +65,11 @@ class AsyncSolrClientCloudIntegrationSpec extends FunSpec with BeforeAndAfterAll
 
     val solrServers = new CloudSolrServers(
       zk.getConnectString,
-      clusterStateUpdateInterval = 100 millis,
+      clusterStateUpdateInterval = clusterStateUpdateIntervalTime,
       defaultCollection = Some("collection1"))
     // We need to configure a retry policy as otherwise requests fail because server status is not
     // updated fast enough...
-    cut = AsyncSolrClient.Builder(RoundRobinLB(solrServers)).withRetryPolicy(RetryPolicy.TryAvailableServers).build
+    cut = AsyncSolrClient.Builder(RoundRobinLB(solrServers))(TwitterFactory).withRetryPolicy(RetryPolicy.TryAvailableServers).build
 
     cloudSolrServer.deleteByQuery("*:*")
     cloudSolrServer.add(someDocsAsJList)
@@ -83,86 +96,64 @@ class AsyncSolrClientCloudIntegrationSpec extends FunSpec with BeforeAndAfterAll
     }
   }
 
-  describe("AsyncSolrClient with CloudSolrServers + RoundRobinLB") {
+  describe("AsyncSolrClient with CloudSolrServers + RoundRobinLB Twitter Futures Implementation") {
 
     it("should serve queries while solr server is restarted") {
 
-      eventually(Timeout(2 seconds)) {
+      eventually(eventuallyTime) {
         cut.loadBalancer.solrServers.all should contain theSameElementsAs solrRunnerUrls.map(SolrServer(_, Enabled))
-      }
-
-      // Check normal operation
-      val q = queryAndCheckResponse
-
-      // Run queries in the background
-      val run = new AtomicBoolean(true)
-      val resultFuture = Future {
-        runQueries(q, run)
       }
 
       // Stop solr
       solrRunners.last.stop()
 
       // Wait some time after tomcat was stopped
-      Thread.sleep(100)
+      Thread.sleep(200)
 
       // Restart solr
       solrRunners.last.start
 
       // Wait some time after tomcat was restarted
-      Thread.sleep(200)
+      Thread.sleep(500)
 
-      // Stop queries
-      run.set(false)
+      // Check normal operation
+      val q = queryAndCheckResponse
 
-      // Assert
-      val responseFutures = await(resultFuture)
-      responseFutures.length should be > 0
+      // Stop solr
+      solrRunners.last.stop()
 
-      responseFutures.foreach { response =>
-        response.value.get.isSuccess should be (true)
-        await(response) should contain theSameElementsAs someDocsIds
-      }
 
-      eventually(Timeout(2 seconds)) {
+      eventually(eventuallyTime) {
         cut.loadBalancer.solrServers.all should contain theSameElementsAs solrRunnerUrls.map(SolrServer(_, Enabled))
       }
     }
 
     it("should serve queries when ZK is not available") {
 
-      eventually(Timeout(2 seconds)) {
+      eventually(eventuallyTime) {
         cut.loadBalancer.solrServers.all should contain theSameElementsAs solrRunnerUrls.map(SolrServer(_, Enabled))
       }
+
+      // Stop solr
+      solrRunners.last.stop()
+
+      // Wait some time after tomcat was stopped
+      Thread.sleep(200)
+
+      // Restart solr
+      solrRunners.last.start
+
+      // Wait some time after tomcat was restarted
+      Thread.sleep(500)
 
       // Check normal operation
       val q = queryAndCheckResponse
 
-      // Run queries in the background
-      val run = new AtomicBoolean(true)
-      val resultFuture = Future {
-        runQueries(q, run)
-      }
+      // Stop solr
+      solrRunners.last.stop()
 
-      // Stop ZK
-      zk.restart()
 
-      // Wait some time after ZK was stopped
-      Thread.sleep(500)
-
-      // Stop queries
-      run.set(false)
-
-      // Assert
-      val responseFutures = await(resultFuture)
-      responseFutures.length should be > 0
-
-      responseFutures.foreach { response =>
-        response.value.get.isSuccess should be (true)
-        await(response) should contain theSameElementsAs someDocsIds
-      }
-
-      eventually(Timeout(2 seconds)) {
+      eventually(eventuallyTime) {
         cut.loadBalancer.solrServers.all should contain theSameElementsAs solrRunnerUrls.map(SolrServer(_, Enabled))
       }
     }
@@ -170,17 +161,6 @@ class AsyncSolrClientCloudIntegrationSpec extends FunSpec with BeforeAndAfterAll
   }
 
   private def solrRunnerUrls = solrRunners.map(solrRunner => s"http://$hostName:${solrRunner.port}/solr/collection1/")
-
-  @tailrec
-  private def runQueries(q: SolrQuery, run: AtomicBoolean, res: List[Future[List[String]]] = Nil): List[Future[List[String]]] = run.get() match {
-    case false => res
-    case true =>
-      val response = cut.query(q).map(getIds)
-      response.onFailure {
-        case NonFatal(e) => logger.error("Query failed.", e)
-      }
-      runQueries(q, run, awaitReady(response) :: res)
-  }
 
   private def queryAndCheckResponse: SolrQuery = {
     val q = new SolrQuery("*:*").setRows(Int.MaxValue)

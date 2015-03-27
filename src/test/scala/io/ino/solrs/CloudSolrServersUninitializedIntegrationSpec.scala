@@ -16,6 +16,7 @@ import scala.language.postfixOps
 class CloudSolrServersUninitializedIntegrationSpec extends FunSpec with BeforeAndAfterEach with Matchers with FutureAwaits with MockitoSugar {
 
   private implicit val awaitTimeout = 2 seconds
+  private implicit val futureFactory = io.ino.solrs.future.ScalaFactory
   private implicit val patienceConfig = PatienceConfig(timeout = scaled(Span(1000, Millis)))
 
   private var zk: Option[TestingServer] = None

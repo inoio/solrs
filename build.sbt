@@ -6,11 +6,11 @@ homepage := Some(url("https://github.com/inoio/solrs"))
 
 organization := "io.ino"
 
-version := "1.0.3"
+version := "1.0.4-SNAPSHOT"
 
 licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.html"))
 
-scalaVersion := "2.10.4"
+scalaVersion := "2.11.6"
 
 crossScalaVersions := Seq("2.10.4", "2.11.4")
 
@@ -55,6 +55,7 @@ libraryDependencies ++= Seq(
   "org.apache.tomcat" % "tomcat-catalina" % tomcatVersion % "test",
   "org.apache.tomcat" % "tomcat-jasper" % tomcatVersion % "test",
   "org.apache.tomcat.embed" % "tomcat-embed-core" % tomcatVersion % "test",
+  "com.twitter" %% "util-collection" % "6.23.0" % "test",
   "commons-logging" % "commons-logging" % "1.2"
 )
 
@@ -91,3 +92,13 @@ pomExtra := (
       <url>https://github.com/magro</url>
     </developer>
   </developers>)
+
+publishTo <<= version { (v: String) =>
+  val nexus = "http://nexus.rnd.unicredit.eu/"
+  if (v.trim.endsWith("SNAPSHOT"))
+    Some("snapshots" at nexus + "content/repositories/snapshots")
+  else
+    Some("3rdparty"  at nexus + "content/repositories/thirdparty")
+}
+
+credentials += Credentials(Path.userHome / ".ivy2" / ".credentials")

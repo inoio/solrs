@@ -18,12 +18,13 @@ import scala.language.postfixOps
 class CloudSolrServersIntegrationSpec extends FunSpec with BeforeAndAfterAll with BeforeAndAfterEach with Matchers with FutureAwaits with MockitoSugar {
 
   private implicit val awaitTimeout = 2 seconds
+  private implicit val futureFactory = io.ino.solrs.future.ScalaFactory
   private implicit val patienceConfig = PatienceConfig(timeout = scaled(Span(20000, Millis)),
                                                        interval = scaled(Span(1000, Millis)))
 
   private var zk: TestingServer = _
   private var solrRunners = List.empty[SolrRunner]
-  private var solrs = Map.empty[SolrRunner, AsyncSolrClient]
+  private var solrs = Map.empty[SolrRunner, AsyncSolrClient[scala.concurrent.Future]]
 
   private var cut: CloudSolrServers = _
   private var cloudSolrServer: CloudSolrClient = _
@@ -39,7 +40,7 @@ class CloudSolrServersIntegrationSpec extends FunSpec with BeforeAndAfterAll wit
       SolrRunner.start(18889, Some(ZooKeeperOptions(zk.getConnectString)))
     )
 
-    solrs = solrRunners.foldLeft(Map.empty[SolrRunner, AsyncSolrClient])( (res, solrRunner) =>
+    solrs = solrRunners.foldLeft(Map.empty[SolrRunner, AsyncSolrClient[scala.concurrent.Future]])( (res, solrRunner) =>
       res + (solrRunner -> AsyncSolrClient(s"http://$hostName:${solrRunner.port}/solr/collection1")))
 
     cloudSolrServer = new CloudSolrClient(zk.getConnectString)

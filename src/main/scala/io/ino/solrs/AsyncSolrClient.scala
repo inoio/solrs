@@ -87,8 +87,13 @@ object AsyncSolrClient {
 
     protected def createMetrics: Metrics = NoopMetrics
 
+    // the load balancer might need to access this instance, extracted as protected method to be overridable from tests
+    protected def setOnLoadBalancer(solr: AsyncSolrClient): Unit = {
+      loadBalancer.setAsyncSolrClient(solr)
+    }
+
     def build: AsyncSolrClient = {
-      new AsyncSolrClient(
+      val res = new AsyncSolrClient(
         loadBalancer,
         httpClient.getOrElse(createHttpClient),
         shutdownHttpClient,
@@ -98,6 +103,8 @@ object AsyncSolrClient {
         serverStateObservation,
         retryPolicy
       )
+      setOnLoadBalancer(res)
+      res
     }
   }
 
@@ -193,12 +200,13 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
   }
 
   private def query(solrServer: SolrServer, q: SolrQuery): Future[QueryResponse] = {
+    val monitoredQuery = loadBalancer.interceptQuery(doQuery) _
     requestInterceptor.map(ri =>
-      ri.interceptQuery(doQuery)(solrServer, q)
-    ).getOrElse(doQuery(solrServer, q))
+      ri.interceptQuery(monitoredQuery)(solrServer, q)
+    ).getOrElse(monitoredQuery(solrServer, q))
   }
 
-  private def doQuery(solrServer: SolrServer, q: SolrQuery): Future[QueryResponse] = {
+  private[solrs] def doQuery(solrServer: SolrServer, q: SolrQuery): Future[QueryResponse] = {
 
     val wparams = new ModifiableSolrParams(q)
     if (responseParser != null) {

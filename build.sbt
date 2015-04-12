@@ -6,13 +6,13 @@ homepage := Some(url("https://github.com/inoio/solrs"))
 
 organization := "io.ino"
 
-version := "1.0.3"
+version := "1.1.0"
 
 licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.html"))
 
-scalaVersion := "2.10.4"
+scalaVersion := "2.10.5"
 
-crossScalaVersions := Seq("2.10.4", "2.11.4")
+crossScalaVersions := Seq("2.10.5", "2.11.6")
 
 // https://github.com/jrudolph/sbt-dependency-graph
 // E.g. adds dependency-graph task

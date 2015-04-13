@@ -119,7 +119,12 @@ object RoundRobinLB {
  * to the specified `initialTestRuns`, by default 10) to have initial stats.
  *
  * @param solrServers solr servers to load balance, those are regularly tested.
- * @param testQuery the query used to test solr servers
+ * @param collectionAndTestQuery a function that returns the collection name and a testQuery for the given server.
+ *                               The collection is used to partition server when classifying "fast"/"slow" servers,
+ *                               because for different collections response times will be different.
+ *                               It's somehow similar with the testQuery: it might be different per server, e.g.
+ *                               some server might only provide a /suggest handler while others provide /select
+ *                               (which can be specified via the "qt" query param in the test query).
  * @param minDelay the minimum delay between the response of a test and the start of
  *                 the next test (to limit test frequency)
  * @param maxDelay the delay between tests for slow servers (or all servers if there are no real requests)
@@ -129,11 +134,11 @@ object RoundRobinLB {
  *              run using a scheduled executor, therefore this interval uses the system clock
  */
 class FastestServerLB(override val solrServers: SolrServers,
-                testQuery: SolrQuery = new SolrQuery("*:*"),
-                minDelay: Duration = 100 millis,
-                maxDelay: Duration = 10 seconds,
-                initialTestRuns: Int = 10,
-                clock: Clock = Clock.systemDefault) extends LoadBalancer {
+                      collectionAndTestQuery: SolrServer => (String, SolrQuery),
+                      minDelay: Duration = 100 millis,
+                      maxDelay: Duration = 10 seconds,
+                      initialTestRuns: Int = 10,
+                      clock: Clock = Clock.systemDefault) extends LoadBalancer {
 
   import FastestServerLB._
 
@@ -147,7 +152,10 @@ class FastestServerLB(override val solrServers: SolrServers,
   protected[solrs] val serverTestTimestamp = TrieMap.empty[SolrServer, Millisecond].withDefaultValue(Millisecond(0))
   // "fast" servers are faster than the average of all servers, they're tested more frequently than slow servers.
   // slow servers e.g. are running in a separate dc and are not expected to suddenly perform significantly better
-  protected var fastServers = Set.empty[SolrServer]
+  protected var fastServersByCollection = Map.empty[String, Set[SolrServer]].withDefaultValue(Set.empty)
+
+  private def collection(server: SolrServer): String = collectionAndTestQuery(server)._1
+  private def testQuery(server: SolrServer): SolrQuery = collectionAndTestQuery(server)._2
 
   scheduleTests()
   scheduleUpdateStats()
@@ -215,7 +223,10 @@ class FastestServerLB(override val solrServers: SolrServers,
     // test each (fast) server matching the given query
     solrServers
       .matching(q)
-      .filter(server => server.status == Enabled && fastServers.contains(server))
+      .filter { server =>
+        val fastServers = fastServersByCollection(collection(server))
+        server.status == Enabled &&  fastServers.contains(server)
+      }
       .foreach(testWithMinDelay)
     res
   }
@@ -245,7 +256,7 @@ class FastestServerLB(override val solrServers: SolrServers,
     serverTestTimestamp.update(server, Millisecond(clock.millis()))
 
     val request = stats(server).requestStarted(TestQueryClass)
-    val res = client.doQuery(server, testQuery)
+    val res = client.doQuery(server, testQuery(server))
 
     res.onComplete { _ =>
       request.finished()
@@ -260,31 +271,35 @@ class FastestServerLB(override val solrServers: SolrServers,
 
   private[solrs] def updateStats(): Unit = {
     statsByServer.values.foreach(_.updateStats())
-    val previousFastServers = fastServers
-    fastServers = determineFastServers
-    if(fastServers != previousFastServers) {
+    val previousFastServers = fastServersByCollection
+    fastServersByCollection = determineFastServers
+    if(fastServersByCollection != previousFastServers) {
       onFastServersChanged(previousFastServers)
     }
   }
 
-  protected def onFastServersChanged(previousFastServers: Set[SolrServer]): Unit = {
+  protected def onFastServersChanged(previousFastServers: Map[String, Set[SolrServer]]): Unit = {
     if(logger.isInfoEnabled) {
-      val others = statsByServer.keys.filterNot(fastServers.contains)
-      logger.info(s"Updated fast servers: $fastServers (previous: $previousFastServers, others: $others)")
+      fastServersByCollection.foreach { case (collection, fastServers) =>
+        logger.info(s"Updated fast servers ($collection): $fastServers (previous: ${previousFastServers(collection)})")
+      }
     }
   }
 
   /**
    * Determines the servers that are tested more frequently.
    */
-  protected def determineFastServers: Set[SolrServer] = {
-    if(statsByServer.isEmpty) Set.empty
+  protected def determineFastServers: Map[String, Set[SolrServer]] = {
+    if(statsByServer.isEmpty) Map.empty
     else {
-      val durationByServer = statsByServer.mapValues(_.predictDuration(TestQueryClass))
-      val average = durationByServer.values.sum / durationByServer.size
-      durationByServer.filter { case (server, duration) =>
-        duration <= average
-      }.keys.toSet
+      val serversByCollection = statsByServer.keys.toSet.groupBy(collection)
+      serversByCollection.mapValues { servers =>
+        val durationByServer = statsByServer.filterKeys(servers.contains).mapValues(_.predictDuration(TestQueryClass))
+        val average = durationByServer.values.sum / durationByServer.size
+        durationByServer.filter { case (_, duration) =>
+          duration <= average
+        }.keys.toSet
+      }
     }
   }
 

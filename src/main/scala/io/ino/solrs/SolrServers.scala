@@ -182,7 +182,7 @@ class CloudSolrServers(zkHost: String,
     val collection = Option(q.get("collection")).orElse(defaultCollection).getOrElse(
       throw new SolrServerException("No collection param specified on request and no default collection has been set.")
     )
-    collectionToServers.get(collection).getOrElse(Vector.empty)
+    collectionToServers.getOrElse(collection, Vector.empty)
   }
 
 }

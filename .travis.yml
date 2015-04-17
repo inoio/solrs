@@ -1,7 +1,7 @@
 language: scala
 scala:
-   - 2.10.5
-   - 2.11.6
+   - 2.10.4
+   - 2.11.2
 before_install:
    # prevent OutOfMemoryError: unable to create new native thread
    - ulimit -t 166384

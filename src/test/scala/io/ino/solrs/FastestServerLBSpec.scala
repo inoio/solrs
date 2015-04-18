@@ -7,6 +7,8 @@ import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.response.QueryResponse
 import org.mockito.Matchers.{eq => mockEq, _}
 import org.mockito.Mockito._
+import org.scalatest.concurrent.Eventually._
+import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.mock.MockitoSugar
 import org.scalatest.{BeforeAndAfterEach, FunSpec, Matchers}
 
@@ -16,6 +18,9 @@ import scala.language.postfixOps
 import scala.util.{Success, Try}
 
 class FastestServerLBSpec extends FunSpec with Matchers with MockitoSugar with BeforeAndAfterEach {
+
+  // use class under test as field so that we can safely shutdown it after each test
+  private var cut: FastestServerLB = _
 
   private val server1 = SolrServer("host1")
   private val server2 = SolrServer("host2")
@@ -34,12 +39,16 @@ class FastestServerLBSpec extends FunSpec with Matchers with MockitoSugar with B
     mockDoQuery(solrs)
   }
 
+  override def afterEach(): Unit = {
+    cut.shutdown()
+  }
+
   private def mockDoQuery(mock: AsyncSolrClient, solrServer: => SolrServer = any[SolrServer](), responseDelay: Duration = 1 milli): Unit = {
     // for spies doReturn should be used...
     doReturn(delayedResponse(responseDelay.toMillis)).when(mock).doQuery(solrServer, any())
   }
 
-  describe("DynamicLB") {
+  describe("FastestServerLB") {
 
     it("should return None if no solr server matches") {
       val nonMatchingServers = new SolrServers {
@@ -141,8 +150,6 @@ class FastestServerLBSpec extends FunSpec with Matchers with MockitoSugar with B
       spyClient.query(realQuery)
       verify(spyClient).doQuery(any(), mockEq(realQuery))
       solrServers.all.foreach(verify(spyClient, times(2)).doQuery(_, testQuery))
-
-      cut.shutdown()
     }
 
     it("should test slow servers less frequently") {
@@ -171,8 +178,6 @@ class FastestServerLBSpec extends FunSpec with Matchers with MockitoSugar with B
       // verify that the lb ran the test query against fast server servers, but not against the slow server
       List(server1, server2).foreach(verify(spyClient, times(1)).doQuery(_, testQuery))
       verify(spyClient, never()).doQuery(server3, testQuery)
-
-      cut.shutdown()
     }
 
     it("should test slow/all servers according to the specified maxDelay") {
@@ -191,15 +196,17 @@ class FastestServerLBSpec extends FunSpec with Matchers with MockitoSugar with B
       reset(spyClient)
       mockQueries(spyClient)
 
-      // we have to wait because the max delay is realized via scheduled executor
-      Thread.sleep(maxDelay.toMillis)
       // we must also update the clock to that the internal, time based tests let the tests run
       clock.advance(maxDelay.toMillis)
 
-      // verify that the lb ran the test query (in this case for all servers)
-      solrServers.all.foreach(verify(spyClient, times(1)).doQuery(_, testQuery))
+      // we have to wait because the max delay is realized via scheduled executor
+      Thread.sleep(maxDelay.toMillis)
 
-      cut.shutdown()
+      // verify that the lb ran the test query (in this case for all servers)
+      // ... and we accept a slight delay because the scheduler might be a bit inaccurate...
+      eventually(Timeout(maxDelay)) {
+        solrServers.all.foreach(verify(spyClient, times(1)).doQuery(_, testQuery))
+      }
     }
   }
 
@@ -208,7 +215,7 @@ class FastestServerLBSpec extends FunSpec with Matchers with MockitoSugar with B
                           mockQueries: AsyncSolrClient => Unit = (spyClient: AsyncSolrClient) => mockDoQuery(spyClient)
                          ):(SolrQuery, FastestServerLB, AsyncSolrClient) = {
     val testQuery = new SolrQuery("testQuery")
-    val cut = new FastestServerLB(solrServers, _ => ("collection1", testQuery), minDelay, maxDelay, clock = clock)
+    cut = new FastestServerLB(solrServers, _ => ("collection1", testQuery), minDelay, maxDelay, clock = clock)
     // we use a spy to have a real async solr client for that we can verify interactions
     var spyClient: AsyncSolrClient = null
     val realClient: AsyncSolrClient = new AsyncSolrClient.Builder(cut) {
@@ -222,12 +229,12 @@ class FastestServerLBSpec extends FunSpec with Matchers with MockitoSugar with B
   }
 
   private def newDynamicLB(solrServers: SolrServers, minDelay: Duration = 50 millis): FastestServerLB = {
-    val res = new FastestServerLB(solrServers, _ => ("collection1", q), minDelay, maxDelay = 30 seconds, initialTestRuns = 1, clock = clock) {
+    cut = new FastestServerLB(solrServers, _ => ("collection1", q), minDelay, maxDelay = 30 seconds, initialTestRuns = 1, clock = clock) {
       override protected def scheduleTests(): Unit = Unit
       override protected def scheduleUpdateStats(): Unit = Unit
     }
-    res.setAsyncSolrClient(solrs)
-    res
+    cut.setAsyncSolrClient(solrs)
+    cut
   }
 
   private def atSecond[T](second: Long)(f: => T): T = {

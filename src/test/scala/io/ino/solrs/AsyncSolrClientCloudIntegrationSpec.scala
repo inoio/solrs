@@ -30,6 +30,7 @@ class AsyncSolrClientCloudIntegrationSpec extends FunSpec with BeforeAndAfterAll
   private var zk: TestingServer = _
   private var solrRunners = List.empty[SolrRunner]
 
+  private var solrServers: CloudSolrServers = _
   private var cut: AsyncSolrClient = _
   private var cloudSolrServer: CloudSolrClient = _
 
@@ -49,7 +50,7 @@ class AsyncSolrClientCloudIntegrationSpec extends FunSpec with BeforeAndAfterAll
     cloudSolrServer = new CloudSolrClient(zk.getConnectString)
     cloudSolrServer.setDefaultCollection("collection1")
 
-    val solrServers = new CloudSolrServers(
+    solrServers = new CloudSolrServers(
       zk.getConnectString,
       clusterStateUpdateInterval = 100 millis,
       defaultCollection = Some("collection1"))
@@ -65,6 +66,7 @@ class AsyncSolrClientCloudIntegrationSpec extends FunSpec with BeforeAndAfterAll
   override def afterAll(configMap: ConfigMap) {
     cloudSolrServer.shutdown()
     cut.shutdown
+    solrServers.shutdown
     solrRunners.foreach(_.stop())
     zk.close()
   }

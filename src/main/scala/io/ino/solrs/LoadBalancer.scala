@@ -135,6 +135,12 @@ object RoundRobinLB {
  * @param maxDelay the delay between tests for slow servers (or all servers if there are no real requests)
  * @param initialTestRuns on start each active server is tested the given number of
  *                        times to gather initial stats and determine fast/slow servers.
+ * @param filterFastServers a function to filter fast / preferred servers. The function takes the calculated average duration
+ *                          of all servers of a collection, and returns a function for a SolrServer->Duration tuple
+ *                          that returns true/false to indicate if a server should be considered "fast".
+ *                          The default value for filterFastServers uses `duration <= average * 1.1 + 5` (use
+ *                          1.1 as multiplier to accepted some deviation, for smaller values like 1 or 2 millis
+ *                          also add some fix value to allow normal deviation).
  * @param clock the clock to get the current time from. The tests using the maxDelay are
  *              run using a scheduled executor, therefore this interval uses the system clock
  */
@@ -143,6 +149,8 @@ class FastestServerLB(override val solrServers: SolrServers,
                       minDelay: Duration = 100 millis,
                       maxDelay: Duration = 10 seconds,
                       initialTestRuns: Int = 10,
+                      filterFastServers: Long => ((SolrServer, Long)) => Boolean =
+                        average => { case (_, duration) => duration <= average * 1.1 + 5 },
                       clock: Clock = Clock.systemDefault) extends LoadBalancer with FastestServerLBJmxSupport {
 
   import FastestServerLB._
@@ -295,10 +303,8 @@ class FastestServerLB(override val solrServers: SolrServers,
       serversByCollection.foreach { case (collection, servers) =>
         val durationByServer = statsByServer.filterKeys(servers.contains).mapValues(_.predictDuration(TestQueryClass))
         val average = durationByServer.values.sum / durationByServer.size
-        val fastServers = durationByServer.filter { case (_, duration) =>
-          duration <= average
-        }.keys.toSet
-
+        val serverFilter = filterFastServers(average)
+        val fastServers = durationByServer.filter(serverFilter).keys.toSet
         if(fastServers != fastServersByCollection(collection)) {
           onBeforeFastServersChanged(collection, fastServers, durationByServer, average)
           fastServersByCollection += (collection -> fastServers)
@@ -309,7 +315,7 @@ class FastestServerLB(override val solrServers: SolrServers,
 
   protected def onBeforeFastServersChanged(collection: String,
                                           fastServers: Set[SolrServer],
-                                          durationByServer: collection.Map[SolrServer, Long],
+                                          durationByServer: scala.collection.Map[SolrServer, Long],
                                           average: Long): Unit = {
     if (logger.isInfoEnabled) {
       logger.info(s"Updating fast servers ($collection): $fastServers (average: $average, durationByServer: ${durationByServer.mkString(", ")})")

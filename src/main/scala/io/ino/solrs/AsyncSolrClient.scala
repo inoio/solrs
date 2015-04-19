@@ -156,11 +156,12 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
   /**
    * Closes the http client (asynchronously) if it was not provided but created by this class.
    */
-  def shutdown = {
+  def shutdown() = {
     cancellableObservation.foreach(_.cancel())
     if(shutdownHttpClient) {
       httpClient.closeAsynchronously()
     }
+    loadBalancer.shutdown()
   }
 
   def query(q: SolrQuery): Future[QueryResponse] = {

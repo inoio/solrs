@@ -42,6 +42,10 @@ trait LoadBalancer extends RequestInterceptor {
     // empty default
   }
 
+  def shutdown(): Unit = {
+    // empty default
+  }
+
 }
 
 class SingleServerLB(val server: SolrServer) extends LoadBalancer {
@@ -134,11 +138,11 @@ object RoundRobinLB {
  *              run using a scheduled executor, therefore this interval uses the system clock
  */
 class FastestServerLB(override val solrServers: SolrServers,
-                      collectionAndTestQuery: SolrServer => (String, SolrQuery),
+                      val collectionAndTestQuery: SolrServer => (String, SolrQuery),
                       minDelay: Duration = 100 millis,
                       maxDelay: Duration = 10 seconds,
                       initialTestRuns: Int = 10,
-                      clock: Clock = Clock.systemDefault) extends LoadBalancer {
+                      clock: Clock = Clock.systemDefault) extends LoadBalancer with FastestServerLBJmxSupport {
 
   import FastestServerLB._
 
@@ -157,11 +161,17 @@ class FastestServerLB(override val solrServers: SolrServers,
   private def collection(server: SolrServer): String = collectionAndTestQuery(server)._1
   private def testQuery(server: SolrServer): SolrQuery = collectionAndTestQuery(server)._2
 
-  scheduleTests()
-  scheduleUpdateStats()
+  init()
 
-  def shutdown(): Unit = {
+  protected def init(): Unit = {
+    scheduleTests()
+    scheduleUpdateStats()
+    initJmx()
+  }
+
+  override def shutdown(): Unit = {
     scheduler.shutdownNow()
+    shutdownJmx()
   }
 
   protected def scheduleTests(): Unit = {
@@ -303,7 +313,7 @@ class FastestServerLB(override val solrServers: SolrServers,
     }
   }
 
-  private def stats(server: SolrServer): PerformanceStats = {
+  protected def stats(server: SolrServer): PerformanceStats = {
     statsByServer.getOrElseUpdate(server, new PerformanceStats(server, clock))
   }
 
@@ -312,5 +322,116 @@ class FastestServerLB(override val solrServers: SolrServers,
 object FastestServerLB {
 
   val TestQueryClass = "testQuery"
+
+}
+
+import javax.management.openmbean.{CompositeData, TabularData}
+
+/**
+ * JMX MBean for FastestServerLB.
+ */
+trait FastestServerLBMBean /*extends DynamicMBean*/ {
+
+  def fastServers(collection: String): CompositeData
+
+  def predictDurations(collection: String): CompositeData
+
+  def averagesPerSecond(collection: String): TabularData
+
+  def averagesPer10Seconds(collection: String): TabularData
+
+  def averagesTotalAverage(collection: String): CompositeData
+
+}
+
+import java.lang.management.ManagementFactory
+import javax.management.ObjectName
+import javax.management.openmbean._
+
+import scala.collection.JavaConversions._
+
+/**
+ * JMX support for FastestServerLB, implementation of FastestServerLBMBean, to be mixed into FastestServerLB.
+ */
+trait FastestServerLBJmxSupport extends FastestServerLBMBean { self: FastestServerLB =>
+
+  import FastestServerLB._
+  import FastestServerLBJmxSupport._
+
+  def initJmx(): Unit = {
+    ManagementFactory.getPlatformMBeanServer.registerMBean(this, ObjName)
+  }
+
+  def shutdownJmx(): Unit = {
+    ManagementFactory.getPlatformMBeanServer.unregisterMBean(ObjName)
+  }
+
+  override def averagesPerSecond(collection: String): TabularData = {
+    val servers = serversByCollection(collection)
+    val itemNames = Array("Second") ++ servers.map(_.baseUrl)
+    val (ct, table) = compositeTypeAndTable(itemNames)
+    for (second <- -20 to 0) {
+      table.put(new CompositeDataSupport(ct, Map("Second" -> "-%02d".format(-second)) ++
+        servers.map(s => s.baseUrl -> stats(s).averageDurationForSecond(TestQueryClass, second).map(_.toString).getOrElse("-")).toMap[String, String]))
+    }
+    table
+  }
+
+  override def averagesPer10Seconds(collection: String): TabularData = {
+    val servers = serversByCollection(collection)
+    val itemNames = Array("10 Seconds") ++ servers.map(_.baseUrl)
+    val (ct, table) = compositeTypeAndTable(itemNames)
+    for (tenSeconds <- 0 to 5) {
+      table.put(new CompositeDataSupport(ct, Map("10 Seconds" -> s"-$tenSeconds") ++
+        servers.map(s => s.baseUrl -> stats(s).averageDurationFor10Seconds(TestQueryClass, tenSeconds).map(_.toString).getOrElse("-")).toMap[String, String]))
+    }
+    table
+  }
+
+  override def averagesTotalAverage(collection: String): CompositeData = {
+    val (servers, serverNames) = serversAndNames(collection)
+    new CompositeDataSupport(
+      compositeType(serverNames),
+      servers.map(s => s.baseUrl -> stats(s).totalAverageDuration(TestQueryClass).toString).toMap[String, String])
+  }
+
+  override def predictDurations(collection: String): CompositeData = {
+    val (servers, serverNames) = serversAndNames(collection)
+    new CompositeDataSupport(
+      compositeType(serverNames),
+      servers.map(s => s.baseUrl -> stats(s).predictDuration(TestQueryClass).toString).toMap[String, String])
+  }
+
+  override def fastServers(collection: String): CompositeData = {
+    val servers = fastServersByCollection(collection).toArray
+    new CompositeDataSupport(
+      compositeType(servers.map(_.baseUrl)),
+      servers.map(s => s.baseUrl -> stats(s).totalAverageDuration(TestQueryClass).toString).toMap[String, String])
+  }
+
+  private def serversAndNames(collection: String): (Array[SolrServer], Array[String]) = {
+    val servers = serversByCollection(collection)
+    (servers, servers.map(_.baseUrl))
+  }
+
+  private def serversByCollection(collection: String): Array[SolrServer] = {
+    statsByServer.keys.filter(collectionAndTestQuery(_)._1 == collection).toArray
+  }
+
+  private def compositeType(itemNames: Array[String]): CompositeType = {
+    new CompositeType("Stats", "Server stats", itemNames, itemNames, itemNames.map(_ => SimpleType.STRING))
+  }
+
+  private def compositeTypeAndTable(itemNames: Array[String]): (CompositeType, TabularData) = {
+    val ct = compositeType(itemNames)
+    val table = new TabularDataSupport(new TabularType("ServerStats", "Table server stats", ct, itemNames))
+    (ct, table)
+  }
+
+}
+
+object FastestServerLBJmxSupport {
+
+  val ObjName = new ObjectName("io.ino.solrs:type=FastestServerLB")
 
 }

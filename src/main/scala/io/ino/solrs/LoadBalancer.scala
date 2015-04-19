@@ -10,6 +10,7 @@ import org.apache.solr.client.solrj.response.QueryResponse
 import org.slf4j.LoggerFactory
 
 import scala.annotation.tailrec
+import scala.collection
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -281,35 +282,37 @@ class FastestServerLB(override val solrServers: SolrServers,
 
   private[solrs] def updateStats(): Unit = {
     statsByServer.values.foreach(_.updateStats())
-    val previousFastServers = fastServersByCollection
-    fastServersByCollection = determineFastServers
-    if(fastServersByCollection != previousFastServers) {
-      onFastServersChanged(previousFastServers)
-    }
-  }
-
-  protected def onFastServersChanged(previousFastServers: Map[String, Set[SolrServer]]): Unit = {
-    if(logger.isInfoEnabled) {
-      fastServersByCollection.foreach { case (collection, fastServers) =>
-        logger.info(s"Updated fast servers ($collection): $fastServers (previous: ${previousFastServers(collection)})")
-      }
-    }
+    updateFastServers()
   }
 
   /**
    * Determines the servers that are tested more frequently.
    */
-  protected def determineFastServers: Map[String, Set[SolrServer]] = {
+  protected def updateFastServers(): Unit = {
     if(statsByServer.isEmpty) Map.empty
     else {
       val serversByCollection = statsByServer.keys.toSet.groupBy(collection)
-      serversByCollection.mapValues { servers =>
+      serversByCollection.foreach { case (collection, servers) =>
         val durationByServer = statsByServer.filterKeys(servers.contains).mapValues(_.predictDuration(TestQueryClass))
         val average = durationByServer.values.sum / durationByServer.size
-        durationByServer.filter { case (_, duration) =>
+        val fastServers = durationByServer.filter { case (_, duration) =>
           duration <= average
         }.keys.toSet
+
+        if(fastServers != fastServersByCollection(collection)) {
+          onBeforeFastServersChanged(collection, fastServers, durationByServer, average)
+          fastServersByCollection += (collection -> fastServers)
+        }
       }
+    }
+  }
+
+  protected def onBeforeFastServersChanged(collection: String,
+                                          fastServers: Set[SolrServer],
+                                          durationByServer: collection.Map[SolrServer, Long],
+                                          average: Long): Unit = {
+    if (logger.isInfoEnabled) {
+      logger.info(s"Updating fast servers ($collection): $fastServers (average: $average, durationByServer: ${durationByServer.mkString(", ")})")
     }
   }
 

@@ -200,9 +200,18 @@ class FastestServerLB(override val solrServers: SolrServers,
   }
 
   protected def scheduleUpdateStats(): Unit = {
-    scheduler.schedule(new Runnable {
-      override def run(): Unit = updateStats()
-    }, 1, TimeUnit.SECONDS)
+    // delay the first run until the next second starts
+    val initialDelay = clock.millis() % 1000
+    scheduler.scheduleAtFixedRate(new Runnable {
+      override def run(): Unit = try {
+        updateStats()
+      } catch {
+        // catch all exceptions, because an uncaught exception would prevent further
+        // executions of this task.
+        case e: Throwable =>
+          logger.error("An error occurred when trying to updateStats().", e)
+      }
+    }, initialDelay, 1000, TimeUnit.MILLISECONDS)
   }
 
   override def setAsyncSolrClient(client: AsyncSolrClient): Unit = {

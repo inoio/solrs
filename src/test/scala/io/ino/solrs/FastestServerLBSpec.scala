@@ -37,6 +37,7 @@ class FastestServerLBSpec extends FunSpec with Matchers with MockitoSugar with B
   override def beforeEach(): Unit = {
     reset(solrs)
     mockDoQuery(solrs)
+    clock.set(0)
   }
 
   override def afterEach(): Unit = {
@@ -85,13 +86,27 @@ class FastestServerLBSpec extends FunSpec with Matchers with MockitoSugar with B
 
       when(solrs.doQuery(any(), any())).thenReturn(delayedResponse(1))
       cut.test(server1)
-      when(solrs.doQuery(any(), any())).thenReturn(delayedResponse(2))
+      when(solrs.doQuery(any(), any())).thenReturn(delayedResponse(10))
       cut.test(server2)
-      when(solrs.doQuery(any(), any())).thenReturn(delayedResponse(3))
+      when(solrs.doQuery(any(), any())).thenReturn(delayedResponse(20))
       cut.test(server3)
 
       cut.solrServer(q) should be (Some(server1))
       cut.solrServer(q) should be (Some(server1))
+      cut.solrServer(q) should be (Some(server1))
+    }
+
+    it("should round robin equally fast servers") {
+      val cut = newDynamicLB(solrServers)
+
+      runTests(cut, server1, q, fromSecond = 1, toSecond = 5, startResponseTime = 1, endResponseTime = 1)
+      runTests(cut, server2, q, fromSecond = 1, toSecond = 5, startResponseTime = 1, endResponseTime = 1)
+      runTests(cut, server3, q, fromSecond = 1, toSecond = 5, startResponseTime = 1, endResponseTime = 1)
+      cut.updateStats()
+
+      cut.solrServer(q) should be (Some(server1))
+      cut.solrServer(q) should be (Some(server2))
+      cut.solrServer(q) should be (Some(server3))
       cut.solrServer(q) should be (Some(server1))
     }
 

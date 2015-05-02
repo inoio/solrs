@@ -1,5 +1,6 @@
 package io.ino.solrs
 
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.{Executors, TimeUnit}
 
 import io.ino.concurrent.Execution
@@ -166,6 +167,7 @@ class FastestServerLB(override val solrServers: SolrServers,
   // "fast" servers are faster than the average of all servers, they're tested more frequently than slow servers.
   // slow servers e.g. are running in a separate dc and are not expected to suddenly perform significantly better
   protected var fastServersByCollection = Map.empty[String, Set[SolrServer]].withDefaultValue(Set.empty)
+  private val lastServerIdx = new AtomicInteger(-1)
 
   private def collection(server: SolrServer): String = collectionAndTestQuery(server)._1
   private def testQuery(server: SolrServer): SolrQuery = collectionAndTestQuery(server)._2
@@ -237,7 +239,8 @@ class FastestServerLB(override val solrServers: SolrServers,
     if(servers.isEmpty) {
       None
     } else {
-      val (serverIdx, result) = findBestServer(servers)
+      val (serverIdx, result) = findBestServer(servers, lastServerIdx.get())
+      lastServerIdx.lazySet(serverIdx)
       Some(result)
     }
   }
@@ -262,12 +265,14 @@ class FastestServerLB(override val solrServers: SolrServers,
   /**
    * Start from the given idx and try servers.length servers to get the next available.
    */
-  private def findBestServer(servers: IndexedSeq[SolrServer]): (Int, SolrServer) = {
+  private def findBestServer(servers: IndexedSeq[SolrServer], lastServerIdx: Int): (Int, SolrServer) = {
     // servers.groupBy(server => serverStats(server).averageDuration(queryClass))
     val sorted = servers.sortBy(server => stats(server).predictDuration(TestQueryClass))
 
-    val fastest = sorted.head
-    (servers.indexOf(fastest), fastest)
+    val serversByDuration = servers.groupBy(server => stats(server).predictDuration(TestQueryClass)).toSeq.sortBy(_._1)
+    val fastestServers = serversByDuration.head._2
+    val idx = if(lastServerIdx + 1 < fastestServers.size) lastServerIdx + 1 else 0
+    (idx, fastestServers(idx))
   }
 
   private def testWithMinDelay(server: SolrServer): Option[Future[QueryResponse]] = {

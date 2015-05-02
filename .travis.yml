@@ -7,6 +7,8 @@ scala:
 before_install:
    # prevent OutOfMemoryError: unable to create new native thread
    - ulimit -t 166384
+   # get the actually set values
+   - ulimit -a
 
 cache:
   directories:

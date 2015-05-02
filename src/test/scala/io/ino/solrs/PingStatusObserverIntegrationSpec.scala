@@ -4,6 +4,7 @@ import java.net.ConnectException
 import java.util.concurrent.{TimeUnit, TimeoutException, ExecutionException}
 
 import com.ning.http.client.{AsyncHttpClientConfig, AsyncHttpClient}
+import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.mock.MockitoSugar
 import org.scalatest.{BeforeAndAfterEach, FunSpec, Matchers}
 import org.scalatest.concurrent.Eventually._
@@ -15,7 +16,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 class PingStatusObserverIntegrationSpec extends FunSpec with RunningSolr with BeforeAndAfterEach with Matchers with FutureAwaits with MockitoSugar {
 
   private implicit val awaitTimeout = 2000 millis
-  private val httpClientTimeout = 300
+  private val httpClientTimeout = 20
   private val httpClient = new AsyncHttpClient()
 
   private lazy val solrUrl = s"http://localhost:${solrRunner.port}/solr/collection1"
@@ -55,7 +56,7 @@ class PingStatusObserverIntegrationSpec extends FunSpec with RunningSolr with Be
 
       solrRunner.tomcat.stop()
 
-      eventually {
+      eventually(Timeout(awaitTimeout)) {
         pingAction(solrUrl, "status").getStatusCode should be (503)
       }
 
@@ -80,7 +81,7 @@ class PingStatusObserverIntegrationSpec extends FunSpec with RunningSolr with Be
         val httpClientConfig = new AsyncHttpClientConfig.Builder().setIdleConnectionTimeoutInMs(1).build()
         val pingStatusObserver2 = new PingStatusObserver(solrServers, new AsyncHttpClient(httpClientConfig))
 
-        awaitReady(pingStatusObserver2.checkServerStatus())((httpClientTimeout millis) * 2)
+        awaitReady(pingStatusObserver2.checkServerStatus())
         solrServers(0).status should be(Failed)
       } finally {
         solrRunner.tomcat.getConnector.resume()
@@ -108,9 +109,9 @@ class PingStatusObserverIntegrationSpec extends FunSpec with RunningSolr with Be
 
   }
 
-  private def enable(solrUrl: String) = pingAction(solrUrl, "enable")
+  private def enable(solrUrl: String, timeoutInMillis: Long = 600) = pingAction(solrUrl, "enable", timeoutInMillis)
   private def disable(solrUrl: String) = pingAction(solrUrl, "disable")
-  private def pingAction(solrUrl: String, action: String) =
-    httpClient.prepareGet(s"$solrUrl/admin/ping?action=$action").execute().get(httpClientTimeout * 2, TimeUnit.MILLISECONDS)
+  private def pingAction(solrUrl: String, action: String, timeoutInMillis: Long = httpClientTimeout * 2) =
+    httpClient.prepareGet(s"$solrUrl/admin/ping?action=$action").execute().get(timeoutInMillis, TimeUnit.MILLISECONDS)
 
 }

@@ -79,7 +79,7 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
         solrServers(0).status should be (Disabled)
       }
 
-      solr.shutdown
+      solr.shutdown()
     }
 
     it("should be built with LoadBalancer") {

@@ -33,7 +33,7 @@ class AsyncSolrClientSpec extends FunSpec with Matchers with FutureAwaits with M
         override def createHttpClient = ahcMock
       }.build
 
-      solr.shutdown
+      solr.shutdown()
 
       verify(ahcMock).closeAsynchronously()
     }
@@ -42,7 +42,7 @@ class AsyncSolrClientSpec extends FunSpec with Matchers with FutureAwaits with M
       val ahcMock = mock[AsyncHttpClient]
       val solr = AsyncSolrClient.Builder("http://localhost:12345/solr").withHttpClient(ahcMock).build
 
-      solr.shutdown
+      solr.shutdown()
 
       verify(ahcMock, times(0)).closeAsynchronously()
     }

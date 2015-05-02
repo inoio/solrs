@@ -56,7 +56,7 @@ class CloudSolrServersIntegrationSpec extends FunSpec with BeforeAndAfterAll wit
   override def afterAll(configMap: ConfigMap) {
     cloudSolrServer.shutdown()
     cut.shutdown
-    solrs.values.foreach(_.shutdown)
+    solrs.values.foreach(_.shutdown())
     solrRunners.foreach(_.stop())
     zk.close()
   }

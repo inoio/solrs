@@ -24,6 +24,9 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
   private implicit val timeout = 1.second
   private val httpClient = new AsyncHttpClient()
 
+  private lazy val solrUrl = s"http://localhost:${solrRunner.port}/solr/collection1"
+  private lazy val solrs = AsyncSolrClient(solrUrl)
+
   import io.ino.solrs.SolrUtils._
 
   override def beforeEach() {
@@ -34,10 +37,12 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
     solr.commit()
   }
 
-  describe("Solr") {
+  override def afterAll(): Unit = {
+    solrs.shutdown()
+    httpClient.close()
+  }
 
-    lazy val solrUrl = s"http://localhost:${solrRunner.port}/solr/collection1"
-    lazy val solr = AsyncSolrClient(solrUrl)
+  describe("Solr") {
 
     it("should query async with SolrQuery") {
 
@@ -45,7 +50,7 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
       query.setQuery("cat:cat1")
       query.addSort(SortClause.asc("price"))
 
-      val response: Future[QueryResponse] = solr.query(query)
+      val response: Future[QueryResponse] = solrs.query(query)
 
       val docs = await(response).getResults
       docs.getNumFound should be (2)
@@ -55,7 +60,7 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
     }
 
     it("should allow to transform the response") {
-      val response: Future[List[String]] = solr.query(new SolrQuery("cat:cat1")).map(getIds)
+      val response: Future[List[String]] = solrs.query(new SolrQuery("cat:cat1")).map(getIds)
 
       await(response) should contain theSameElementsAs Vector("id1", "id2")
     }
@@ -95,6 +100,8 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
       val response = solr.query(new SolrQuery("cat:cat1"))
 
       await(response).getResults.getNumFound should be (2)
+
+      solr.shutdown()
     }
 
     it("should allow to set the response parser") {
@@ -104,11 +111,13 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
       val response = solr.query(new SolrQuery("cat:cat1"))
 
       await(response).getResults.getNumFound should be (2)
+
+      solr.shutdown()
     }
 
     it("should return failed future on request with bad query") {
 
-      val response: Future[QueryResponse] = solr.query(new SolrQuery("fieldDoesNotExist:foo"))
+      val response: Future[QueryResponse] = solrs.query(new SolrQuery("fieldDoesNotExist:foo"))
 
       awaitReady(response)
       a [RemoteSolrException] should be thrownBy await(response)
@@ -123,6 +132,8 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
       awaitReady(response)
       a [RemoteSolrException] should be thrownBy await(response)
       (the [RemoteSolrException] thrownBy await(response)).getMessage should include ("parsing error")
+
+      solr.shutdown()
     }
 
     it("should gather request time metrics") {
@@ -132,6 +143,8 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
       await(solr.query(new SolrQuery("*:*")))
 
       verify(metrics).requestTime(anyLong())
+
+      solr.shutdown()
     }
 
     it("should allow to intercept requests") {
@@ -152,6 +165,8 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
 
       capturedServer should be (SolrServer(solrUrl))
       capturedQuery should be (q)
+
+      solr.shutdown()
     }
 
   }

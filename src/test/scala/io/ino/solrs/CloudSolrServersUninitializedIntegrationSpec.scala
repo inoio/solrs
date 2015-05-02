@@ -25,9 +25,6 @@ class CloudSolrServersUninitializedIntegrationSpec extends FunSpec with BeforeAn
 
   import SolrUtils._
 
-  override def beforeEach(): Unit = {
-  }
-
   override def afterEach() {
     cut.foreach(_.shutdown)
     cut = None

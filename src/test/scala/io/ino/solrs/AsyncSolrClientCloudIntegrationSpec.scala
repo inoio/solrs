@@ -34,6 +34,8 @@ class AsyncSolrClientCloudIntegrationSpec extends FunSpec with BeforeAndAfterAll
   private var cut: AsyncSolrClient = _
   private var cloudSolrServer: CloudSolrClient = _
 
+  private val q = new SolrQuery("*:*").setRows(Int.MaxValue)
+
   private val logger = LoggerFactory.getLogger(getClass)
 
   import io.ino.solrs.SolrUtils._
@@ -59,13 +61,24 @@ class AsyncSolrClientCloudIntegrationSpec extends FunSpec with BeforeAndAfterAll
     cut = AsyncSolrClient.Builder(RoundRobinLB(solrServers)).withRetryPolicy(RetryPolicy.TryAvailableServers).build
 
     cloudSolrServer.deleteByQuery("*:*")
+    cloudSolrServer.commit()
+
     cloudSolrServer.add(someDocsAsJList)
     cloudSolrServer.commit()
+
+    // Check that indexed data is available
+    queryAndCheckResponse()
+  }
+
+  private def queryAndCheckResponse(): Unit = {
+    eventually(Timeout(2 seconds)) {
+      getIds(cloudSolrServer.query(q)) should contain theSameElementsAs someDocsIds
+    }
   }
 
   override def afterAll(configMap: ConfigMap) {
     cloudSolrServer.shutdown()
-    cut.shutdown
+    cut.shutdown()
     solrServers.shutdown
     solrRunners.foreach(_.stop())
     zk.close()
@@ -91,9 +104,6 @@ class AsyncSolrClientCloudIntegrationSpec extends FunSpec with BeforeAndAfterAll
       eventually(Timeout(2 seconds)) {
         cut.loadBalancer.solrServers.all should contain theSameElementsAs solrRunnerUrls.map(SolrServer(_, Enabled))
       }
-
-      // Check normal operation
-      val q = queryAndCheckResponse
 
       // Run queries in the background
       val run = new AtomicBoolean(true)
@@ -135,9 +145,6 @@ class AsyncSolrClientCloudIntegrationSpec extends FunSpec with BeforeAndAfterAll
       eventually(Timeout(2 seconds)) {
         cut.loadBalancer.solrServers.all should contain theSameElementsAs solrRunnerUrls.map(SolrServer(_, Enabled))
       }
-
-      // Check normal operation
-      val q = queryAndCheckResponse
 
       // Run queries in the background
       val run = new AtomicBoolean(true)
@@ -181,13 +188,6 @@ class AsyncSolrClientCloudIntegrationSpec extends FunSpec with BeforeAndAfterAll
         case NonFatal(e) => logger.error("Query failed.", e)
       }
       runQueries(q, run, awaitReady(response) :: res)
-  }
-
-  private def queryAndCheckResponse: SolrQuery = {
-    val q = new SolrQuery("*:*").setRows(Int.MaxValue)
-    val response: Future[List[String]] = cut.query(q).map(getIds)
-    await(response) should contain theSameElementsAs someDocsIds
-    q
   }
 
 }

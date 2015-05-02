@@ -36,6 +36,8 @@ class PingStatusObserverIntegrationSpec extends FunSpec with RunningSolr with Be
     }
   }
 
+  override def afterAll(): Unit = httpClient.close()
+
   describe("PingStatusObserver") {
 
     lazy val solrServers = Seq(SolrServer(solrUrl))
@@ -57,7 +59,12 @@ class PingStatusObserverIntegrationSpec extends FunSpec with RunningSolr with Be
       solrRunner.tomcat.stop()
 
       eventually(Timeout(awaitTimeout)) {
-        pingAction(solrUrl, "status").getStatusCode should be (503)
+        try {
+          pingAction(solrUrl, "status").getStatusCode should be (503)
+        } catch {
+          case e: ExecutionException if e.getCause.isInstanceOf[TimeoutException] =>
+            // that's fine as well, alternatively to a 503...
+        }
       }
 
       await(pingStatusObserver.checkServerStatus())

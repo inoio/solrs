@@ -96,6 +96,9 @@ class FastestServerLBSpec extends FunSpec with Matchers with MockitoSugar with B
       cut.solrServer(q) should be (Some(server1))
     }
 
+    /**
+     * if servers are equally fast then the first one should not get all requests...
+     */
     it("should round robin equally fast servers") {
       val cut = newDynamicLB(solrServers)
 
@@ -123,6 +126,32 @@ class FastestServerLBSpec extends FunSpec with Matchers with MockitoSugar with B
       cut.updateStats()
 
       cut.solrServer(q) should be (Some(server2))
+    }
+
+    /**
+     * Response times 1 and 10 are obviously different, but 2 and 3 should be considered to be equal
+     * and for them the round robin distribution should lead to better load balancing
+     */
+    it("should allow to quantize / consider (very) similar predicted response times to be equal") {
+      // quantize to 5: 0 to 4 = 0, 5 to 9 = 1 etc.
+      val cut = newDynamicLB(solrServers, mapPredictedResponseTime = t => t/5)
+
+      runTests(cut, server1, q, fromSecond = 1, toSecond = 5, startResponseTime = 1, endResponseTime = 1)
+      runTests(cut, server2, q, fromSecond = 1, toSecond = 5, startResponseTime = 2, endResponseTime = 2)
+      runTests(cut, server3, q, fromSecond = 1, toSecond = 5, startResponseTime = 3, endResponseTime = 3)
+      cut.updateStats()
+
+      cut.solrServer(q) should be (Some(server1))
+      cut.solrServer(q) should be (Some(server2))
+      cut.solrServer(q) should be (Some(server3))
+      cut.solrServer(q) should be (Some(server1))
+
+      runTests(cut, server2, q, fromSecond = 6, toSecond = 10, startResponseTime = 10, endResponseTime = 10)
+      runTests(cut, server3, q, fromSecond = 6, toSecond = 10, startResponseTime = 10, endResponseTime = 10)
+      cut.updateStats()
+
+      cut.solrServer(q) should be (Some(server1))
+      cut.solrServer(q) should be (Some(server1))
     }
 
     it("should initially test servers to gather performance stats") {
@@ -243,8 +272,11 @@ class FastestServerLBSpec extends FunSpec with Matchers with MockitoSugar with B
     (testQuery, cut, spyClient)
   }
 
-  private def newDynamicLB(solrServers: SolrServers, minDelay: Duration = 50 millis): FastestServerLB = {
-    cut = new FastestServerLB(solrServers, _ => ("collection1", q), minDelay, maxDelay = 30 seconds, initialTestRuns = 1, clock = clock) {
+  private def newDynamicLB(solrServers: SolrServers,
+                           minDelay: Duration = 50 millis,
+                           mapPredictedResponseTime: Long => Long = identity): FastestServerLB = {
+    cut = new FastestServerLB(solrServers, _ => ("collection1", q), minDelay, maxDelay = 30 seconds, initialTestRuns = 1,
+      mapPredictedResponseTime = mapPredictedResponseTime, clock = clock) {
       override protected def scheduleTests(): Unit = Unit
       override protected def scheduleUpdateStats(): Unit = Unit
     }

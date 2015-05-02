@@ -11,7 +11,6 @@ import org.apache.solr.client.solrj.response.QueryResponse
 import org.slf4j.LoggerFactory
 
 import scala.annotation.tailrec
-import scala.collection
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -142,6 +141,8 @@ object RoundRobinLB {
  *                          The default value for filterFastServers uses `duration <= average * 1.1 + 5` (use
  *                          1.1 as multiplier to accepted some deviation, for smaller values like 1 or 2 millis
  *                          also add some fix value to allow normal deviation).
+ * @param mapPredictedResponseTime a function that's applied to the predicted response time. This can e.g. be used to
+ *                                 quantize the time so that minor differences are ignored.
  * @param clock the clock to get the current time from. The tests using the maxDelay are
  *              run using a scheduled executor, therefore this interval uses the system clock
  */
@@ -152,6 +153,7 @@ class FastestServerLB(override val solrServers: SolrServers,
                       initialTestRuns: Int = 10,
                       filterFastServers: Long => ((SolrServer, Long)) => Boolean =
                         average => { case (_, duration) => duration <= average * 1.1 + 5 },
+                      val mapPredictedResponseTime: Long => Long = identity,
                       clock: Clock = Clock.systemDefault) extends LoadBalancer with FastestServerLBJmxSupport {
 
   import FastestServerLB._
@@ -269,7 +271,9 @@ class FastestServerLB(override val solrServers: SolrServers,
     // servers.groupBy(server => serverStats(server).averageDuration(queryClass))
     val sorted = servers.sortBy(server => stats(server).predictDuration(TestQueryClass))
 
-    val serversByDuration = servers.groupBy(server => stats(server).predictDuration(TestQueryClass)).toSeq.sortBy(_._1)
+    val serversByDuration = servers.groupBy(server =>
+      mapPredictedResponseTime(stats(server).predictDuration(TestQueryClass))
+    ).toSeq.sortBy(_._1)
     val fastestServers = serversByDuration.head._2
     val idx = if(lastServerIdx + 1 < fastestServers.size) lastServerIdx + 1 else 0
     (idx, fastestServers(idx))
@@ -359,6 +363,8 @@ trait FastestServerLBMBean /*extends DynamicMBean*/ {
 
   def predictDurations(collection: String): CompositeData
 
+  def quantizePredictedDurations(collection: String): CompositeData
+
   def averagesPerSecond(collection: String): TabularData
 
   def averagesPer10Seconds(collection: String): TabularData
@@ -423,6 +429,13 @@ trait FastestServerLBJmxSupport extends FastestServerLBMBean { self: FastestServ
     new CompositeDataSupport(
       compositeType(serverNames),
       servers.map(s => s.baseUrl -> stats(s).predictDuration(TestQueryClass).toString).toMap[String, String])
+  }
+
+  override def quantizePredictedDurations(collection: String): CompositeData = {
+    val (servers, serverNames) = serversAndNames(collection)
+    new CompositeDataSupport(
+      compositeType(serverNames),
+      servers.map(s => s.baseUrl -> mapPredictedResponseTime(stats(s).predictDuration(TestQueryClass)).toString).toMap[String, String])
   }
 
   override def fastServers(collection: String): CompositeData = {

@@ -248,7 +248,7 @@ class FastestServerLBSpec extends FunSpec with Matchers with MockitoSugar with B
 
       // verify that the lb ran the test query (in this case for all servers)
       // ... and we accept a slight delay because the scheduler might be a bit inaccurate...
-      eventually(Timeout(maxDelay * 2)) {
+      eventually(Timeout(maxDelay * 5)) {
         solrServers.all.foreach(verify(spyClient, times(1)).doQuery(_, testQuery))
       }
     }

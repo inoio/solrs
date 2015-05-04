@@ -24,7 +24,7 @@ class RetryPolicySpec extends FunSpec with Matchers with Inside {
 
     it("should not retry when no servers available") {
       val lb = new LoadBalancer {
-        override def solrServer(q: SolrQuery): Option[SolrServer] = None
+        override def solrServer(q: SolrQuery, preferred: Option[SolrServer] = None): Option[SolrServer] = None
         override val solrServers = new StaticSolrServers(IndexedSeq.empty)
       }
       val retry = TryAvailableServers.shouldRetry(e, server1, QueryContext(q), lb)

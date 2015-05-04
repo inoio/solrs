@@ -48,4 +48,17 @@ class RoundRobinLBSpec extends FunSpec with Matchers {
       cut.solrServer(q) should be (None)
     }
   }
+
+  it("should consider the preferred server if active") {
+    val servers = IndexedSeq(SolrServer("host1"), SolrServer("host2"))
+    val cut = new RoundRobinLB(new StaticSolrServers(servers))
+
+    val preferred = Some(SolrServer("host2"))
+
+    cut.solrServer(q, preferred) should be (preferred)
+    cut.solrServer(q, preferred) should be (preferred)
+
+    servers(1).status = Failed
+    cut.solrServer(q, preferred) should be (Some(SolrServer("host1")))
+  }
 }

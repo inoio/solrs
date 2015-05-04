@@ -3,6 +3,7 @@ package io.ino.solrs
 import java.io.IOException
 
 import akka.actor.ActorSystem
+import io.ino.concurrent.Execution
 import io.ino.solrs.RetryDecision.Result
 import org.apache.solr.client.solrj.ResponseParser
 import org.apache.solr.client.solrj.SolrQuery
@@ -164,12 +165,28 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
     loadBalancer.shutdown()
   }
 
+  /**
+   * Performs a query to a solr server.
+   * @param q the query to send to solr.
+   * @return
+   */
   def query(q: SolrQuery): Future[QueryResponse] = {
-    loadBalanceQuery(QueryContext(q))
+    loadBalanceQuery(QueryContext(q)).map(_._1)(Execution.sameThreadContext)
   }
 
-  private def loadBalanceQuery(queryContext: QueryContext): Future[QueryResponse] = {
-    loadBalancer.solrServer(queryContext.q) match {
+  /**
+   * Performs a query to a solr server taking the preferred server into account if provided.
+   * @param q the query to send to the solr server.
+   * @param preferred the server that should be preferred to process the query. Specific [[io.ino.solrs.LoadBalancer LoadBalancer]]
+   *                  implementations have to support this and might add their own semantics.
+   * @return the response and the server that handled the query.
+   */
+  def queryPreferred(q: SolrQuery, preferred: Option[SolrServer]): Future[(QueryResponse, SolrServer)] = {
+    loadBalanceQuery(QueryContext(q, preferred))
+  }
+
+  private def loadBalanceQuery(queryContext: QueryContext): Future[(QueryResponse, SolrServer)] = {
+    loadBalancer.solrServer(queryContext.q, queryContext.preferred) match {
       case Some(solrServer) => queryWithRetries(solrServer, queryContext)
       case None =>
         val msg =
@@ -179,25 +196,27 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
     }
   }
 
-  private def queryWithRetries(server: SolrServer, queryContext: QueryContext): Future[QueryResponse] = {
+  private def queryWithRetries(server: SolrServer, queryContext: QueryContext): Future[(QueryResponse, SolrServer)] = {
     import scala.concurrent.ExecutionContext.Implicits.global
     val start = System.currentTimeMillis()
-    query(server, queryContext.q).recoverWith { case NonFatal(e) =>
-      val updatedContext = queryContext.failedRequest(server, (System.currentTimeMillis() - start) millis, e)
-      retryPolicy.shouldRetry(e, server, updatedContext, loadBalancer) match {
-        case RetryServer(s) =>
-          logger.warn(s"Query failed for server $server, trying next server $s. Exception was: $e")
-          queryWithRetries(s, updatedContext)
-        case StandardRetryDecision(Result.Retry) =>
-          logger.warn(s"Query failed for server $server, trying to get another server from loadBalancer for retry. Exception was: $e")
-          loadBalanceQuery(updatedContext)
-        case StandardRetryDecision(Result.Fail) =>
-          logger.warn(s"Query failed for server $server, not retrying. Exception was: $e", e)
-          // Wrap SolrException with solrs RemoteSolrException
-          val ex = if(e.isInstanceOf[SolrException]) new RemoteSolrException(500, e.getMessage, e) else e
-          Future.failed(ex)
+    query(server, queryContext.q)
+      .map(_ -> server)(Execution.sameThreadContext)
+      .recoverWith { case NonFatal(e) =>
+        val updatedContext = queryContext.failedRequest(server, (System.currentTimeMillis() - start) millis, e)
+        retryPolicy.shouldRetry(e, server, updatedContext, loadBalancer) match {
+          case RetryServer(s) =>
+            logger.warn(s"Query failed for server $server, trying next server $s. Exception was: $e")
+            queryWithRetries(s, updatedContext)
+          case StandardRetryDecision(Result.Retry) =>
+            logger.warn(s"Query failed for server $server, trying to get another server from loadBalancer for retry. Exception was: $e")
+            loadBalanceQuery(updatedContext)
+          case StandardRetryDecision(Result.Fail) =>
+            logger.warn(s"Query failed for server $server, not retrying. Exception was: $e", e)
+            // Wrap SolrException with solrs RemoteSolrException
+            val ex = if(e.isInstanceOf[SolrException]) new RemoteSolrException(500, e.getMessage, e) else e
+            Future.failed(ex)
+        }
       }
-    }
   }
 
   private def query(solrServer: SolrServer, q: SolrQuery): Future[QueryResponse] = {

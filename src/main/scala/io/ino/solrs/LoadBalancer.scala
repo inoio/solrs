@@ -24,7 +24,7 @@ trait LoadBalancer extends RequestInterceptor {
   /**
    * Determines the solr server to use for a new request.
    */
-  def solrServer(q: SolrQuery): Option[SolrServer]
+  def solrServer(q: SolrQuery, preferred: Option[SolrServer]): Option[SolrServer]
 
   /**
    * Intercept the given query, allows implementations to monitor solr server performance.
@@ -52,7 +52,7 @@ trait LoadBalancer extends RequestInterceptor {
 class SingleServerLB(val server: SolrServer) extends LoadBalancer {
   def this(baseUrl: String) = this(SolrServer(baseUrl))
   private val someServer = Some(server)
-  override def solrServer(q: SolrQuery) = someServer
+  override def solrServer(q: SolrQuery, preferred: Option[SolrServer] = None) = someServer
   override val solrServers: SolrServers = new StaticSolrServers(IndexedSeq(server))
 }
 
@@ -78,16 +78,20 @@ class RoundRobinLB(override val solrServers: SolrServers) extends LoadBalancer {
     }
   }
 
-  override def solrServer(q: SolrQuery): Option[SolrServer] = {
+  override def solrServer(q: SolrQuery, preferred: Option[SolrServer] = None): Option[SolrServer] = {
     val servers = solrServers.matching(q)
     if(servers.isEmpty) {
       None
     } else {
-      // idx + 1 might be > servers.length, so let's use % to get a valid start position
-      val startIndex = (idx + 1) % servers.length
-      val (newIndex, result) = findAvailable(servers, startIndex)
-      idx = newIndex
-      result
+      if(preferred.isDefined && servers.exists(s => s.baseUrl == preferred.get.baseUrl && s.status == Enabled)) {
+        preferred
+      } else {
+        // idx + 1 might be > servers.length, so let's use % to get a valid start position
+        val startIndex = (idx + 1) % servers.length
+        val (newIndex, result) = findAvailable(servers, startIndex)
+        idx = newIndex
+        result
+      }
     }
   }
 
@@ -236,12 +240,12 @@ class FastestServerLB(override val solrServers: SolrServers,
   /**
    * Determines the solr server to use for a new request.
    */
-  override def solrServer(q: SolrQuery): Option[SolrServer] = {
+  override def solrServer(q: SolrQuery, preferred: Option[SolrServer] = None): Option[SolrServer] = {
     val servers = solrServers.matching(q).filter(_.status == Enabled)
     if(servers.isEmpty) {
       None
     } else {
-      val (serverIdx, result) = findBestServer(servers, lastServerIdx.get())
+      val (serverIdx, result) = findBestServer(servers, lastServerIdx.get(), preferred)
       lastServerIdx.lazySet(serverIdx)
       Some(result)
     }
@@ -267,7 +271,7 @@ class FastestServerLB(override val solrServers: SolrServers,
   /**
    * Start from the given idx and try servers.length servers to get the next available.
    */
-  private def findBestServer(servers: IndexedSeq[SolrServer], lastServerIdx: Int): (Int, SolrServer) = {
+  private def findBestServer(servers: IndexedSeq[SolrServer], lastServerIdx: Int, preferred: Option[SolrServer]): (Int, SolrServer) = {
     // servers.groupBy(server => serverStats(server).averageDuration(queryClass))
     val sorted = servers.sortBy(server => stats(server).predictDuration(TestQueryClass))
 
@@ -275,8 +279,17 @@ class FastestServerLB(override val solrServers: SolrServers,
       mapPredictedResponseTime(stats(server).predictDuration(TestQueryClass))
     ).toSeq.sortBy(_._1)
     val fastestServers = serversByDuration.head._2
-    val idx = if(lastServerIdx + 1 < fastestServers.size) lastServerIdx + 1 else 0
-    (idx, fastestServers(idx))
+
+
+    if(preferred.isDefined && fastestServers.exists(s => s.baseUrl == preferred.get.baseUrl && s.status == Enabled)) {
+      // if the preferred server is chosen, the last server index is returned as is, round robin shall not be affected
+      // e.g. if the previous query got server 1, then another client got server 2, then client 1 asks to get server 1
+      // again -> the next client should get server 3
+      (lastServerIdx, preferred.get)
+    } else {
+      val idx = if (lastServerIdx + 1 < fastestServers.size) lastServerIdx + 1 else 0
+      (idx, fastestServers(idx))
+    }
   }
 
   private def testWithMinDelay(server: SolrServer): Option[Future[QueryResponse]] = {

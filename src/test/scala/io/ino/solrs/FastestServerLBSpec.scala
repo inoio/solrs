@@ -113,6 +113,23 @@ class FastestServerLBSpec extends FunSpec with Matchers with MockitoSugar with B
       cut.solrServer(q) should be (Some(server1))
     }
 
+    it("should consider the preferred server if it's one of the fastest servers") {
+      val cut = newDynamicLB(solrServers)
+      val preferred = Some(server2)
+
+      runTests(cut, server1, q, fromSecond = 1, toSecond = 5, startResponseTime = 1, endResponseTime = 1)
+      runTests(cut, server2, q, fromSecond = 1, toSecond = 5, startResponseTime = 1, endResponseTime = 1)
+      runTests(cut, server3, q, fromSecond = 1, toSecond = 5, startResponseTime = 10, endResponseTime = 10)
+      cut.updateStats()
+
+      cut.solrServer(q, preferred = Some(server2)) should be (Some(server2))
+      cut.solrServer(q, preferred = Some(server2)) should be (Some(server2))
+
+      // if the preferred server is too slow then the fastest ones should be round robin'ed
+      cut.solrServer(q, preferred = Some(server3)) should be (Some(server1))
+      cut.solrServer(q, preferred = Some(server3)) should be (Some(server2))
+    }
+
     it("should return the server with a better predicted response time") {
       val cut = newDynamicLB(solrServers)
 

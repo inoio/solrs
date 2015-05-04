@@ -64,12 +64,17 @@ object RetryPolicy {
 
     override def shouldRetry(e: Throwable, server: SolrServer, queryContext: QueryContext, lb: LoadBalancer): RetryDecision = {
 
+      val countServers = lb.solrServers.all.length
+      val preferred = queryContext.preferred.flatMap(p =>
+        if(queryContext.triedServers.contains(p)) None else queryContext.preferred
+      )
+
       @tailrec
       def findAvailable(round: Int): Option[SolrServer] = {
-        if(round >= lb.solrServers.all.length) {
+        if(round >= countServers) {
           None
         } else {
-          val maybeServer = lb.solrServer(queryContext.q)
+          val maybeServer = lb.solrServer(queryContext.q, preferred)
           maybeServer match {
             case None => None
             case Some(s) if s == server || queryContext.triedServers.contains(s) => findAvailable(round + 1)

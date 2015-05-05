@@ -92,6 +92,9 @@ Solr Cloud is supported with the following properties / restrictions:
 * No Collection Aliases supported (should be implemented next)
 * Can use a default collection, if this is not provided, per request the `SolrQuery` must specify
   the collection via the "collection" parameter.
+* New solr servers or solr servers that changed their state from inactive (e.g. down) to active can be tested
+  with warmup queries before they're used for load balancing queries, for this a `WarmupQueries` instance
+  can be set.
 * Querying solr is possible when ZooKeeper is temporarily not available
 * Construction of `CloudSolrServers` is possible while ZooKeeper is not available. When ZK becomes
   available `CloudSolrServers` will be connected to ZK. As interval for trying to connect the
@@ -122,7 +125,8 @@ val servers = new CloudSolrServers(zkHost = "host1:2181,host2:2181",
                                    zkClientTimeout = 15 seconds,
                                    zkConnectTimeout = 10 seconds,
                                    clusterStateUpdateInterval = 1 second,
-                                   defaultCollection = Some("collection1"))
+                                   defaultCollection = Some("collection1"),
+                                   warmupQueries: WarmupQueries("collection1" => Seq(new SolrQuery("*:*")), count = 10))
 val solr = AsyncSolrClient.Builder(RoundRobinLB(servers)).build
 ```
 

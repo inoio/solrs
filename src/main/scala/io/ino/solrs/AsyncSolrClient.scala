@@ -88,8 +88,12 @@ object AsyncSolrClient {
 
     protected def createMetrics: Metrics = NoopMetrics
 
-    // the load balancer might need to access this instance, extracted as protected method to be overridable from tests
-    protected def setOnLoadBalancer(solr: AsyncSolrClient): Unit = {
+    // the load balancer and others might need to access this instance, extracted as protected method to be overridable from tests
+    protected def setOnAsyncSolrClientAwares(solr: AsyncSolrClient): Unit = {
+      // the solr servers should be able to probe servers before the load balancer gets the handle...
+      // it's also set here (instead of letting the LoadBalancer pass the solrs instance to SolrServers),
+      // so that a LoadBalancer subclass cannot not forget to invoke super
+      loadBalancer.solrServers.setAsyncSolrClient(solr)
       loadBalancer.setAsyncSolrClient(solr)
     }
 
@@ -104,7 +108,7 @@ object AsyncSolrClient {
         serverStateObservation,
         retryPolicy
       )
-      setOnLoadBalancer(res)
+      setOnAsyncSolrClientAwares(res)
       res
     }
   }
@@ -354,6 +358,19 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
       reason = msg.toString()
     }
     reason
+  }
+
+}
+
+trait AsyncSolrClientAware {
+
+  /**
+   * On creation of AsyncSolrClient this method is invoked with the created instance if the
+   * concrete component is "supported", right now this are SolrServers and LoadBalancer.
+   * Subclasses can override this method to get access to the solr client.
+   */
+  def setAsyncSolrClient(solr: AsyncSolrClient): Unit = {
+    // empty default
   }
 
 }

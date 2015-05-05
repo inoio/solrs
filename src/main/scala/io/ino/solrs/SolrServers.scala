@@ -2,18 +2,22 @@ package io.ino.solrs
 
 import java.util.concurrent.{Executors, ScheduledExecutorService, ThreadFactory}
 
-import com.ning.http.client.{Response, AsyncCompletionHandler, AsyncHttpClient}
-import org.apache.solr.client.solrj.{SolrServerException, SolrQuery}
+import com.ning.http.client.{AsyncCompletionHandler, AsyncHttpClient, Response}
+import io.ino.solrs.CloudSolrServers.WarmupQueries
+import org.apache.solr.client.solrj.response.QueryResponse
+import org.apache.solr.client.solrj.{SolrQuery, SolrServerException}
 import org.apache.solr.common.cloud._
 import org.slf4j.LoggerFactory
 
-import scala.concurrent.Future
+import scala.collection.immutable.Iterable
+import scala.concurrent.{Promise, Future}
 import scala.util.control.NonFatal
+import scala.util.{Failure, Success, Try}
 
 /**
  * Provides the list of solr servers.
  */
-trait SolrServers {
+trait SolrServers extends AsyncSolrClientAware {
   /**
    * The currently known solr servers.
    */
@@ -32,9 +36,10 @@ object StaticSolrServers {
   def apply(baseUrls: IndexedSeq[String]): StaticSolrServers = new StaticSolrServers(baseUrls.map(SolrServer(_)))
 }
 
+import java.util.concurrent.TimeUnit
+
 import scala.concurrent.duration._
 import scala.languageFeature.postfixOps
-import java.util.concurrent.TimeUnit
 
 private object ZkClusterStateUpdateTF {
   private val tg = new ThreadGroup("solrs-CloudSolrServersUpdate")
@@ -45,7 +50,7 @@ private class ZkClusterStateUpdateTF extends ThreadFactory {
   override def newThread(r: Runnable): Thread = {
     val td: Thread = new Thread(tg, r, "solrs-CloudSolrServersUpdateThread-" + tg.activeCount() + 1)
     td.setDaemon(true)
-    return td
+    td
   }
 }
 
@@ -66,18 +71,24 @@ class CloudSolrServers(zkHost: String,
                        zkClientTimeout: Duration = 15 seconds, // default from Solr Core, see also SOLR-5221
                        zkConnectTimeout: Duration = 10 seconds, // default from solrj CloudSolrServer
                        clusterStateUpdateInterval: Duration = 1 second,
-                       defaultCollection: Option[String] = None) extends SolrServers {
+                       defaultCollection: Option[String] = None,
+                       warmupQueries: Option[WarmupQueries] = None) extends SolrServers {
 
-  private val logger = LoggerFactory.getLogger(getClass())
+  private val logger = LoggerFactory.getLogger(getClass)
 
   private var maybeZk: Option[ZkStateReader] = None
 
   private var lastClusterState: ClusterState = _
-  private var collectionToServers = Map.empty[String, IndexedSeq[SolrServer]]
+  private var collectionToServers = Map.empty[String, IndexedSeq[SolrServer]].withDefaultValue(IndexedSeq.empty)
 
   private var scheduledExecutor: ScheduledExecutorService = Executors.newScheduledThreadPool(1, new ZkClusterStateUpdateTF)
 
-  createZkStateReader()
+  private var asyncSolrClient: AsyncSolrClient = _
+
+  override def setAsyncSolrClient(client: AsyncSolrClient): Unit = {
+    asyncSolrClient = client
+    createZkStateReader()
+  }
 
   private def createZkStateReader(): Unit = {
     // Setup ZkStateReader, schedule retry if ZK is unavailable
@@ -120,6 +131,8 @@ class CloudSolrServers(zkHost: String,
    * Updates the server list when the ZkStateReader clusterState changed
    */
   private def updateFromClusterState(zkStateReader: ZkStateReader): Unit = {
+    import scala.concurrent.ExecutionContext.Implicits.global
+
     val clusterState = zkStateReader.getClusterState
     if(clusterState != lastClusterState) {
 
@@ -137,15 +150,55 @@ class CloudSolrServers(zkHost: String,
 
         lastClusterState = clusterState
 
-        if(newCollectionToServers != collectionToServers) {
+        // expect the new collection to servers map just for better readability on usage side...
+        def set(newCollectionToServers: Map[String, IndexedSeq[SolrServer]]): Unit = {
           collectionToServers = newCollectionToServers
-          if(logger.isDebugEnabled) logger.debug(s"Updated server map: $collectionToServers from ClusterState $clusterState")
-          else logger.info(s"Updated server map: $collectionToServers")
+          if (logger.isDebugEnabled) logger.debug (s"Updated server map: $collectionToServers from ClusterState $clusterState")
+          else logger.info (s"Updated server map: $collectionToServers")
+        }
+
+        if(newCollectionToServers != collectionToServers) warmupQueries match {
+          case Some(warmup) => warmupNewServers(newCollectionToServers, warmup)
+            .onComplete(_ => set(newCollectionToServers))
+          case None => set(newCollectionToServers)
         }
 
       } catch {
         case NonFatal(e) =>
-          logger.error(s"Could not process cluster state, server list might get outdated. Cluster state: ${clusterState}", e)
+          logger.error(s"Could not process cluster state, server list might get outdated. Cluster state: $clusterState", e)
+      }
+    }
+  }
+
+  protected def warmupNewServers(newCollectionToServers: Map[String, IndexedSeq[SolrServer]],
+                               warmup: WarmupQueries): Future[Iterable[Try[QueryResponse]]] = {
+    import scala.concurrent.ExecutionContext.Implicits.global
+
+    val perCollectionResponses = newCollectionToServers.flatMap { case (collection, solrServers) =>
+      val existingServers = collectionToServers(collection)
+      // SolrServer.equals checks both baseUrl and status, therefore we can just use contains
+      val newActiveServers = solrServers.filter(s => s.isEnabled && !existingServers.contains(s))
+      newActiveServers.map(warmupNewServer(collection, _, warmup.queriesByCollection(collection), warmup.count))
+    }
+
+    Future.sequence(perCollectionResponses).map(_.flatten)
+  }
+
+  protected def warmupNewServer(collection: String, s: SolrServer, queries: Seq[SolrQuery], count: Int): Future[Seq[Try[QueryResponse]]] = {
+    import scala.concurrent.ExecutionContext.Implicits.global
+    // queries shall be run in parallel, one round after the other
+    (1 to count).foldLeft(Future.successful(Seq.empty[Try[QueryResponse]])) { (res, round) =>
+      res.flatMap { _ =>
+        val warmupResponses = queries.map(q =>
+          asyncSolrClient.doQuery(s, q)
+            .map(Success(_))
+            .recover {
+            case NonFatal(e) =>
+              logger.warn(s"Warmup query $q failed", e)
+              Failure(e)
+          }
+        )
+        Future.sequence(warmupResponses)
       }
     }
   }
@@ -189,7 +242,7 @@ class CloudSolrServers(zkHost: String,
 
 class ReloadingSolrServers(url: String, extractor: Array[Byte] => IndexedSeq[SolrServer], httpClient: AsyncHttpClient) extends SolrServers {
 
-  private val logger = LoggerFactory.getLogger(getClass())
+  private val logger = LoggerFactory.getLogger(getClass)
 
   private var solrServers = IndexedSeq.empty[SolrServer]
 
@@ -218,7 +271,7 @@ class ReloadingSolrServers(url: String, extractor: Array[Byte] => IndexedSeq[Sol
   }
 
   protected def loadUrl(): Future[Array[Byte]] = {
-    val promise = scala.concurrent.promise[Array[Byte]]
+    val promise = Promise[Array[Byte]]()
     httpClient.prepareGet(url).execute(new AsyncCompletionHandler[Response]() {
       override def onCompleted(response: Response): Response = {
         promise.success(response.getResponseBodyAsBytes)
@@ -232,5 +285,16 @@ class ReloadingSolrServers(url: String, extractor: Array[Byte] => IndexedSeq[Sol
     promise.future
   }
 
+
+}
+
+object CloudSolrServers {
+
+  /**
+   * Specifies how newly added servers / servers that changed from down to active are put under load.
+   * @param queriesByCollection a function that returns warmup queries for a given collection.
+   * @param count the number of times that the queries shall be run.s
+   */
+  case class WarmupQueries(queriesByCollection: String => Seq[SolrQuery], count: Int)
 
 }

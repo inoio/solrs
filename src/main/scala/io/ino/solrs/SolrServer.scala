@@ -10,6 +10,8 @@ class SolrServer(val baseUrl: String) {
   @volatile
   var status: ServerStatus = Enabled
 
+  def isEnabled = status == Enabled
+
   override def toString(): String = s"SolrServer($baseUrl, $status)"
 
   override def equals(other: Any): Boolean = other match {

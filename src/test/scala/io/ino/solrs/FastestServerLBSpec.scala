@@ -4,7 +4,6 @@ import java.util.concurrent.TimeUnit
 
 import io.ino.time.Clock
 import org.apache.solr.client.solrj.SolrQuery
-import org.apache.solr.client.solrj.response.QueryResponse
 import org.mockito.Matchers.{eq => mockEq, _}
 import org.mockito.Mockito._
 import org.scalatest.concurrent.Eventually._
@@ -12,10 +11,8 @@ import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.mock.MockitoSugar
 import org.scalatest.{BeforeAndAfterEach, FunSpec, Matchers}
 
-import scala.concurrent._
 import scala.concurrent.duration._
 import scala.language.postfixOps
-import scala.util.{Success, Try}
 
 class FastestServerLBSpec extends FunSpec with Matchers with MockitoSugar with BeforeAndAfterEach {
 
@@ -30,9 +27,11 @@ class FastestServerLBSpec extends FunSpec with Matchers with MockitoSugar with B
   private val q = new SolrQuery("foo")
   private val classifyQuery: (SolrQuery) => String = solrQuery => "foo"
 
-  private val clock = Clock.mutable
+  private implicit val clock = Clock.mutable
 
   private val solrs = mock[AsyncSolrClient]
+
+  import AsyncSolrClientMocks._
 
   override def beforeEach(): Unit = {
     reset(solrs)
@@ -42,11 +41,6 @@ class FastestServerLBSpec extends FunSpec with Matchers with MockitoSugar with B
 
   override def afterEach(): Unit = {
     cut.shutdown()
-  }
-
-  private def mockDoQuery(mock: AsyncSolrClient, solrServer: => SolrServer = any[SolrServer](), responseDelay: Duration = 1 milli): Unit = {
-    // for spies doReturn should be used...
-    doReturn(delayedResponse(responseDelay.toMillis)).when(mock).doQuery(solrServer, any())
   }
 
   describe("FastestServerLB") {
@@ -280,10 +274,10 @@ class FastestServerLBSpec extends FunSpec with Matchers with MockitoSugar with B
     // we use a spy to have a real async solr client for that we can verify interactions
     var spyClient: AsyncSolrClient = null
     val realClient: AsyncSolrClient = new AsyncSolrClient.Builder(cut) {
-      override protected def setOnLoadBalancer(solr: AsyncSolrClient): Unit = {
+      override protected def setOnAsyncSolrClientAwares(solr: AsyncSolrClient): Unit = {
         spyClient = spy(solr)
         mockQueries(spyClient)
-        super.setOnLoadBalancer(spyClient)
+        super.setOnAsyncSolrClientAwares(spyClient)
       }
     }.build
     (testQuery, cut, spyClient)
@@ -304,23 +298,6 @@ class FastestServerLBSpec extends FunSpec with Matchers with MockitoSugar with B
   private def atSecond[T](second: Long)(f: => T): T = {
     clock.set(TimeUnit.SECONDS.toMillis(second))
     f
-  }
-
-  private def delayedResponse(delay: Long): Future[QueryResponse] = {
-    val response = new QueryResponse()
-    new Future[QueryResponse] {
-      override def onComplete[U](func: (Try[QueryResponse]) => U)(implicit executor: ExecutionContext): Unit = {
-        clock.advance(delay)
-        func(Success(response))
-      }
-      override def isCompleted: Boolean = true
-      override def value: Option[Try[QueryResponse]] = Some(Success(response))
-      @throws(classOf[Exception])
-      override def result(atMost: Duration)(implicit permit: CanAwait): QueryResponse = response
-      @throws(classOf[InterruptedException])
-      @throws(classOf[TimeoutException])
-      override def ready(atMost: Duration)(implicit permit: CanAwait): this.type = this
-    }
   }
 
   private def runTests(cut: FastestServerLB, server: SolrServer, query: SolrQuery,

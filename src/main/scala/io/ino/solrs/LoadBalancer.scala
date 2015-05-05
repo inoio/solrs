@@ -16,7 +16,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-trait LoadBalancer extends RequestInterceptor {
+trait LoadBalancer extends RequestInterceptor with AsyncSolrClientAware {
 
   val solrServers: SolrServers
 
@@ -33,14 +33,6 @@ trait LoadBalancer extends RequestInterceptor {
   override def interceptQuery(f: (SolrServer, SolrQuery) => Future[QueryResponse])
                              (solrServer: SolrServer, q: SolrQuery): Future[QueryResponse] = {
     f(solrServer, q)
-  }
-
-  /**
-   * On creation of AsyncSolrClient this method is invoked with the created instance.
-   * Subclasses can override this method to get access to the solr client.
-   */
-  def setAsyncSolrClient(solr: AsyncSolrClient): Unit = {
-    // empty default
   }
 
   def shutdown(): Unit = {

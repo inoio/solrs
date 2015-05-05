@@ -1,5 +1,7 @@
 package io.ino.solrs
 
+import io.ino.solrs.AsyncSolrClientMocks._
+import io.ino.time.Clock
 import org.apache.curator.test.TestingServer
 import org.scalatest._
 import org.scalatest.concurrent.Eventually._
@@ -48,6 +50,8 @@ class CloudSolrServersUninitializedIntegrationSpec extends FunSpec with BeforeAn
     it("should be able to start and stop with unavailable ZK") {
       // Create CUT when there's no ZK available
       cut = Some(new CloudSolrServers("localhost:2181", zkConnectTimeout = 1 second, clusterStateUpdateInterval = 100 millis))
+      val asyncSolrClient = mockDoQuery(mock[AsyncSolrClient])(Clock.mutable)
+      cut.foreach(_.setAsyncSolrClient(asyncSolrClient))
 
       // Just see that shutdown doesn't block
       cut.get.shutdown
@@ -64,6 +68,8 @@ class CloudSolrServersUninitializedIntegrationSpec extends FunSpec with BeforeAn
       // Create CUT when there's no ZK available. There are also no solr servers started, so that initially the
       // zkStateReader.createClusterStateWatchersAndUpdate will fail as well...
       cut = Some(new CloudSolrServers(zkConnectString, zkConnectTimeout = 1 second, clusterStateUpdateInterval = 100 millis))
+      val asyncSolrClient = mockDoQuery(mock[AsyncSolrClient])(Clock.mutable)
+      cut.foreach(_.setAsyncSolrClient(asyncSolrClient))
 
       // Now start ZK
       zk = Some(new TestingServer(zkPort, true))

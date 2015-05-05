@@ -1,14 +1,19 @@
 package io.ino.solrs
 
+import io.ino.solrs.CloudSolrServers.WarmupQueries
+import io.ino.time.Clock
 import org.apache.curator.test.TestingServer
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.impl.CloudSolrClient
+import org.apache.solr.client.solrj.response.QueryResponse
+import org.mockito.Mockito._
 import org.scalatest._
 import org.scalatest.concurrent.Eventually._
 import org.scalatest.mock.MockitoSugar
 import org.scalatest.time.{Millis, Span}
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Promise
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
@@ -24,6 +29,9 @@ class CloudSolrServersIntegrationSpec extends FunSpec with BeforeAndAfterAll wit
   private var zk: TestingServer = _
   private var solrRunners = List.empty[SolrRunner]
   private var solrs = Map.empty[SolrRunner, AsyncSolrClient]
+
+  import AsyncSolrClientMocks._
+  private val asyncSolrClient = mockDoQuery(mock[AsyncSolrClient])(Clock.mutable)
 
   private var cut: CloudSolrServers = _
   private var cloudSolrServer: CloudSolrClient = _
@@ -46,6 +54,7 @@ class CloudSolrServersIntegrationSpec extends FunSpec with BeforeAndAfterAll wit
     cloudSolrServer.setDefaultCollection("collection1")
 
     cut = new CloudSolrServers(zk.getConnectString, clusterStateUpdateInterval = 100 millis)
+    cut.setAsyncSolrClient(asyncSolrClient)
 
     cloudSolrServer.deleteByQuery("*:*")
     import scala.collection.JavaConversions._
@@ -106,6 +115,36 @@ class CloudSolrServersIntegrationSpec extends FunSpec with BeforeAndAfterAll wit
         cut.all.map(_.status) should contain theSameElementsInOrderAs Seq(Enabled, Enabled)
       }
 
+    }
+
+    it("should test solr instances according to the WarmupQueries") {
+      val queries = Seq(new SolrQuery("foo"))
+      val warmupQueries = WarmupQueries(queriesByCollection = _ => queries, count = 2)
+      val cut = new CloudSolrServers(zk.getConnectString, warmupQueries = Some(warmupQueries))
+
+      val standardResponsePromise = Promise[QueryResponse]()
+      val standardResponse = standardResponsePromise.future
+
+      val asyncSolrClient = mockDoQuery(mock[AsyncSolrClient], standardResponse)
+      cut.setAsyncSolrClient(asyncSolrClient)
+
+      // initially the list of servers should be empty
+      cut.all should be ('empty)
+
+      // as soon as the response is set the LB should provide the servers...
+      standardResponsePromise.success(new QueryResponse())
+      eventually {
+        cut.all should contain theSameElementsAs solrRunnerUrls.map(SolrServer(_, Enabled))
+      }
+
+      // and the servers should have been tested with queries
+      solrRunnerUrls.map(SolrServer(_, Enabled)).foreach { solrServer =>
+        warmupQueries.queriesByCollection("col1").foreach { q =>
+          verify(asyncSolrClient, times(warmupQueries.count)).doQuery(solrServer, q)
+        }
+      }
+
+      cut.shutdown
     }
 
     it("should resolve server by collection alias") {

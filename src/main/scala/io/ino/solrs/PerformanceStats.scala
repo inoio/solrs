@@ -1,5 +1,6 @@
 package io.ino.solrs
 
+import java.util
 import java.util.NavigableSet
 import java.util.concurrent.ConcurrentSkipListSet
 import java.util.concurrent.TimeUnit._
@@ -31,9 +32,9 @@ class PerformanceStats(solrServer: SolrServer, clock: Clock) {
   // store all current requests with their startedAtMillis, independently from the queryClass, to predict
   // response time based on the longest lasting request.
   // the idea is that a stop-the-world gc is affecting all requests, independently from the actual query
-  private val currentRequests = TrieMap.empty[QueryClass, NavigableSet[RequestHandle]]
+  private val currentRequests = TrieMap.empty[QueryClass, util.NavigableSet[RequestHandle]].withDefaultValue(new ConcurrentSkipListSet[RequestHandle])
   // shortcut method, withDefault does not update the map...
-  private def currentRequestsFor(queryClass: QueryClass): NavigableSet[RequestHandle] = {
+  private def currentRequestsFor(queryClass: QueryClass): util.NavigableSet[RequestHandle] = {
     currentRequests.getOrElseUpdate(queryClass, new ConcurrentSkipListSet[RequestHandle])
   }
 

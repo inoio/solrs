@@ -14,7 +14,7 @@ import scala.reflect.ClassTag
 /**
  * Statistics for a solr server.
  */
-class PerformanceStats(solrServer: SolrServer, clock: Clock) {
+class PerformanceStats(solrServer: SolrServer, initialPredictedResponseTime: Long, clock: Clock) {
 
   private val logger = LoggerFactory.getLogger(getClass)
 
@@ -161,10 +161,10 @@ class PerformanceStats(solrServer: SolrServer, clock: Clock) {
     requestAveragesPer10Seconds(math.abs(relativeTenSeconds)).get(queryClass)
   }
 
-  def totalAverageDuration(queryClass: QueryClass): Long = {
+  def totalAverageDuration(queryClass: QueryClass, defaultValue: Long): Long = {
     val (count, duration) = totalCountAndDuration(queryClass)
     if(count == 0) {
-      0
+      defaultValue
     } else {
       duration / count
     }
@@ -182,7 +182,7 @@ class PerformanceStats(solrServer: SolrServer, clock: Clock) {
             .getOrElse(
               averageDurationFor10Seconds(queryClass, 0)
                 .getOrElse(
-                  totalAverageDuration(queryClass))))
+                  totalAverageDuration(queryClass, initialPredictedResponseTime))))
     }
 
     // use pollFirst because first() throws NoSuchElementException if empty

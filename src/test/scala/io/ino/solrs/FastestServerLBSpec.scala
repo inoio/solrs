@@ -60,7 +60,7 @@ class FastestServerLBSpec extends FunSpec with Matchers with MockitoSugar with B
 
       cut.solrServer(q) should be (Some(SolrServer("host1")))
       // we must create some performance stats for host1, so that host2 will be selected
-      runTests(cut, server1, q, fromSecond = 1, toSecond = 2, startResponseTime = 10, endResponseTime = 10)
+      runTests(cut, server1, q, fromSecond = 1, toSecond = 2, startResponseTime = 1000, endResponseTime = 1000)
       cut.solrServer(q) should be (Some(SolrServer("host2")))
 
       servers.head.status = Disabled

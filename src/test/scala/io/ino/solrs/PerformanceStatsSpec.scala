@@ -26,7 +26,7 @@ class PerformanceStatsSpec extends FunSpec with Matchers with BeforeAndAfterEach
   describe("PerformanceStats") {
 
     it("should calculate averages per second (for the last 10 seconds)") {
-      val cut = new PerformanceStats(SolrServer("host1"), clock)
+      val cut = new PerformanceStats(SolrServer("host1"), 0, clock)
 
       // set clock to the start of a second, so that both measurements are in the same bucket
       val second1 =  MILLISECONDS.toSeconds(clock.millis())
@@ -63,7 +63,7 @@ class PerformanceStatsSpec extends FunSpec with Matchers with BeforeAndAfterEach
     }
 
     it("should calculate averages for 10 second intervals") {
-      val cut = new PerformanceStats(SolrServer("host1"), clock)
+      val cut = new PerformanceStats(SolrServer("host1"), 0, clock)
 
       // simulate several requests, not only 1 per second, to see how averages per second are handled
       // 6 measurements, sum = 240 => average = 40
@@ -90,7 +90,7 @@ class PerformanceStatsSpec extends FunSpec with Matchers with BeforeAndAfterEach
     }
 
     it("should store the overall average") {
-      val cut = new PerformanceStats(SolrServer("host1"), clock)
+      val cut = new PerformanceStats(SolrServer("host1"), 0, clock)
 
       // simulate several requests, not only 1 per second, to see how averages per second are handled
       // 6 measurements, sum = 240 => average = 40
@@ -100,7 +100,7 @@ class PerformanceStatsSpec extends FunSpec with Matchers with BeforeAndAfterEach
       cut.updateStats()
 
       cut.averageDurationFor10Seconds(queryClass1, relativeTenSeconds = 0) shouldBe Some(40)
-      cut.totalAverageDuration(queryClass1) shouldBe 40
+      cut.totalAverageDuration(queryClass1, 0) shouldBe 40
 
       // some more requests later
       requests(cut, SortedMap(20000L -> 50L, 21000L -> 60L, 22000L -> 60L, 23000L -> 60L, 24000L -> 60L, 25000L -> 70L))
@@ -111,13 +111,13 @@ class PerformanceStatsSpec extends FunSpec with Matchers with BeforeAndAfterEach
       cut.averageDurationFor10Seconds(queryClass1, relativeTenSeconds = 0) shouldBe Some(60)
       cut.averageDurationFor10Seconds(queryClass1, relativeTenSeconds = -1) shouldBe None
       cut.averageDurationFor10Seconds(queryClass1, relativeTenSeconds = -2) shouldBe Some(40)
-      cut.totalAverageDuration(queryClass1) shouldBe 50
+      cut.totalAverageDuration(queryClass1, 0) shouldBe 50
 
       // after more than 60 seconds in total, the overall average should be 50
       clock.advance(60000)
       cut.updateStats()
 
-      cut.totalAverageDuration(queryClass1) shouldBe 50
+      cut.totalAverageDuration(queryClass1, 0) shouldBe 50
     }
 
     /**
@@ -129,7 +129,7 @@ class PerformanceStatsSpec extends FunSpec with Matchers with BeforeAndAfterEach
      * longer compared to the average.
      */
     it("should predict the response time based on ongoing requests") {
-      val cut = new PerformanceStats(SolrServer("host1"), clock)
+      val cut = new PerformanceStats(SolrServer("host1"), 0, clock)
 
       // simulate some requests to generate some averages in the past
       requests(cut, SortedMap(0L -> 100L, 1000L -> 100L, 2000L -> 100L))
@@ -151,7 +151,7 @@ class PerformanceStatsSpec extends FunSpec with Matchers with BeforeAndAfterEach
     }
 
     it("should predict the response time based on finished requests from the current second") {
-      val cut = new PerformanceStats(SolrServer("host1"), clock)
+      val cut = new PerformanceStats(SolrServer("host1"), 0, clock)
 
       // simulate some requests in the past to generate some averages in the past
       requests(cut, SortedMap(0L -> 10L, 1000L -> 10L, 2000L -> 10L))
@@ -166,7 +166,7 @@ class PerformanceStatsSpec extends FunSpec with Matchers with BeforeAndAfterEach
      * longer than the average.
      */
     it("should predict the response time based on finished requests from the current second, ignoring shorter active requests") {
-      val cut = new PerformanceStats(SolrServer("host1"), clock)
+      val cut = new PerformanceStats(SolrServer("host1"), 0, clock)
 
       // simulate some requests in the past to generate some averages in the past
       requests(cut, SortedMap(0L -> 10L, 1000L -> 10L, 2000L -> 10L))
@@ -185,7 +185,7 @@ class PerformanceStatsSpec extends FunSpec with Matchers with BeforeAndAfterEach
     }
 
     it("should predict the response time based on the last 10 seconds") {
-      val cut = new PerformanceStats(SolrServer("host1"), clock)
+      val cut = new PerformanceStats(SolrServer("host1"), 0, clock)
 
       // simulate some requests in the past to generate some averages in the past
       requests(cut, SortedMap(0L -> 10L, 1000L -> 20L, 2000L -> 30L, 3000L -> 20L))
@@ -198,7 +198,7 @@ class PerformanceStatsSpec extends FunSpec with Matchers with BeforeAndAfterEach
     }
 
     it("should predict the response time based on the overall average as fallback") {
-      val cut = new PerformanceStats(SolrServer("host1"), clock)
+      val cut = new PerformanceStats(SolrServer("host1"), 0, clock)
 
       // simulate some requests in the past to generate some averages in the past
       requests(cut, SortedMap(0L -> 10L, 100L -> 20L, 200L -> 30L, 300L -> 20L))

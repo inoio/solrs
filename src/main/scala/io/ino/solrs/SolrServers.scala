@@ -4,13 +4,16 @@ import java.util.concurrent.{Executors, ScheduledExecutorService, ThreadFactory}
 
 import com.ning.http.client.{AsyncCompletionHandler, AsyncHttpClient, Response}
 import io.ino.solrs.CloudSolrServers.WarmupQueries
+import io.ino.solrs.ServerStateChangeObservable.StateChange
 import org.apache.solr.client.solrj.response.QueryResponse
 import org.apache.solr.client.solrj.{SolrQuery, SolrServerException}
 import org.apache.solr.common.cloud._
 import org.slf4j.LoggerFactory
 
 import scala.collection.immutable.Iterable
+import scala.collection.mutable
 import scala.concurrent.{Promise, Future}
+import scala.language.postfixOps
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
@@ -54,6 +57,23 @@ private class ZkClusterStateUpdateTF extends ThreadFactory {
   }
 }
 
+trait StateChangeObserver {
+  def onStateChange(event: StateChange)
+}
+
+trait ServerStateChangeObservable {
+  def register(listener: StateChangeObserver)
+}
+
+object ServerStateChangeObservable {
+
+  sealed trait StateChange
+  case class Added(server: SolrServer, collection: String) extends StateChange
+  case class Removed(server: SolrServer, collection: String) extends StateChange
+  case class StateChanged(from: SolrServer, to: SolrServer, collection: String) extends StateChange
+
+}
+
 /**
  * Provides servers based on information from from ZooKeeper. Uses the ZkStateReader to read the ZK cluster state,
  * which is also used by solrj's CloudSolrServer. While ZkStateReader uses ZK Watches to get cluster state changes
@@ -72,7 +92,7 @@ class CloudSolrServers(zkHost: String,
                        zkConnectTimeout: Duration = 10 seconds, // default from solrj CloudSolrServer
                        clusterStateUpdateInterval: Duration = 1 second,
                        defaultCollection: Option[String] = None,
-                       warmupQueries: Option[WarmupQueries] = None) extends SolrServers {
+                       warmupQueries: Option[WarmupQueries] = None) extends SolrServers with ServerStateChangeObservable {
 
   private val logger = LoggerFactory.getLogger(getClass)
 
@@ -152,6 +172,7 @@ class CloudSolrServers(zkHost: String,
 
         // expect the new collection to servers map just for better readability on usage side...
         def set(newCollectionToServers: Map[String, IndexedSeq[SolrServer]]): Unit = {
+          notifyObservers(collectionToServers, newCollectionToServers)
           collectionToServers = newCollectionToServers
           if (logger.isDebugEnabled) logger.debug (s"Updated server map: $collectionToServers from ClusterState $clusterState")
           else logger.info (s"Updated server map: $collectionToServers")
@@ -238,6 +259,68 @@ class CloudSolrServers(zkHost: String,
     collectionToServers.getOrElse(collection, Vector.empty)
   }
 
+  // server state change
+
+  private val serverChangeStateObservers = mutable.ListBuffer.empty[StateChangeObserver]
+
+  override def register(listener: StateChangeObserver): Unit = {
+    serverChangeStateObservers += listener
+  }
+
+  private def notifyObservers(oldState: Map[String, Seq[SolrServer]], newState: Map[String, Seq[SolrServer]]) = {
+    CloudSolrServers.diff(oldState, newState).foreach { event =>
+      serverChangeStateObservers.foreach(_.onStateChange(event))
+    }
+  }
+
+}
+
+object CloudSolrServers {
+
+  /**
+   * Specifies how newly added servers / servers that changed from down to active are put under load.
+   * @param queriesByCollection a function that returns warmup queries for a given collection.
+   * @param count the number of times that the queries shall be run.s
+   */
+  case class WarmupQueries(queriesByCollection: String => Seq[SolrQuery], count: Int)
+
+  private[solrs] def diff(oldState: Map[String, Seq[SolrServer]], newState: Map[String, Seq[SolrServer]]): Iterable[StateChange] = {
+
+    import ServerStateChangeObservable._
+
+    def changes(servers1: Seq[SolrServer], servers2: Seq[SolrServer],
+                stateChanged: (SolrServer, SolrServer) => StateChanged,
+                onlyInServers2: SolrServer => StateChange): Set[StateChange] = {
+      servers2.foldLeft(Set.empty[StateChange]) { (res, server2) =>
+        servers1.find(_.baseUrl == server2.baseUrl) match {
+          case Some(server1) if server1.status == server2.status => res
+          case Some(server1) => res + stateChanged(server1, server2)
+          case None => res + onlyInServers2(server2)
+        }
+      }
+    }
+
+    val changesFromOldCollections = oldState.flatMap { case (collection, oldServers) =>
+      val newServers = newState.getOrElse(collection, Nil)
+      val changesFromOldState = changes(oldServers, newServers,
+        stateChanged = (oldServer, newServer) => StateChanged(oldServer, newServer, collection),
+        onlyInServers2 = (server2) => Added(server2, collection))
+      val changesFromNewState = changes(newServers, oldServers,
+        stateChanged = (newServer, oldServer) => StateChanged(oldServer, newServer, collection),
+        onlyInServers2 = (server2) => Removed(server2, collection))
+      changesFromOldState ++ changesFromNewState
+    }
+
+    val changesFromNewCollections = newState
+      .filterKeys(newCollection => !oldState.contains(newCollection))
+      .flatMap {
+        case (collection, newServers) =>
+          newServers.map(Added(_, collection))
+      }
+
+    changesFromOldCollections ++ changesFromNewCollections
+  }
+
 }
 
 class ReloadingSolrServers(url: String, extractor: Array[Byte] => IndexedSeq[SolrServer], httpClient: AsyncHttpClient) extends SolrServers {
@@ -285,16 +368,5 @@ class ReloadingSolrServers(url: String, extractor: Array[Byte] => IndexedSeq[Sol
     promise.future
   }
 
-
-}
-
-object CloudSolrServers {
-
-  /**
-   * Specifies how newly added servers / servers that changed from down to active are put under load.
-   * @param queriesByCollection a function that returns warmup queries for a given collection.
-   * @param count the number of times that the queries shall be run.s
-   */
-  case class WarmupQueries(queriesByCollection: String => Seq[SolrQuery], count: Int)
 
 }

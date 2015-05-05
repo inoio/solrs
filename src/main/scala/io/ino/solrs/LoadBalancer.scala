@@ -4,6 +4,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.{Executors, TimeUnit}
 
 import io.ino.concurrent.Execution
+import io.ino.solrs.ServerStateChangeObservable.{StateChanged, Removed, StateChange}
 import io.ino.time.Clock
 import io.ino.time.Units.Millisecond
 import org.apache.solr.client.solrj.SolrQuery
@@ -173,6 +174,7 @@ class FastestServerLB(override val solrServers: SolrServers,
   init()
 
   protected def init(): Unit = {
+    subscribeToServerChanges()
     scheduleTests()
     scheduleUpdateStats()
     initJmx()
@@ -181,6 +183,26 @@ class FastestServerLB(override val solrServers: SolrServers,
   override def shutdown(): Unit = {
     scheduler.shutdownNow()
     shutdownJmx()
+  }
+
+  // servers that become inactive should be removed from stats, because these stats are no longer valid
+  // when a server comes active again (e.g. it might just not yet be completely warmed up)
+  protected def subscribeToServerChanges(): Unit = {
+    solrServers match {
+      case observable: ServerStateChangeObservable => observable.register(new StateChangeObserver {
+        override def onStateChange(event: StateChange): Unit = event match {
+          case Removed(server, collection) if server.isEnabled =>
+            // clean up
+            statsByServer.remove(server)
+            serverTestTimestamp.remove(server)
+          case StateChanged(from, to, collection) if from.isEnabled && !to.isEnabled =>
+            statsByServer.remove(from)
+            serverTestTimestamp.remove(from)
+          case _ => // ignore
+        }
+      })
+      case _ => // nothing to do
+    }
   }
 
   protected def scheduleTests(): Unit = {
@@ -264,9 +286,6 @@ class FastestServerLB(override val solrServers: SolrServers,
    * Start from the given idx and try servers.length servers to get the next available.
    */
   private def findBestServer(servers: IndexedSeq[SolrServer], lastServerIdx: Int, preferred: Option[SolrServer]): (Int, SolrServer) = {
-    // servers.groupBy(server => serverStats(server).averageDuration(queryClass))
-    val sorted = servers.sortBy(server => stats(server).predictDuration(TestQueryClass))
-
     val serversByDuration = servers.groupBy(server =>
       mapPredictedResponseTime(stats(server).predictDuration(TestQueryClass))
     ).toSeq.sortBy(_._1)
@@ -346,7 +365,12 @@ class FastestServerLB(override val solrServers: SolrServers,
   }
 
   protected def stats(server: SolrServer): PerformanceStats = {
-    statsByServer.getOrElseUpdate(server, new PerformanceStats(server, clock))
+    statsByServer.getOrElseUpdate(server, new PerformanceStats(server, initialPredictedResponseTime, clock))
+  }
+
+  protected def initialPredictedResponseTime: Long = {
+    // just some fairly high value, should be bigger than usual predicted response times
+    1000
   }
 
 }
@@ -426,7 +450,7 @@ trait FastestServerLBJmxSupport extends FastestServerLBMBean { self: FastestServ
     val (servers, serverNames) = serversAndNames(collection)
     new CompositeDataSupport(
       compositeType(serverNames),
-      servers.map(s => s.baseUrl -> stats(s).totalAverageDuration(TestQueryClass).toString).toMap[String, String])
+      servers.map(s => s.baseUrl -> stats(s).totalAverageDuration(TestQueryClass, -1).toString).toMap[String, String])
   }
 
   override def predictDurations(collection: String): CompositeData = {
@@ -447,7 +471,7 @@ trait FastestServerLBJmxSupport extends FastestServerLBMBean { self: FastestServ
     val servers = fastServersByCollection(collection).toArray
     new CompositeDataSupport(
       compositeType(servers.map(_.baseUrl)),
-      servers.map(s => s.baseUrl -> stats(s).totalAverageDuration(TestQueryClass).toString).toMap[String, String])
+      servers.map(s => s.baseUrl -> stats(s).totalAverageDuration(TestQueryClass, -1).toString).toMap[String, String])
   }
 
   private def serversAndNames(collection: String): (Array[SolrServer], Array[String]) = {

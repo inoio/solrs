@@ -6,7 +6,7 @@ homepage := Some(url("https://github.com/inoio/solrs"))
 
 organization := "io.ino"
 
-version := "1.3.1"
+version := "1.3.2"
 
 licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.html"))
 

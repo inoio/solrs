@@ -133,10 +133,12 @@ class CloudSolrServers(zkHost: String,
       zkStateReader.createClusterStateWatchersAndUpdate
       logger.info(s"Successfully created ZK cluster state watchers at $zkHost")
 
+      // Directly update, because scheduler thread creation might take too long (issue #7)
+      updateFromClusterState(zkStateReader)
       // Now regularly update the server list from ZkStateReader clusterState
       scheduledExecutor.scheduleAtFixedRate(new Runnable {
         override def run(): Unit = updateFromClusterState(zkStateReader)
-      }, 0, clusterStateUpdateInterval.toMillis, TimeUnit.MILLISECONDS)
+      }, clusterStateUpdateInterval.toMillis, clusterStateUpdateInterval.toMillis, TimeUnit.MILLISECONDS)
     } catch {
       case NonFatal(e) =>
         logger.warn("Could not initialize ZkStateReader, this can happen when there are no solr servers connected." +

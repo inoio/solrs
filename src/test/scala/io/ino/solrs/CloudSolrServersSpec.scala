@@ -1,20 +1,10 @@
 package io.ino.solrs
 
-import io.ino.solrs.CloudSolrServers.WarmupQueries
-import io.ino.time.Clock
-import org.apache.curator.test.TestingServer
-import org.apache.solr.client.solrj.SolrQuery
-import org.apache.solr.client.solrj.impl.CloudSolrClient
-import org.apache.solr.client.solrj.response.QueryResponse
-import org.mockito.Mockito._
-import org.scalatest._
-import org.scalatest.concurrent.Eventually._
-import org.scalatest.mock.MockitoSugar
-import org.scalatest.time.{Millis, Span}
+import java.nio.file.{Files, Paths}
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Promise
-import scala.concurrent.duration._
+import org.apache.solr.common.cloud.ClusterState
+import org.scalatest._
+
 import scala.language.postfixOps
 
 /**
@@ -49,6 +39,22 @@ class CloudSolrServersSpec extends FunSpec with Matchers {
         Added(SolrServer("h30", Enabled), "col3")
       )
 
+    }
+
+    it("should read all servers from ClusterState with multiple shards") {
+      import scala.collection.JavaConversions._
+
+      val bytes = Files.readAllBytes(Paths.get(this.getClass.getResource("/cluster_status.json").toURI))
+      val cs = ClusterState.load(1, bytes, Set("server1:8983_solr"))
+
+      val collectionToServers = CloudSolrServers.getCollectionToServers(cs)
+      collectionToServers("my-collection").map(_.baseUrl) should contain allOf(
+        "http://server1:8983/solr/my-collection_shard1_replica1/",
+        "http://server2:8983/solr/my-collection_shard1_replica2/",
+        "http://server3:8983/solr/my-collection_shard2_replica1/",
+        "http://server4:8983/solr/my-collection_shard2_replica2/",
+        "http://server5:8983/solr/my-collection_shard3_replica1/",
+        "http://server6:8983/solr/my-collection_shard3_replica2/")
     }
 
   }

@@ -12,7 +12,7 @@ import org.slf4j.LoggerFactory
 
 import scala.collection.immutable.Iterable
 import scala.collection.mutable
-import scala.concurrent.{Promise, Future}
+import scala.concurrent.{Future, Promise}
 import scala.language.postfixOps
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
@@ -94,7 +94,7 @@ class CloudSolrServers(zkHost: String,
                        defaultCollection: Option[String] = None,
                        warmupQueries: Option[WarmupQueries] = None) extends SolrServers with ServerStateChangeObservable {
 
-  private val logger = LoggerFactory.getLogger(getClass)
+  import CloudSolrServers._
 
   private var maybeZk: Option[ZkStateReader] = None
 
@@ -130,7 +130,7 @@ class CloudSolrServers(zkHost: String,
     try {
       // createClusterStateWatchersAndUpdate fails when no solr servers are connected to solr, exception is:
       // KeeperException$NoNodeException: KeeperErrorCode = NoNode for /live_nodes
-      zkStateReader.createClusterStateWatchersAndUpdate
+      zkStateReader.createClusterStateWatchersAndUpdate()
       logger.info(s"Successfully created ZK cluster state watchers at $zkHost")
 
       // Directly update, because scheduler thread creation might take too long (issue #7)
@@ -159,18 +159,6 @@ class CloudSolrServers(zkHost: String,
     if(clusterState != lastClusterState) {
 
       try {
-        import scala.collection.JavaConversions._
-
-        val newCollectionToServers = (for {
-          collectionName <- clusterState.getCollections
-          collectionSlice = clusterState.getCollection(collectionName).getSlices
-          replica <- collectionSlice.map(_.getReplicas)
-        } yield collectionName -> replica.map( repl =>
-            SolrServer(ZkCoreNodeProps.getCoreUrl(repl), serverStatus(repl))
-          ).toIndexedSeq
-        ).toMap
-
-        lastClusterState = clusterState
 
         // expect the new collection to servers map just for better readability on usage side...
         def set(newCollectionToServers: Map[String, IndexedSeq[SolrServer]]): Unit = {
@@ -179,6 +167,9 @@ class CloudSolrServers(zkHost: String,
           if (logger.isDebugEnabled) logger.debug (s"Updated server map: $collectionToServers from ClusterState $clusterState")
           else logger.info (s"Updated server map: $collectionToServers")
         }
+
+        val newCollectionToServers = getCollectionToServers(clusterState)
+        lastClusterState = clusterState
 
         if(newCollectionToServers != collectionToServers) warmupQueries match {
           case Some(warmup) => warmupNewServers(newCollectionToServers, warmup)
@@ -231,18 +222,6 @@ class CloudSolrServers(zkHost: String,
     scheduledExecutor.shutdownNow()
   }
 
-  private def serverStatus(replica: Replica): ServerStatus = replica.get(ZkStateReader.STATE_PROP) match {
-    case ZkStateReader.ACTIVE => Enabled
-    case ZkStateReader.RECOVERING => Disabled
-    case ZkStateReader.RECOVERY_FAILED => Failed
-    case ZkStateReader.DOWN => Failed
-    case default =>
-      // E.g. there's SYNC, which *should* not be used according to http://markmail.org/message/wt54x2xisileyeoo, but
-      // we should at log unknown states and handle them as Failed.
-      logger.warn(s"Unknown state $default, translating to 'Failed' for now...")
-      Failed
-  }
-
   /**
    * The currently known solr servers.
    */
@@ -278,6 +257,34 @@ class CloudSolrServers(zkHost: String,
 }
 
 object CloudSolrServers {
+
+  private val logger = LoggerFactory.getLogger(classOf[CloudSolrServers])
+
+  private[solrs] def getCollectionToServers(clusterState: ClusterState): Map[String, IndexedSeq[SolrServer]] = {
+    import scala.collection.JavaConversions._
+
+    clusterState.getCollections.foldLeft(
+      Map.empty[String, IndexedSeq[SolrServer]].withDefaultValue(IndexedSeq.empty)
+    ) { (res, collection) =>
+      val slices = clusterState.getCollection(collection).getSlices
+      val servers = slices.flatMap(_.getReplicas.map(repl =>
+        SolrServer(ZkCoreNodeProps.getCoreUrl(repl), serverStatus(repl))
+      )).toIndexedSeq
+      res.updated(collection, res(collection) ++ servers)
+    }
+  }
+
+  private def serverStatus(replica: Replica): ServerStatus = replica.get(ZkStateReader.STATE_PROP) match {
+    case ZkStateReader.ACTIVE => Enabled
+    case ZkStateReader.RECOVERING => Disabled
+    case ZkStateReader.RECOVERY_FAILED => Failed
+    case ZkStateReader.DOWN => Failed
+    case default =>
+      // E.g. there's SYNC, which *should* not be used according to http://markmail.org/message/wt54x2xisileyeoo, but
+      // we should at log unknown states and handle them as Failed.
+      logger.warn(s"Unknown state $default, translating to 'Failed' for now...")
+      Failed
+  }
 
   /**
    * Specifies how newly added servers / servers that changed from down to active are put under load.

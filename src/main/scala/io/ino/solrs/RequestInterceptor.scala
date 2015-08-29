@@ -3,7 +3,7 @@ package io.ino.solrs
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.response.QueryResponse
 
-import scala.concurrent.Future
+import io.ino.solrs.future.Future
 
 /**
  * Clients can intercept requests.

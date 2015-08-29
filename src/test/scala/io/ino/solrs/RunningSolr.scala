@@ -1,12 +1,9 @@
 package io.ino.solrs
 
 import org.apache.solr.client.solrj.impl.HttpSolrClient
-import org.scalatest.BeforeAndAfterAll
-import org.scalatest.ConfigMap
-import org.scalatest.Suite
-import org.scalatest.mock.MockitoSugar
+import org.scalatest.{BeforeAndAfterAll, ConfigMap, Suite}
 
-trait RunningSolr extends BeforeAndAfterAll with MockitoSugar {
+trait RunningSolr extends BeforeAndAfterAll {
   this: Suite =>
 
   protected var solrRunner: SolrRunner = _

@@ -9,13 +9,14 @@ import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.mock.MockitoSugar
 import org.scalatest.time.{Millis, Span}
 
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
 /**
  * Test that starts uninitialized, there is no ZK and no solr servers started before tests. 
  */
-class CloudSolrServersUninitializedIntegrationSpec extends FunSpec with BeforeAndAfterEach with Matchers with FutureAwaits with MockitoSugar {
+class CloudSolrServersUninitializedIntegrationSpec extends StandardFunSpec {
 
   private implicit val awaitTimeout = 2 seconds
   private implicit val patienceConfig = PatienceConfig(timeout = scaled(Span(1000, Millis)))
@@ -23,7 +24,9 @@ class CloudSolrServersUninitializedIntegrationSpec extends FunSpec with BeforeAn
   private var zk: Option[TestingServer] = None
   private var solrRunners = List.empty[SolrRunner]
 
-  private var cut: Option[CloudSolrServers] = None
+  private var cut: Option[CloudSolrServers[Future]] = None
+
+  private type AsyncSolrClient = io.ino.solrs.AsyncSolrClient[Future]
 
   import SolrUtils._
 

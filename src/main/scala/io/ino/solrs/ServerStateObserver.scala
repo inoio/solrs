@@ -2,19 +2,19 @@ package io.ino.solrs
 
 import akka.actor.ActorSystem
 import org.asynchttpclient.{Response, AsyncCompletionHandler, AsyncHttpClient}
+import io.ino.solrs.future.{Future, FutureFactory, ScalaFutureFactory}
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration._
-import scala.language.postfixOps
-import scala.concurrent.{ExecutionContext, Future}
+import scala.language.{higherKinds, postfixOps}
 import scala.util.Success
 import scala.xml.XML
 
 /**
  * Monitoring of solr server state (enabled/disabled/dead etc.)
  */
-trait ServerStateObserver {
-  def checkServerStatus()(implicit ec: ExecutionContext): Future[Unit]
+trait ServerStateObserver[F[_]] {
+  def checkServerStatus(): Future[Unit]
 }
 
 /**
@@ -22,12 +22,12 @@ trait ServerStateObserver {
  * @param serverStateObserver the observer that checks server state
  * @param checkInterval the interval to check server state
  * @param actorSystem used for scheduling
- * @param ec used for running the scheduled observation
+ * @param futureFactory factory to create promise/future types.
  */
-case class ServerStateObservation(serverStateObserver: ServerStateObserver,
+case class ServerStateObservation[F[_]](serverStateObserver: ServerStateObserver[F],
                                   checkInterval: FiniteDuration,
                                   actorSystem: ActorSystem,
-                                  ec: ExecutionContext)
+                                  futureFactory: FutureFactory[F])
 
 
 /**
@@ -38,20 +38,22 @@ case class ServerStateObservation(serverStateObserver: ServerStateObserver,
  * &lt;str name="healthcheckFile"&gt;server-enabled.txt&lt;/str&gt;
  * </pre></code>
  */
-class PingStatusObserver(solrServers: SolrServers, httpClient: AsyncHttpClient) extends ServerStateObserver {
+class PingStatusObserver[F[_]](solrServers: SolrServers, httpClient: AsyncHttpClient)
+                              (implicit futureFactory: FutureFactory[F]) extends ServerStateObserver[F] {
 
-  def this(solrServers: Seq[SolrServer], httpClient: AsyncHttpClient) = this(new StaticSolrServers(solrServers.toIndexedSeq), httpClient)
+  def this(solrServers: Seq[SolrServer], httpClient: AsyncHttpClient)
+          (implicit futureFactory: FutureFactory[F] = ScalaFutureFactory) = this(new StaticSolrServers(solrServers.toIndexedSeq), httpClient)
 
   private val logger = LoggerFactory.getLogger(getClass())
 
-  override def checkServerStatus()(implicit ec: ExecutionContext): Future[Unit] = {
+  override def checkServerStatus(): Future[Unit] = {
     val futures = solrServers.all.map { server =>
       val url = server.baseUrl + "/admin/ping?action=status"
-      val promise = scala.concurrent.promise[Unit]
+      val promise = futureFactory.newPromise[Unit]
       httpClient.prepareGet(url).execute(new AsyncCompletionHandler[Response]() {
         override def onCompleted(response: Response): Response = {
           updateServerStatus(server, response, url)
-          promise.complete(Success(server.status))
+          promise.success(Success(server.status))
           response
         }
         override def onThrowable(t: Throwable): Unit = {
@@ -64,7 +66,7 @@ class PingStatusObserver(solrServers: SolrServers, httpClient: AsyncHttpClient) 
       })
       promise.future
     }
-    Future.sequence(futures).map(_ => Unit)
+    FutureFactory.sequence(futures).map(_ => Unit)
   }
 
   private def updateServerStatus(server: SolrServer, response: Response, url: String) {

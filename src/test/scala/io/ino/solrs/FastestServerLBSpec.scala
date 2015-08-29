@@ -7,14 +7,15 @@ import org.apache.solr.client.solrj.SolrQuery
 import org.mockito.Matchers.{eq => mockEq, _}
 import org.mockito.Mockito._
 import org.scalatest.concurrent.Eventually._
-import org.scalatest.concurrent.PatienceConfiguration.Timeout
-import org.scalatest.mock.MockitoSugar
-import org.scalatest.{BeforeAndAfterEach, FunSpec, Matchers}
 
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class FastestServerLBSpec extends FunSpec with Matchers with MockitoSugar with BeforeAndAfterEach {
+class FastestServerLBSpec extends StandardFunSpec {
+
+  type FastestServerLB = io.ino.solrs.FastestServerLB[Future]
+  type AsyncSolrClient = io.ino.solrs.AsyncSolrClient[Future]
 
   // use class under test as field so that we can safely shutdown it after each test
   private var cut: FastestServerLB = _

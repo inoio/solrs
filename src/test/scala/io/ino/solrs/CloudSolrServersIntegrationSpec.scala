@@ -9,22 +9,23 @@ import org.apache.solr.client.solrj.response.QueryResponse
 import org.mockito.Mockito._
 import org.scalatest._
 import org.scalatest.concurrent.Eventually._
-import org.scalatest.mock.MockitoSugar
 import org.scalatest.time.{Millis, Span}
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Promise
+import scala.concurrent.{Future, Promise}
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
 /**
  * Test that starts ZK, solrRunners and our Class Under Test before all tests.
  */
-class CloudSolrServersIntegrationSpec extends FunSpec with BeforeAndAfterAll with BeforeAndAfterEach with Matchers with FutureAwaits with MockitoSugar {
+class CloudSolrServersIntegrationSpec extends StandardFunSpec {
 
   private implicit val awaitTimeout = 2 seconds
   private implicit val patienceConfig = PatienceConfig(timeout = scaled(Span(20000, Millis)),
                                                        interval = scaled(Span(1000, Millis)))
+
+  private type AsyncSolrClient = io.ino.solrs.AsyncSolrClient[Future]
 
   private var zk: TestingServer = _
   private var solrRunners = List.empty[SolrRunner]
@@ -33,7 +34,7 @@ class CloudSolrServersIntegrationSpec extends FunSpec with BeforeAndAfterAll wit
   import AsyncSolrClientMocks._
   private val asyncSolrClient = mockDoQuery(mock[AsyncSolrClient])(Clock.mutable)
 
-  private var cut: CloudSolrServers = _
+  private var cut: CloudSolrServers[Future] = _
   private var cloudSolrServer: CloudSolrClient = _
 
   import io.ino.solrs.SolrUtils._
@@ -122,7 +123,7 @@ class CloudSolrServersIntegrationSpec extends FunSpec with BeforeAndAfterAll wit
       val warmupQueries = WarmupQueries(queriesByCollection = _ => queries, count = 2)
       val cut = new CloudSolrServers(zk.getConnectString, warmupQueries = Some(warmupQueries))
 
-      val standardResponsePromise = Promise[QueryResponse]()
+      val standardResponsePromise = futureFactory.newPromise[QueryResponse]
       val standardResponse = standardResponsePromise.future
 
       val asyncSolrClient = mockDoQuery(mock[AsyncSolrClient], standardResponse)

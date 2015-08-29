@@ -8,6 +8,7 @@ This is a solr client for scala providing a query interface like SolrJ, just asy
 
 - [Installation](#installation)
 - [Usage](#usage)
+ - [Several Future Implementations](#several-future-implementations)
  - [Load Balancing](#load-balancing)
  - [Solr Cloud / ZooKeeper Support](#solr-cloud--zookeeper-support)
  - [Retry Policy](#retry-policy)
@@ -32,6 +33,7 @@ A complete example:
 
 ```scala
 import io.ino.solrs.AsyncSolrClient
+import io.ino.solrs.future.ScalaFutureFactory.Implicit
 import org.apache.solr.client.solrj.response.QueryResponse
 import org.apache.solr.client.solrj.SolrQuery
 import scala.concurrent.Future
@@ -46,6 +48,7 @@ response.onSuccess {
   case qr => println(s"found ${qr.getResults.getNumFound} docs")
 }
 
+// Just included to present the 'shutdown'...
 solr.shutdown
 ```
 
@@ -54,7 +57,8 @@ via the `AsyncSolrClient.Builder` (other configuration properties are described 
 
 ```scala
 import com.ning.http.client.AsyncHttpClient
-import io.ino.solrs.{CodaHaleMetrics, AsyncSolrClient}
+import io.ino.solrs.AsyncSolrClient
+import io.ino.solrs.future.ScalaFutureFactory.Implicit
 import org.apache.solr.client.solrj.impl.XMLResponseParser
 
 val solr = AsyncSolrClient.Builder("http://localhost:8983/solr/collection1")
@@ -62,6 +66,18 @@ val solr = AsyncSolrClient.Builder("http://localhost:8983/solr/collection1")
             .withResponseParser(new XMLResponseParser())
             .build
 ```
+
+### Several Future Implementations
+
+Solrs supports different future implementations, which affects the result type of `AsyncSolrClient.query`.
+Perhaps you've already noticed the `import io.ino.solrs.future.ScalaFutureFactory.Implicit` in
+the examples above - this brings the factory for standard scala futures in scope (the various `AsyncSolrClient`
+builder methods expect a `io.ino.solrs.future.FutureFactory` to be implicitely available).
+
+Out of the box standard scala futures and twitter futures (`i.i.s.future.TwitterFutureFactory`) are supported.
+
+Want to roll your own? Just implement `io.ino.solrs.future.FutureFactory` (and the related `Promise` and `Future` traits)
+and bring an instance of your future factory in scope.
 
 ### Load Balancing
 
@@ -76,6 +92,7 @@ To run solrs with a load balancer you have to pass it to the `Builder`
 
 ```scala
 import io.ino.solrs._
+import io.ino.solrs.future.ScalaFutureFactory.Implicit
 
 val lb = RoundRobinLB(IndexedSeq("http://localhost:8983/solr/collection1", "http://localhost:8984/solr/collection1"))
 val solr = AsyncSolrClient.Builder(lb).build
@@ -110,6 +127,7 @@ The simplest case looks like this:
 
 ```scala
 import io.ino.solrs._
+import io.ino.solrs.future.ScalaFutureFactory.Implicit
 
 val servers = new CloudSolrServers("localhost:2181")
 val solr = AsyncSolrClient.Builder(RoundRobinLB(servers)).build
@@ -119,6 +137,7 @@ Here's an example that shows all configuration properties in use:
 
 ```scala
 import io.ino.solrs._
+import io.ino.solrs.future.ScalaFutureFactory.Implicit
 import scala.concurrent.duration._
 
 val servers = new CloudSolrServers(zkHost = "host1:2181,host2:2181",
@@ -126,7 +145,7 @@ val servers = new CloudSolrServers(zkHost = "host1:2181,host2:2181",
                                    zkConnectTimeout = 10 seconds,
                                    clusterStateUpdateInterval = 1 second,
                                    defaultCollection = Some("collection1"),
-                                   warmupQueries: WarmupQueries("collection1" => Seq(new SolrQuery("*:*")), count = 10))
+                                   warmupQueries = WarmupQueries("collection1" => Seq(new SolrQuery("*:*")), count = 10))
 val solr = AsyncSolrClient.Builder(RoundRobinLB(servers)).build
 ```
 
@@ -158,6 +177,7 @@ The retry policy can be configure via the `Builder`, like this:
 
 ```scala
 import io.ino.solrs._
+import io.ino.solrs.future.ScalaFutureFactory.Implicit
 
 val solr = AsyncSolrClient.Builder(RoundRobinLB(new CloudSolrServers("host1:2181,host2:2181")))
              .withRetryPolicy(RetryPolicy.TryAvailableServers)
@@ -172,6 +192,7 @@ Solrs allows to intercept queries sent to Solr, here's an example that shows how
 
 ```scala
 import io.ino.solrs._
+import io.ino.solrs.future.ScalaFutureFactory.Implicit
 
 val loggingInterceptor = new RequestInterceptor {
   override def interceptQuery(f: (SolrServer, SolrQuery) => Future[QueryResponse])
@@ -199,6 +220,7 @@ To configure solrs with the `Metrics` implementation just pass an initialized in
 
 ```scala
 import io.ino.solrs._
+import io.ino.solrs.future.ScalaFutureFactory.Implicit
 
 val solr = AsyncSolrClient.Builder("http://localhost:8983/solr/collection1")
              .withMetrics(new CodaHaleMetrics()).build

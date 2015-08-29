@@ -9,8 +9,9 @@ import scala.concurrent.Future
 import org.apache.solr.client.solrj.SolrQuery
 import java.net.ConnectException
 import scala.concurrent.duration._
+import io.ino.solrs.future.ScalaFutureFactory
 
-class AsyncSolrClientSpec extends FunSpec with Matchers with FutureAwaits with MockitoSugar {
+class AsyncSolrClientSpec extends StandardFunSpec {
 
   private val query = new SolrQuery("*:*")
   private implicit val timeout = 1.second

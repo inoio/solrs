@@ -10,17 +10,16 @@ import org.apache.solr.client.solrj.{SolrQuery, SolrServerException}
 import org.apache.solr.common.cloud._
 import org.slf4j.LoggerFactory
 
-import scala.collection.immutable.Iterable
+import io.ino.solrs.future.{Future, FutureFactory, ScalaFutureFactory}
 import scala.collection.mutable
-import scala.concurrent.{Future, Promise}
-import scala.language.postfixOps
+import scala.language.{postfixOps, higherKinds}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
 /**
  * Provides the list of solr servers.
  */
-trait SolrServers extends AsyncSolrClientAware {
+trait SolrServers {
   /**
    * The currently known solr servers.
    */
@@ -87,12 +86,13 @@ object ServerStateChangeObservable {
  * @param clusterStateUpdateInterval Used for pulling the ClusterState from ZkStateReader
  * @param defaultCollection Optional default collection to use when the query does not specify the "collection" param.
  */
-class CloudSolrServers(zkHost: String,
-                       zkClientTimeout: Duration = 15 seconds, // default from Solr Core, see also SOLR-5221
-                       zkConnectTimeout: Duration = 10 seconds, // default from solrj CloudSolrServer
-                       clusterStateUpdateInterval: Duration = 1 second,
-                       defaultCollection: Option[String] = None,
-                       warmupQueries: Option[WarmupQueries] = None) extends SolrServers with ServerStateChangeObservable {
+class CloudSolrServers[F[_]](zkHost: String,
+                             zkClientTimeout: Duration = 15 seconds, /* default from Solr Core, see also SOLR-5221*/
+                             zkConnectTimeout: Duration = 10 seconds, /* default from solrj CloudSolrServer*/
+                             clusterStateUpdateInterval: Duration = 1 second,
+                             defaultCollection: Option[String] = None,
+                             warmupQueries: Option[WarmupQueries] = None)
+                            (implicit futureFactory: FutureFactory[F]) extends SolrServers with AsyncSolrClientAware[F] with ServerStateChangeObservable {
 
   import CloudSolrServers._
 
@@ -103,9 +103,9 @@ class CloudSolrServers(zkHost: String,
 
   private var scheduledExecutor: ScheduledExecutorService = Executors.newScheduledThreadPool(1, new ZkClusterStateUpdateTF)
 
-  private var asyncSolrClient: AsyncSolrClient = _
+  private var asyncSolrClient: AsyncSolrClient[F] = _
 
-  override def setAsyncSolrClient(client: AsyncSolrClient): Unit = {
+  override def setAsyncSolrClient(client: AsyncSolrClient[F]): Unit = {
     asyncSolrClient = client
     createZkStateReader()
   }
@@ -153,7 +153,6 @@ class CloudSolrServers(zkHost: String,
    * Updates the server list when the ZkStateReader clusterState changed
    */
   private def updateFromClusterState(zkStateReader: ZkStateReader): Unit = {
-    import scala.concurrent.ExecutionContext.Implicits.global
 
     val clusterState = zkStateReader.getClusterState
     if(clusterState != lastClusterState) {
@@ -186,7 +185,6 @@ class CloudSolrServers(zkHost: String,
 
   protected def warmupNewServers(newCollectionToServers: Map[String, IndexedSeq[SolrServer]],
                                warmup: WarmupQueries): Future[Iterable[Try[QueryResponse]]] = {
-    import scala.concurrent.ExecutionContext.Implicits.global
 
     val perCollectionResponses = newCollectionToServers.flatMap { case (collection, solrServers) =>
       val existingServers = collectionToServers(collection)
@@ -195,24 +193,23 @@ class CloudSolrServers(zkHost: String,
       newActiveServers.map(warmupNewServer(collection, _, warmup.queriesByCollection(collection), warmup.count))
     }
 
-    Future.sequence(perCollectionResponses).map(_.flatten)
+    futureFactory.sequence(perCollectionResponses).map(_.flatten)
   }
 
   protected def warmupNewServer(collection: String, s: SolrServer, queries: Seq[SolrQuery], count: Int): Future[Seq[Try[QueryResponse]]] = {
-    import scala.concurrent.ExecutionContext.Implicits.global
     // queries shall be run in parallel, one round after the other
-    (1 to count).foldLeft(Future.successful(Seq.empty[Try[QueryResponse]])) { (res, round) =>
+    (1 to count).foldLeft(futureFactory.successful(Seq.empty[Try[QueryResponse]])) { (res, round) =>
       res.flatMap { _ =>
         val warmupResponses = queries.map(q =>
           asyncSolrClient.doQuery(s, q)
             .map(Success(_))
-            .recover {
+            .handle {
             case NonFatal(e) =>
               logger.warn(s"Warmup query $q failed", e)
               Failure(e)
           }
         )
-        Future.sequence(warmupResponses)
+        futureFactory.sequence(warmupResponses)
       }
     }
   }
@@ -258,7 +255,7 @@ class CloudSolrServers(zkHost: String,
 
 object CloudSolrServers {
 
-  private val logger = LoggerFactory.getLogger(classOf[CloudSolrServers])
+  private val logger = LoggerFactory.getLogger(getClass)
 
   private[solrs] def getCollectionToServers(clusterState: ClusterState): Map[String, IndexedSeq[SolrServer]] = {
     import scala.collection.JavaConversions._
@@ -332,7 +329,7 @@ object CloudSolrServers {
 
 }
 
-class ReloadingSolrServers(url: String, extractor: Array[Byte] => IndexedSeq[SolrServer], httpClient: AsyncHttpClient) extends SolrServers {
+class ReloadingSolrServers[F[_]](url: String, extractor: Array[Byte] => IndexedSeq[SolrServer], httpClient: AsyncHttpClient)(implicit futureFactory: FutureFactory[F] = ScalaFutureFactory) extends SolrServers {
 
   private val logger = LoggerFactory.getLogger(getClass)
 
@@ -350,9 +347,8 @@ class ReloadingSolrServers(url: String, extractor: Array[Byte] => IndexedSeq[Sol
    */
   override def matching(q: SolrQuery): IndexedSeq[SolrServer] = solrServers
 
-  def reload(): Future[IndexedSeq[SolrServer]] = {
-    import scala.concurrent.ExecutionContext.Implicits.global
-    loadUrl().map { data =>
+  def reload(): F[IndexedSeq[SolrServer]] = {
+    val f = loadUrl().map { data =>
       // TODO: check if solr servers actually changed, perhaps only add/remove changed stuff
       // or somehow preserve the status of servers
       val oldServers = solrServers
@@ -360,10 +356,11 @@ class ReloadingSolrServers(url: String, extractor: Array[Byte] => IndexedSeq[Sol
       logger.info(s"Changed solr servers from $oldServers to $solrServers")
       solrServers
     }
+    futureFactory.toBase(f)
   }
 
   protected def loadUrl(): Future[Array[Byte]] = {
-    val promise = Promise[Array[Byte]]()
+    val promise = futureFactory.newPromise[Array[Byte]]
     httpClient.prepareGet(url).execute(new AsyncCompletionHandler[Response]() {
       override def onCompleted(response: Response): Response = {
         promise.success(response.getResponseBodyAsBytes)

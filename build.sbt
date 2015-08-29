@@ -55,6 +55,7 @@ libraryDependencies ++= Seq(
   "org.apache.tomcat" % "tomcat-catalina" % tomcatVersion % "test",
   "org.apache.tomcat" % "tomcat-jasper" % tomcatVersion % "test",
   "org.apache.tomcat.embed" % "tomcat-embed-core" % tomcatVersion % "test",
+  "com.twitter" %% "util-core" % "6.26.0" % "optional",
   "commons-logging" % "commons-logging" % "1.2"
 )
 

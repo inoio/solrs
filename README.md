@@ -18,7 +18,7 @@ This is a solr client for scala providing a query interface like SolrJ, just asy
 
 You must add the library to the dependencies of the build file, e.g. add to `build.sbt`:
 
-    libraryDependencies += "io.ino" %% "solrs" % "1.3.3"
+    libraryDependencies += "io.ino" %% "solrs" % "1.3.4"
 
 solrs is published to maven central for both scala 2.10 and 2.11.
 

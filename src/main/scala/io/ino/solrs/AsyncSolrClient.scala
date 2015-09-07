@@ -262,10 +262,7 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
 
   protected def getPath(query: SolrQuery): String = {
     val qt = query.get(CommonParams.QT)
-    if (qt != null && qt.startsWith("/")) {
-      return qt
-    }
-    return DEFAULT_PATH
+    if (qt != null && qt.startsWith("/")) qt else DEFAULT_PATH
   }
 
   @throws[RemoteSolrException]

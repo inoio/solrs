@@ -1,16 +1,15 @@
 package io.ino.solrs.future
 
 import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.{CompletableFuture, ExecutionException, TimeUnit}
 
+import com.twitter.util.{Future => TFuture}
 import io.ino.solrs.FutureAwaits
 import org.scalatest.mock.MockitoSugar
 import org.scalatest.{FunSpec, Matchers}
 
 import scala.concurrent.{Future => SFuture}
 import scala.language.{higherKinds, postfixOps}
-
-
-import com.twitter.util.{Future => TFuture}
 
 class ScalaFutureFactorySpec extends FutureFactorySpec[SFuture] with FutureAwaits {
   import scala.concurrent.duration._
@@ -23,6 +22,17 @@ class TwitterFutureFactorySpec extends FutureFactorySpec[TFuture] with FutureAwa
   import com.twitter.util.Await
   override protected lazy val factory = TwitterFutureFactory
   override protected def awaitBase[T](future: TFuture[T]): T = Await.result(future, 1.second)
+}
+
+class JavaFutureFactorySpec extends FutureFactorySpec[CompletableFuture] with FutureAwaits {
+  override protected lazy val factory = new JavaFutureFactory
+  override protected def awaitBase[T](future: CompletableFuture[T]): T = {
+    try {
+      future.get(1, TimeUnit.SECONDS)
+    } catch {
+      case e: ExecutionException => throw e.getCause
+    }
+  }
 }
 
 abstract class FutureFactorySpec[BaseFuture[_]] extends FunSpec with Matchers with MockitoSugar {

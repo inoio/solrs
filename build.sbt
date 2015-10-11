@@ -14,6 +14,14 @@ scalaVersion := "2.10.6"
 
 crossScalaVersions := Seq("2.10.6", "2.11.8")
 
+javacOptions ++= Seq("-source", "1.8", "-target", "1.8", "-Xlint")
+
+initialize := {
+  val _ = initialize.value
+  if (sys.props("java.specification.version") != "1.8")
+    sys.error("Java 8 is required for this project.")
+}
+
 resolvers ++= Seq(
   "JCenter" at "http://jcenter.bintray.com/",
   "Restlet Repositories" at "http://maven.restlet.org"

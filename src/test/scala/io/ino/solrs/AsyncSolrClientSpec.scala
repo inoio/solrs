@@ -49,7 +49,7 @@ class AsyncSolrClientSpec extends StandardFunSpec {
 
     it("should shutdown http client if it was not provided") {
       val ahcMock = mock[AsyncHttpClient]
-      val solr = new AsyncSolrClient.Builder("http://localhost:12345/solr") {
+      val solr = new AsyncSolrClient.Builder("http://localhost:12345/solr", ascFactory) {
         override def createHttpClient = ahcMock
       }.build
 

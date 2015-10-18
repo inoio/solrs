@@ -19,7 +19,7 @@ javacOptions ++= Seq("-source", "1.8", "-target", "1.8", "-Xlint")
 initialize := {
   val _ = initialize.value
   if (sys.props("java.specification.version") != "1.8")
-    sys.error("Java 8 is required for this project.")
+    sys.error(s"Java 8 is required for this project. Running: ${sys.props("java.specification.version")}")
 }
 
 resolvers ++= Seq(
@@ -51,6 +51,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-actor" % "2.3.15",
   "org.slf4j" % "slf4j-simple" % slf4jVersion % "test",
   "org.scalatest" %% "scalatest" % "2.2.6" % "test",
+  "com.novocode" % "junit-interface" % "0.11" % "test",
   "org.mockito" % "mockito-core" % "1.10.19" % "test",
   "org.clapper" %% "grizzled-scala" % "2.5.0" % "test",
   // Cloud testing, solr-core for ZkController (upconfig), curator-test for ZK TestingServer

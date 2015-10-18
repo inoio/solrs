@@ -1,18 +1,21 @@
 package io.ino.solrs
 
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.{Executors, ScheduledExecutorService, ThreadFactory}
 
 import org.asynchttpclient.{AsyncCompletionHandler, AsyncHttpClient, Response}
 import io.ino.solrs.CloudSolrServers.WarmupQueries
 import io.ino.solrs.ServerStateChangeObservable.StateChange
+import io.ino.solrs.future.JavaFutureFactory
 import org.apache.solr.client.solrj.response.QueryResponse
 import org.apache.solr.client.solrj.{SolrQuery, SolrServerException}
 import org.apache.solr.common.cloud._
 import org.slf4j.LoggerFactory
-
 import io.ino.solrs.future.{Future, FutureFactory, ScalaFutureFactory}
+
 import scala.collection.mutable
-import scala.language.{postfixOps, higherKinds}
+import scala.language.postfixOps
+import scala.language.{higherKinds, postfixOps}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
@@ -36,6 +39,10 @@ class StaticSolrServers(override val all: IndexedSeq[SolrServer]) extends SolrSe
 }
 object StaticSolrServers {
   def apply(baseUrls: IndexedSeq[String]): StaticSolrServers = new StaticSolrServers(baseUrls.map(SolrServer(_)))
+
+  /* Java API */
+  import scala.collection.JavaConversions._
+  def create(baseUrls: java.lang.Iterable[String]): StaticSolrServers = apply(baseUrls.toIndexedSeq)
 }
 
 import java.util.concurrent.TimeUnit
@@ -258,6 +265,37 @@ class CloudSolrServers[F[_]](zkHost: String,
 object CloudSolrServers {
 
   private val logger = LoggerFactory.getLogger(getClass)
+
+  /* Java API */
+  case class Builder(zkHost: String,
+                     zkClientTimeout: Duration = 15 seconds, /* default from Solr Core, see also SOLR-5221*/
+                     zkConnectTimeout: Duration = 10 seconds, /* default from solrj CloudSolrServer*/
+                     clusterStateUpdateInterval: Duration = 1 second,
+                     defaultCollection: Option[String] = None,
+                     warmupQueries: Option[WarmupQueries] = None) {
+    def withZkClientTimeout(value: Long, unit: TimeUnit): Builder = copy(zkClientTimeout = FiniteDuration(value, unit))
+    def withZkConnectTimeout(value: Long, unit: TimeUnit): Builder = copy(zkConnectTimeout = FiniteDuration(value, unit))
+    def withClusterStateUpdateInterval(value: Long, unit: TimeUnit): Builder = copy(clusterStateUpdateInterval = FiniteDuration(value, unit))
+    def withDefaultCollection(collection: String): Builder = copy(defaultCollection = Some(collection))
+    import java.util.function.{Function => JFunction}
+    import java.lang.{Iterable => JIterable}
+    def withWarmupQueries(queriesByCollection: JFunction[String, JIterable[SolrQuery]], count: Int): Builder = {
+      def delegate(collection: String): Seq[SolrQuery] = {
+        val res = queriesByCollection(collection)
+        import scala.collection.convert.WrapAsScala._
+        res.toList
+      }
+      copy(warmupQueries = Some(WarmupQueries(delegate, count)))
+    }
+
+    def build(): CloudSolrServers[CompletableFuture] = new CloudSolrServers(zkHost, zkConnectTimeout, zkConnectTimeout, clusterStateUpdateInterval, defaultCollection, warmupQueries)(JavaFutureFactory)
+
+    def build[F[_]](implicit futureFactory: FutureFactory[F]): CloudSolrServers[F] =
+      new CloudSolrServers(zkHost, zkConnectTimeout, zkConnectTimeout, clusterStateUpdateInterval, defaultCollection, warmupQueries)
+  }
+
+  /* Java API */
+  def builder(zkHost: String): Builder = Builder(zkHost)
 
   private[solrs] def getCollectionToServers(clusterState: ClusterState): Map[String, IndexedSeq[SolrServer]] = {
     import scala.collection.JavaConversions._

@@ -4,6 +4,7 @@ import java.io.IOException
 import java.util.Locale
 
 import akka.actor.ActorSystem
+import io.ino.solrs.AsyncSolrClient.Builder
 import io.ino.solrs.HttpUtils._
 import io.ino.solrs.RetryDecision.Result
 import io.ino.solrs.future.Future
@@ -32,43 +33,67 @@ import scala.util.control.NonFatal
 
 object AsyncSolrClient {
 
+  /* The function that creates that actual instance of AsyncSolrClient */
+  private[solrs] type ASCFactory[F[_], ASC <: AsyncSolrClient[F]] = (LoadBalancer, AsyncHttpClient, /*shutdownHttpClient*/ Boolean,
+    Option[RequestInterceptor], ResponseParser, Metrics, Option[ServerStateObservation[F]], RetryPolicy) => ASC
+
   def apply[F[_]](baseUrl: String)(implicit futureFactory: FutureFactory[F] = ScalaFutureFactory) =
-    new Builder(new SingleServerLB(baseUrl)).build
+    new Builder(new SingleServerLB(baseUrl), ascFactory[F] _).build
   def apply[F[_]](loadBalancer: LoadBalancer)(implicit futureFactory: FutureFactory[F]) =
-    new Builder(loadBalancer).build
+    new Builder(loadBalancer, ascFactory[F] _).build
 
   object Builder {
     def apply[F[_]](baseUrl: String)(implicit futureFactory: FutureFactory[F]) =
-      new Builder(baseUrl)
+      new Builder(baseUrl, ascFactory[F] _)
     def apply[F[_]](loadBalancer: LoadBalancer)(implicit futureFactory: FutureFactory[F]) =
-      new Builder(loadBalancer)
+      new Builder(loadBalancer, ascFactory[F] _)
   }
 
-  case class Builder[F[_]] private (loadBalancer: LoadBalancer,
+  private[solrs] def ascFactory[F[_]](loadBalancer: LoadBalancer,
+                                      httpClient: AsyncHttpClient,
+                                      shutdownHttpClient: Boolean,
+                                      requestInterceptor: Option[RequestInterceptor],
+                                      responseParser: ResponseParser,
+                                      metrics: Metrics,
+                                      serverStateObservation: Option[ServerStateObservation[F]],
+                                      retryPolicy: RetryPolicy)(implicit futureFactory: FutureFactory[F]): AsyncSolrClient[F] =
+    new AsyncSolrClient[F](
+      loadBalancer,
+      httpClient,
+      shutdownHttpClient,
+      requestInterceptor,
+      responseParser,
+      metrics,
+      serverStateObservation,
+      retryPolicy
+    )
+
+  case class Builder[F[_], ASC <: AsyncSolrClient[F]] protected (loadBalancer: LoadBalancer,
                                     httpClient: Option[AsyncHttpClient],
                                     shutdownHttpClient: Boolean,
                                     requestInterceptor: Option[RequestInterceptor] = None,
                                     responseParser: Option[ResponseParser] = None,
                                     metrics: Option[Metrics] = None,
                                     serverStateObservation: Option[ServerStateObservation[F]] = None,
-                                    retryPolicy: RetryPolicy = RetryPolicy.TryOnce)(implicit futureFactory: FutureFactory[F]) {
+                                    retryPolicy: RetryPolicy = RetryPolicy.TryOnce,
+                                    factory: ASCFactory[F, ASC])(implicit futureFactory: FutureFactory[F]) {
 
-    def this(loadBalancer: LoadBalancer)(implicit futureFactory: FutureFactory[F]) = this(loadBalancer, None, true)
-    def this(baseUrl: String)(implicit futureFactory: FutureFactory[F]) = this(new SingleServerLB(baseUrl))
+    def this(loadBalancer: LoadBalancer, factory: ASCFactory[F, ASC])(implicit futureFactory: FutureFactory[F]) = this(loadBalancer, None, true, factory = factory)
+    def this(baseUrl: String, factory: ASCFactory[F, ASC])(implicit futureFactory: FutureFactory[F]) = this(new SingleServerLB(baseUrl), factory = factory)
 
-    def withHttpClient(httpClient: AsyncHttpClient): Builder[F] = {
+    def withHttpClient(httpClient: AsyncHttpClient): Builder[F, ASC] = {
       copy(httpClient = Some(httpClient), shutdownHttpClient = false)
     }
 
-    def withRequestInterceptor(requestInterceptor: RequestInterceptor): Builder[F] = {
+    def withRequestInterceptor(requestInterceptor: RequestInterceptor): Builder[F, ASC] = {
       copy(requestInterceptor = Some(requestInterceptor))
     }
 
-    def withResponseParser(responseParser: ResponseParser): Builder[F] = {
+    def withResponseParser(responseParser: ResponseParser): Builder[F, ASC] = {
       copy(responseParser = Some(responseParser))
     }
 
-    def withMetrics(metrics: Metrics): Builder[F] = {
+    def withMetrics(metrics: Metrics): Builder[F, ASC] = {
       copy(metrics = Some(metrics))
     }
 
@@ -77,14 +102,14 @@ object AsyncSolrClient {
      */
     def withServerStateObservation(serverStateObserver: ServerStateObserver[F],
                               checkInterval: FiniteDuration,
-                              actorSystem: ActorSystem): Builder[F] = {
+                              actorSystem: ActorSystem): Builder[F, ASC] = {
       copy(serverStateObservation = Some(ServerStateObservation[F](serverStateObserver, checkInterval, actorSystem, futureFactory)))
     }
 
     /**
      * Configure the retry policy to apply for failed requests.
      */
-    def withRetryPolicy(retryPolicy: RetryPolicy): Builder[F] = {
+    def withRetryPolicy(retryPolicy: RetryPolicy): Builder[F, ASC] = {
       copy(retryPolicy = retryPolicy)
     }
 
@@ -109,8 +134,8 @@ object AsyncSolrClient {
       set(loadBalancer, solr)
     }
 
-    def build: AsyncSolrClient[F] = {
-      val res = new AsyncSolrClient[F](
+    def build: ASC = {
+      val res = factory(
         loadBalancer,
         httpClient.getOrElse(createHttpClient),
         shutdownHttpClient,
@@ -134,14 +159,14 @@ object AsyncSolrClient {
  *
  * @author <a href="martin.grotzke@inoio.de">Martin Grotzke</a>
  */
-class AsyncSolrClient[F[_]] private (val loadBalancer: LoadBalancer,
-                               val httpClient: AsyncHttpClient,
-                               shutdownHttpClient: Boolean,
-                               requestInterceptor: Option[RequestInterceptor] = None,
-                               responseParser: ResponseParser = new BinaryResponseParser,
-                               val metrics: Metrics = NoopMetrics,
-                               serverStateObservation: Option[ServerStateObservation[F]] = None,
-                               retryPolicy: RetryPolicy = RetryPolicy.TryOnce)(implicit futureFactory: FutureFactory[F]) {
+class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBalancer,
+                                       httpClient: AsyncHttpClient,
+                                       shutdownHttpClient: Boolean,
+                                       requestInterceptor: Option[RequestInterceptor] = None,
+                                       responseParser: ResponseParser = new BinaryResponseParser,
+                                       metrics: Metrics = NoopMetrics,
+                                       serverStateObservation: Option[ServerStateObservation[F]] = None,
+                                       retryPolicy: RetryPolicy = RetryPolicy.TryOnce)(implicit futureFactory: FutureFactory[F]) {
 
   private val UTF_8 = "UTF-8"
   private val DEFAULT_PATH = "/select"
@@ -380,6 +405,49 @@ class AsyncSolrClient[F[_]] private (val loadBalancer: LoadBalancer,
     }
     reason
   }
+
+}
+
+trait TypedAsyncSolrClient[F[_], ASC <: AsyncSolrClient[F]] {
+
+  protected implicit def futureFactory: FutureFactory[F]
+
+  protected def build(loadBalancer: LoadBalancer,
+                      httpClient: AsyncHttpClient,
+                      shutdownHttpClient: Boolean,
+                      requestInterceptor: Option[RequestInterceptor],
+                      responseParser: ResponseParser,
+                      metrics: Metrics,
+                      serverStateObservation: Option[ServerStateObservation[F]],
+                      retryPolicy: RetryPolicy): ASC
+
+  def builder(baseUrl: String) = new Builder[F, ASC](new SingleServerLB(baseUrl), build _)
+  def builder(loadBalancer: LoadBalancer) = new Builder[F, ASC](loadBalancer, build _)
+
+}
+
+import scala.concurrent.{Future => SFuture}
+
+// TODO: can be removed?
+class ScalaAsyncSolrClient(override private[solrs] val loadBalancer: LoadBalancer,
+                           httpClient: AsyncHttpClient,
+                           shutdownHttpClient: Boolean,
+                           requestInterceptor: Option[RequestInterceptor] = None,
+                           responseParser: ResponseParser = new BinaryResponseParser,
+                           metrics: Metrics = NoopMetrics,
+                           serverStateObservation: Option[ServerStateObservation[SFuture]] = None,
+                           retryPolicy: RetryPolicy = RetryPolicy.TryOnce)
+  extends AsyncSolrClient[SFuture](loadBalancer, httpClient, shutdownHttpClient, requestInterceptor, responseParser, metrics, serverStateObservation, retryPolicy)(ScalaFutureFactory) {
+
+  /**
+    * @inheritdoc
+    */
+  override def query(q: SolrQuery): SFuture[QueryResponse] = super.query(q)
+
+  /**
+    * @inheritdoc
+    */
+  override def queryPreferred(q: SolrQuery, preferred: Option[SolrServer]): SFuture[(QueryResponse, SolrServer)] = super.queryPreferred(q, preferred)
 
 }
 

@@ -14,7 +14,7 @@ import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.time.{Millis, Span}
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{Future, Promise}
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.language.postfixOps
 

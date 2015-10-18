@@ -274,7 +274,7 @@ class FastestServerLBSpec extends StandardFunSpec {
     cut = new FastestServerLB(solrServers, _ => ("collection1", testQuery), minDelay, maxDelay, clock = clock)
     // we use a spy to have a real async solr client for that we can verify interactions
     var spyClient: AsyncSolrClient = null
-    val realClient: AsyncSolrClient = new AsyncSolrClient.Builder(cut) {
+    val realClient: AsyncSolrClient = new AsyncSolrClient.Builder(cut, ascFactory) {
       override protected def setOnAsyncSolrClientAwares(solr: AsyncSolrClient): Unit = {
         spyClient = spy(solr)
         mockQueries(spyClient)

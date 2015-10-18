@@ -96,3 +96,5 @@ class JavaFutureFactory extends FutureFactory[CompletableFuture] {
   def newPromise[T] = new JavaPromise[T]
 
 }
+
+object JavaFutureFactory extends JavaFutureFactory

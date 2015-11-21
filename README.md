@@ -115,7 +115,6 @@ To have initial stats, after the `FastestServerLB` was created it runs the test 
 This can be overridden with `initialTestRuns`.
 
 `FastestServerLB` also exports stats via JMX (under object name `io.ino.solrs:type=FastestServerLB`), in case you're interested in this.
-Another trick would be to override `onFastServersChanged` and run `statsByServer.values.foreach(_.dumpStats(FastestServerLB.TestQueryClass))`.
 
 Here's  a code sample of the `FastestServerLB`:
 

@@ -13,3 +13,6 @@ before_install:
 cache:
   directories:
     - $HOME/.ivy2
+
+# use container 
+sudo: false

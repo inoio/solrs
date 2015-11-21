@@ -111,7 +111,7 @@ traffic this leads to high resolution statistics so that e.g. sub-second GC paus
 For "slow" servers (response time > average) tests are run with a fixed `maxDelay` (default: 10 seconds), this is
 also the case for "fast" servers when there are no users queries in the meantime.
 
-To have initial stats, after the `FastestServerLB` was created it runs multiple test queries (default: 10).
+To have initial stats, after the `FastestServerLB` was created it runs the test queries several times (default: 10).
 This can be overridden with `initialTestRuns`.
 
 `FastestServerLB` also exports stats via JMX (under object name `io.ino.solrs:type=FastestServerLB`), in case you're interested in this.

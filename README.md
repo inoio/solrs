@@ -86,8 +86,8 @@ val solr = AsyncSolrClient.Builder(lb).build
 
 #### Fastest Server Load Balancer
 
-The `FastestServerLB` is a statistics based load balancer that devides servers into "fast" and "slow" servers (based on
-their latest average response time) and selects one of the "fast" servers (round robin).
+The `FastestServerLB` is a statistics based load balancer that classifies servers as "fast" and "slow" servers (based on
+their latest average response time) and selects one of the "fast" servers (round robin) when asked for one.
 This is useful e.g. when some solr server is currently performing major GC, or when for some nodes network latency is
 increased (temporary or permanent).
 
@@ -99,10 +99,9 @@ The latest average response time is determined in the following order (the first
 4. total average resonse time
 
 The response time is measured using a configured test query (per collection). A dedicated test query is used, because
-user queries can have very different performance characteristics, so that most often it would even be hard for an application
-to classify them. With the dedicated test query you can control what is used to measure response time.
+user queries can have very different performance characteristics, so that most often it would even be hard for an application to classify them. With the dedicated test query you can control what is used to measure response time.
 
-Servers then are considered "fast", when the response time is <= the average response time of all servers. This is the
+Servers are considered "fast" when the response time is <= the average response time of all servers. This is the
 default, you can also override this (by specifying a `filterFastServers` function).
 
 Because nobody likes log spamming and burning CPU time while everybody else is sleeping, the test query is not executed with a fixed rate.<br/>
@@ -134,7 +133,7 @@ val solr = AsyncSolrClient.Builder(lb).build
 ### Solr Cloud / ZooKeeper Support
 
 Solr Cloud is supported by `io.ino.solrs.CloudSolrServers`, which is a `SolrServers` implementation (can
-be passed to `RoundRobinLB`/`FastestServerLB`.
+be passed to `RoundRobinLB`/`FastestServerLB`).
 
 Solr Cloud is supported with the following properties / restrictions:
 
@@ -204,7 +203,7 @@ currently provided (you can implement your own of course):
   When requests for all servers failed, the last failure is propagated to the client.
 * `RetryPolicy.AtMost(times: Int)`: Retries the given number of times.
 
-The retry policy can be configure via the `Builder`, like this:
+The retry policy can be configured via the `Builder`, like this:
 
 ```scala
 import io.ino.solrs._

@@ -89,7 +89,7 @@ val solr = AsyncSolrClient.Builder(lb).build
 The `FastestServerLB` is a statistics based load balancer that devides servers into "fast" and "slow" servers (based on
 their latest average response time) and selects one of the "fast" servers (round robin).
 This is useful e.g. when some solr server is currently performing major GC, or when for some nodes network latency is
-increased (temporary or persistent).
+increased (temporary or permanent).
 
 The latest average response time is determined in the following order (the first found measure is used):
 
@@ -133,8 +133,8 @@ val solr = AsyncSolrClient.Builder(lb).build
 
 ### Solr Cloud / ZooKeeper Support
 
-Solr Cloud is supported by `io.ino.solrs.CloudSolrServers`, which is a `SolrServers` implementation and can
-be passed to `RoundRobinLB`.
+Solr Cloud is supported by `io.ino.solrs.CloudSolrServers`, which is a `SolrServers` implementation (can
+be passed to `RoundRobinLB`/`FastestServerLB`.
 
 Solr Cloud is supported with the following properties / restrictions:
 
@@ -155,7 +155,7 @@ Solr Cloud is supported with the following properties / restrictions:
   property is (re)used (1 second by default).
 * ZK cluster state updates are read using the `CloudSolrServers.clusterStateUpdateInterval`.
 
-To run solrs connected to SolrCloud / ZooKeeper, you pass an instance of `CloudSolrServers` to `RoundRobinLB`.
+To run solrs connected to SolrCloud / ZooKeeper, you pass an instance of `CloudSolrServers` to `RoundRobinLB`/`FastestServerLB`.
 The simplest case looks like this:
 
 ```scala

@@ -245,17 +245,25 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
 
     val url = solrServer.baseUrl + getPath(q) + ClientUtils.toQueryString(wparams, false)
     val request = httpClient.prepareGet(url).addHeader("User-Agent", AGENT).build()
-    httpClient.executeRequest(request, new AsyncCompletionHandler[Response]() {
-      override def onCompleted(response: Response): Response = {
-        val tryQueryResponse = Try(toQueryResponse(response, url, startTime))
-        promise.complete(tryQueryResponse)
-        response
-      }
-      override def onThrowable(t: Throwable) {
+
+    try {
+      httpClient.executeRequest(request, new AsyncCompletionHandler[Response]() {
+        override def onCompleted(response: Response): Response = {
+          val tryQueryResponse = Try(toQueryResponse(response, url, startTime))
+          promise.complete(tryQueryResponse)
+          response
+        }
+
+        override def onThrowable(t: Throwable) {
+          metrics.countException
+          promise.failure(t)
+        }
+      })
+    } catch {
+      case NonFatal(e) =>
         metrics.countException
-        promise.failure(t)
-      }
-    })
+        promise.failure(e)
+    }
 
     promise.future
   }

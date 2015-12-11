@@ -1,13 +1,15 @@
 package io.ino.solrs
 
-import com.ning.http.client.AsyncHttpClient
-import org.apache.solr.client.solrj.response.QueryResponse
-import org.scalatest.mock.MockitoSugar
-import org.scalatest.{Matchers, FunSpec}
-import org.mockito.Mockito.{verify, times}
-import scala.concurrent.Future
-import org.apache.solr.client.solrj.SolrQuery
+import java.io.IOException
 import java.net.ConnectException
+
+import com.ning.http.client.AsyncHttpClient
+import org.apache.solr.client.solrj.SolrQuery
+import org.mockito.Matchers.any
+import org.mockito.Mockito.{doThrow, spy, times, verify}
+import org.scalatest.mock.MockitoSugar
+import org.scalatest.{FunSpec, Matchers}
+
 import scala.concurrent.duration._
 
 class AsyncSolrClientSpec extends FunSpec with Matchers with FutureAwaits with MockitoSugar {
@@ -21,10 +23,28 @@ class AsyncSolrClientSpec extends FunSpec with Matchers with FutureAwaits with M
 
       val solr = AsyncSolrClient("http://localhost:12345/solr")
 
-      val response: Future[QueryResponse] = solr.query(query)
+      val response = solr.query(query)
 
       awaitReady(response)
       a [ConnectException] should be thrownBy await(response)
+    }
+
+    it("should return failed future on AHC IOException") {
+      val ahc = new AsyncHttpClient()
+      val ahcSpy = spy(ahc)
+      val solr = AsyncSolrClient.Builder("http://localhost:12345/solr").withHttpClient(ahcSpy).build
+
+      val ioe = new IOException("Closed") {
+        override def fillInStackTrace(): Throwable = this
+      }
+      doThrow(ioe).when(ahcSpy).executeRequest(any, any)
+
+      val response = solr.query(query)
+
+      awaitReady(response)
+      a [IOException] should be thrownBy await(response)
+
+      ahc.closeAsynchronously()
     }
 
     it("should shutdown http client if it was not provided") {

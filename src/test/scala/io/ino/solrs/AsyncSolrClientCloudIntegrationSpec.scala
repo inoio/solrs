@@ -6,7 +6,7 @@ import org.apache.curator.test.TestingServer
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.impl.CloudSolrClient
 import org.scalatest._
-import org.scalatest.concurrent.Eventually._
+import org.scalatest.concurrent.{IntegrationPatience, Eventually}
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.mock.MockitoSugar
 import org.slf4j.LoggerFactory
@@ -23,7 +23,8 @@ import scala.util.control.NonFatal
  * RetryPolicy.TryAvailableServers is needed because for a restarted server the status is not updated
  * fast enough.
  */
-class AsyncSolrClientCloudIntegrationSpec extends FunSpec with BeforeAndAfterAll with BeforeAndAfterEach with Matchers with FutureAwaits with MockitoSugar {
+class AsyncSolrClientCloudIntegrationSpec extends FunSpec with BeforeAndAfterAll with BeforeAndAfterEach with Matchers with FutureAwaits with MockitoSugar
+  with Eventually with IntegrationPatience {
 
   private implicit val timeout = 5.second
 
@@ -101,7 +102,7 @@ class AsyncSolrClientCloudIntegrationSpec extends FunSpec with BeforeAndAfterAll
 
     it("should serve queries while solr server is restarted") {
 
-      eventually(Timeout(2 seconds)) {
+      eventually {
         cut.loadBalancer.solrServers.all should contain theSameElementsAs solrRunnerUrls.map(SolrServer(_, Enabled))
       }
 
@@ -135,14 +136,14 @@ class AsyncSolrClientCloudIntegrationSpec extends FunSpec with BeforeAndAfterAll
         await(response) should contain theSameElementsAs someDocsIds
       }
 
-      eventually(Timeout(2 seconds)) {
+      eventually {
         cut.loadBalancer.solrServers.all should contain theSameElementsAs solrRunnerUrls.map(SolrServer(_, Enabled))
       }
     }
 
     it("should serve queries when ZK is not available") {
 
-      eventually(Timeout(2 seconds)) {
+      eventually {
         cut.loadBalancer.solrServers.all should contain theSameElementsAs solrRunnerUrls.map(SolrServer(_, Enabled))
       }
 

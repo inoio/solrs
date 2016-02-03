@@ -12,7 +12,7 @@ licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.
 
 scalaVersion := "2.10.5"
 
-crossScalaVersions := Seq("2.10.5", "2.11.6")
+crossScalaVersions := Seq("2.10.5", "2.11.7")
 
 // https://github.com/jrudolph/sbt-dependency-graph
 // E.g. adds dependency-graph task
@@ -35,22 +35,22 @@ libraryDependencies := {
 }
 
 val solrVersion = "5.0.0"
-val slf4jVersion = "1.7.7"
-val tomcatVersion = "7.0.57"
+val slf4jVersion = "1.7.14"
+val tomcatVersion = "7.0.67"
 
 libraryDependencies ++= Seq(
   "org.apache.solr" % "solr-solrj" % solrVersion,
-  "com.ning" % "async-http-client" % "1.8.15",
+  "com.ning" % "async-http-client" % "1.8.16",
   "com.codahale.metrics" % "metrics-core" % "3.0.2" % "optional",
   "org.slf4j" % "slf4j-api" % slf4jVersion,
-  "com.typesafe.akka" %% "akka-actor" % "2.3.7",
+  "com.typesafe.akka" %% "akka-actor" % "2.3.14",
   "org.slf4j" % "slf4j-simple" % slf4jVersion % "test",
-  "org.scalatest" %% "scalatest" % "2.2.2" % "test",
-  "org.mockito" % "mockito-core" % "1.10.13" % "test",
-  "org.clapper" %% "grizzled-scala" % "1.2" % "test",
+  "org.scalatest" %% "scalatest" % "2.2.6" % "test",
+  "org.mockito" % "mockito-core" % "1.10.19" % "test",
+  "org.clapper" %% "grizzled-scala" % "1.4.0" % "test",
   // Cloud testing, solr-core for ZkController (upconfig), curator-test for ZK TestingServer
   "org.apache.solr" % "solr-core" % solrVersion % "test",
-  "org.apache.curator" % "curator-test" % "2.7.0" % "test",
+  "org.apache.curator" % "curator-test" % "2.9.1" % "test",
   // tomcat
   "org.apache.tomcat" % "tomcat-catalina" % tomcatVersion % "test",
   "org.apache.tomcat" % "tomcat-jasper" % tomcatVersion % "test",

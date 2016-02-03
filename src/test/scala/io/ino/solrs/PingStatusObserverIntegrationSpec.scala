@@ -78,6 +78,8 @@ class PingStatusObserverIntegrationSpec extends FunSpec with RunningSolr with Be
       solrServers(0).status should be (Enabled)
 
       solrRunner.tomcat.getConnector.pause()
+      val httpClientConfig = new AsyncHttpClientConfig.Builder().setIdleConnectionTimeoutInMs(1).build()
+      val asyncHttpClient = new AsyncHttpClient(httpClientConfig)
       try {
 
         eventually {
@@ -85,12 +87,12 @@ class PingStatusObserverIntegrationSpec extends FunSpec with RunningSolr with Be
           thrown.getCause shouldBe a[TimeoutException]
         }
 
-        val httpClientConfig = new AsyncHttpClientConfig.Builder().setIdleConnectionTimeoutInMs(1).build()
-        val pingStatusObserver2 = new PingStatusObserver(solrServers, new AsyncHttpClient(httpClientConfig))
+        val pingStatusObserver2 = new PingStatusObserver(solrServers, asyncHttpClient)
 
         awaitReady(pingStatusObserver2.checkServerStatus())
         solrServers(0).status should be(Failed)
       } finally {
+        asyncHttpClient.closeAsynchronously()
         solrRunner.tomcat.getConnector.resume()
       }
     }

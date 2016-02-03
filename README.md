@@ -13,6 +13,7 @@ This is a solr client for scala providing a query interface like SolrJ, just asy
  - [Load Balancing](#load-balancing)
  - [Solr Cloud / ZooKeeper Support](#solr-cloud--zookeeper-support)
  - [Retry Policy](#retry-policy)
+ - [Request Interception / Filtering](#request-interception--filtering)
  - [Metrics](#metrics)
 - [License](#license)
 

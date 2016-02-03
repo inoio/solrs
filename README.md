@@ -1,5 +1,7 @@
 # solrs - async solr client for scala
 
+[![Join the chat at https://gitter.im/inoio/solrs](https://badges.gitter.im/inoio/solrs.svg)](https://gitter.im/inoio/solrs?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 [![Build Status](https://travis-ci.org/inoio/solrs.png?branch=master)](https://travis-ci.org/inoio/solrs)
 
 This is a solr client for scala providing a query interface like SolrJ, just asynchronously / non-blocking.

@@ -34,7 +34,7 @@ libraryDependencies := {
   }
 }
 
-val solrVersion = "5.0.0"
+val solrVersion = "5.5.1"
 val slf4jVersion = "1.7.14"
 val tomcatVersion = "7.0.67"
 

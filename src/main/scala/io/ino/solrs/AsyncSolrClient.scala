@@ -243,7 +243,7 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
     val promise = scala.concurrent.promise[QueryResponse]
     val startTime = System.currentTimeMillis()
 
-    val url = solrServer.baseUrl + getPath(q) + ClientUtils.toQueryString(wparams, false)
+    val url = solrServer.baseUrl + getPath(q) + wparams.toQueryString
     val request = httpClient.prepareGet(url).addHeader("User-Agent", AGENT).build()
 
     try {

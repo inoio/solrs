@@ -79,7 +79,7 @@ class CloudSolrServersUninitializedIntegrationSpec extends FunSpec with BeforeAn
         SolrRunner.start(18889, Some(ZooKeeperOptions(zkConnectString)))
       )
 
-      eventually(Timeout(5 seconds)) {
+      eventually(Timeout(20 seconds)) {
         cut.get.all should contain theSameElementsAs solrRunnerUrls.map(SolrServer(_, Enabled))
       }
 

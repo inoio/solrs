@@ -10,7 +10,6 @@ import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.SolrServerException
 import org.apache.solr.client.solrj.response.QueryResponse
 
-import org.apache.solr.client.solrj.util.ClientUtils
 import org.apache.solr.common.params.{CommonParams, ModifiableSolrParams}
 import org.apache.solr.common.util.NamedList
 import org.slf4j.LoggerFactory
@@ -243,7 +242,7 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
     val promise = scala.concurrent.promise[QueryResponse]
     val startTime = System.currentTimeMillis()
 
-    val url = solrServer.baseUrl + getPath(q) + ClientUtils.toQueryString(wparams, false)
+    val url = solrServer.baseUrl + getPath(q) + wparams.toQueryString
     val request = httpClient.prepareGet(url).addHeader("User-Agent", AGENT).build()
 
     try {

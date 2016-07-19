@@ -6,7 +6,8 @@ import org.apache.curator.test.TestingServer
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.impl.CloudSolrClient
 import org.scalatest._
-import org.scalatest.concurrent.{IntegrationPatience, Eventually}
+import org.scalatest.concurrent.Eventually.eventually
+import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.mock.MockitoSugar
 import org.slf4j.LoggerFactory
@@ -61,7 +62,9 @@ class AsyncSolrClientCloudIntegrationSpec extends FunSpec with BeforeAndAfterAll
     // updated fast enough...
     cut = AsyncSolrClient.Builder(RoundRobinLB(solrServers)).withRetryPolicy(RetryPolicy.TryAvailableServers).build
 
-    cloudSolrServer.deleteByQuery("*:*")
+    eventually(Timeout(10 seconds)) {
+      cloudSolrServer.deleteByQuery("*:*")
+    }
     cloudSolrServer.commit()
 
     cloudSolrServer.add(someDocsAsJList)
@@ -171,7 +174,7 @@ class AsyncSolrClientCloudIntegrationSpec extends FunSpec with BeforeAndAfterAll
         await(response) should contain theSameElementsAs someDocsIds
       }
 
-      eventually(Timeout(2 seconds)) {
+      eventually(Timeout(10 seconds)) {
         cut.loadBalancer.solrServers.all should contain theSameElementsAs solrRunnerUrls.map(SolrServer(_, Enabled))
       }
     }

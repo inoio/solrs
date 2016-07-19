@@ -14,10 +14,6 @@ scalaVersion := "2.10.5"
 
 crossScalaVersions := Seq("2.10.5", "2.11.7")
 
-// https://github.com/jrudolph/sbt-dependency-graph
-// E.g. adds dependency-graph task
-net.virtualvoid.sbt.graph.Plugin.graphSettings
-
 resolvers ++= Seq(
   "JCenter" at "http://jcenter.bintray.com/",
   "Restlet Repositories" at "http://maven.restlet.org"
@@ -34,9 +30,9 @@ libraryDependencies := {
   }
 }
 
-val solrVersion = "5.0.0"
+val solrVersion = "5.5.2"
 val slf4jVersion = "1.7.14"
-val tomcatVersion = "7.0.67"
+val tomcatVersion = "8.5.3"
 
 libraryDependencies ++= Seq(
   "org.apache.solr" % "solr-solrj" % solrVersion,

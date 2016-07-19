@@ -2,10 +2,11 @@ package io.ino.solrs
 
 import java.io.File
 import java.net.{URL, URLDecoder}
-import java.nio.file.{Files, Paths, Path}
+import java.nio.file.{Files, Path, Paths}
 import java.util.jar.{Attributes, JarFile}
 import java.util.logging.Level
 
+import org.apache.catalina.Context
 import org.apache.catalina.LifecycleState
 import org.apache.catalina.startup.Tomcat
 import org.apache.commons.io.FileUtils
@@ -30,7 +31,9 @@ class SolrRunner(val port: Int,
   import io.ino.solrs.SolrRunner._
 
   val url = s"http://localhost:$port/solr"
-  private[solrs] var tomcat: Tomcat = null
+  private[solrs] var tomcat: Tomcat = _
+
+  private[solrs] var context: Context = _
 
   def start: SolrRunner = {
     if (tomcat != null) {
@@ -56,7 +59,7 @@ class SolrRunner(val port: Int,
     FileUtils.deleteDirectory(baseDir.resolve("webapps").resolve("solr").toFile)
 
     tomcat.setBaseDir(baseDir.toAbsolutePath.toString)
-    val context = tomcat.addWebapp("/solr", solrWar.getAbsolutePath)
+    context = tomcat.addWebapp("/solr", solrWar.getAbsolutePath)
     // context.asInstanceOf[StandardContext].setClearReferencesStopThreads(true)
     tomcat.start()
 

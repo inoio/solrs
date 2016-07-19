@@ -11,6 +11,8 @@ import org.apache.solr.client.solrj.response.QueryResponse
 import org.mockito.Matchers._
 import org.mockito.Mockito.verify
 import org.scalatest.concurrent.Eventually._
+import org.scalatest.concurrent.Eventually.eventually
+import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.mock.MockitoSugar
 import org.scalatest.{BeforeAndAfterEach, FunSpec, Matchers}
 
@@ -30,7 +32,9 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
   import io.ino.solrs.SolrUtils._
 
   override def beforeEach() {
-    solr.deleteByQuery("*:*")
+    eventually(Timeout(10 seconds)) {
+      solr.deleteByQuery("*:*")
+    }
     val doc1 = newInputDoc("id1", "doc1", "cat1", 10)
     val doc2 = newInputDoc("id2", "doc2", "cat1", 20)
     solr.add(asList(doc1, doc2))

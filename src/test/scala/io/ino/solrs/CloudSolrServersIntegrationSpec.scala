@@ -9,6 +9,8 @@ import org.apache.solr.client.solrj.response.QueryResponse
 import org.mockito.Mockito._
 import org.scalatest._
 import org.scalatest.concurrent.Eventually._
+import org.scalatest.concurrent.Eventually.eventually
+import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.mock.MockitoSugar
 import org.scalatest.time.{Millis, Span}
 
@@ -56,7 +58,9 @@ class CloudSolrServersIntegrationSpec extends FunSpec with BeforeAndAfterAll wit
     cut = new CloudSolrServers(zk.getConnectString, clusterStateUpdateInterval = 100 millis)
     cut.setAsyncSolrClient(asyncSolrClient)
 
-    cloudSolrServer.deleteByQuery("*:*")
+    eventually(Timeout(10 seconds)) {
+      cloudSolrServer.deleteByQuery("*:*")
+    }
     import scala.collection.JavaConversions._
     cloudSolrServer.add(someDocs)
     cloudSolrServer.commit()

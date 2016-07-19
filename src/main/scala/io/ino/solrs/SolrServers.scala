@@ -274,16 +274,11 @@ object CloudSolrServers {
     }
   }
 
-  private def serverStatus(replica: Replica): ServerStatus = replica.get(ZkStateReader.STATE_PROP) match {
-    case ZkStateReader.ACTIVE => Enabled
-    case ZkStateReader.RECOVERING => Disabled
-    case ZkStateReader.RECOVERY_FAILED => Failed
-    case ZkStateReader.DOWN => Failed
-    case default =>
-      // E.g. there's SYNC, which *should* not be used according to http://markmail.org/message/wt54x2xisileyeoo, but
-      // we should at log unknown states and handle them as Failed.
-      logger.warn(s"Unknown state $default, translating to 'Failed' for now...")
-      Failed
+  private def serverStatus(replica: Replica): ServerStatus = replica.getState match {
+    case Replica.State.ACTIVE => Enabled
+    case Replica.State.RECOVERING => Disabled
+    case Replica.State.RECOVERY_FAILED => Failed
+    case Replica.State.DOWN => Failed
   }
 
   /**

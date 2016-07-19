@@ -30,9 +30,9 @@ libraryDependencies := {
   }
 }
 
-val solrVersion = "5.5.2"
+val solrVersion = "6.1.0"
 val slf4jVersion = "1.7.14"
-val tomcatVersion = "8.5.3"
+val tomcatVersion = "8.5.4"
 
 libraryDependencies ++= Seq(
   "org.apache.solr" % "solr-solrj" % solrVersion,

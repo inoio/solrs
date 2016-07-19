@@ -163,7 +163,7 @@ object RunSolrCloud extends App {
   }
 
   import scala.collection.JavaConversions._
-  println("Started ZkStateReader, read cluster props: " + zk.getClusterProps.mkString(", ") + ", cluster state: " + zk.getClusterState)
+  println("Started ZkStateReader, read cluster props: " + zk.getClusterProperties.mkString(", ") + ", cluster state: " + zk.getClusterState)
 
   /*
   solrRunner1.stop()

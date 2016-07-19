@@ -6,7 +6,6 @@ import org.apache.curator.test.TestingServer
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.impl.CloudSolrClient
 import org.scalatest._
-import org.scalatest.concurrent.Eventually.eventually
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.mock.MockitoSugar
@@ -81,7 +80,7 @@ class AsyncSolrClientCloudIntegrationSpec extends FunSpec with BeforeAndAfterAll
   }
 
   override def afterAll(configMap: ConfigMap) {
-    cloudSolrServer.shutdown()
+    cloudSolrServer.close()
     cut.shutdown()
     solrServers.shutdown
     solrRunners.foreach(_.stop())

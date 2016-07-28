@@ -52,7 +52,7 @@ class CloudSolrServersIntegrationSpec extends FunSpec with BeforeAndAfterAll wit
     solrs = solrRunners.foldLeft(Map.empty[SolrRunner, AsyncSolrClient])( (res, solrRunner) =>
       res + (solrRunner -> AsyncSolrClient(s"http://$hostName:${solrRunner.port}/solr/collection1")))
 
-    cloudSolrServer = new CloudSolrClient(zk.getConnectString)
+    cloudSolrServer = new CloudSolrClient.Builder().withZkHost(zk.getConnectString).build()
     cloudSolrServer.setDefaultCollection("collection1")
 
     cut = new CloudSolrServers(zk.getConnectString, clusterStateUpdateInterval = 100 millis)

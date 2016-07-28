@@ -14,6 +14,7 @@ import scala.collection.immutable.Iterable
 import scala.collection.mutable
 import scala.concurrent.{Future, Promise}
 import scala.language.postfixOps
+import scala.language.postfixOps
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
@@ -155,6 +156,8 @@ class CloudSolrServers(zkHost: String,
   private def updateFromClusterState(zkStateReader: ZkStateReader): Unit = {
     import scala.concurrent.ExecutionContext.Implicits.global
 
+    // could perhaps be replaced with zkStateReader.registerCollectionStateWatcher(collection, watcher);
+
     val clusterState = zkStateReader.getClusterState
     if(clusterState != lastClusterState) {
 
@@ -263,14 +266,14 @@ object CloudSolrServers {
   private[solrs] def getCollectionToServers(clusterState: ClusterState): Map[String, IndexedSeq[SolrServer]] = {
     import scala.collection.JavaConversions._
 
-    clusterState.getCollections.foldLeft(
+    clusterState.getCollectionsMap.foldLeft(
       Map.empty[String, IndexedSeq[SolrServer]].withDefaultValue(IndexedSeq.empty)
-    ) { (res, collection) =>
-      val slices = clusterState.getCollection(collection).getSlices
+    ) { case (res, (name, collection)) =>
+      val slices = collection.getSlices
       val servers = slices.flatMap(_.getReplicas.map(repl =>
         SolrServer(ZkCoreNodeProps.getCoreUrl(repl), serverStatus(repl))
       )).toIndexedSeq
-      res.updated(collection, res(collection) ++ servers)
+      res.updated(name, res(name) ++ servers)
     }
   }
 

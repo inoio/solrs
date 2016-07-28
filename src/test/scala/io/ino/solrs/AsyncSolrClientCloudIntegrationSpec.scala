@@ -50,7 +50,7 @@ class AsyncSolrClientCloudIntegrationSpec extends FunSpec with BeforeAndAfterAll
       SolrRunner.start(18889, Some(ZooKeeperOptions(zk.getConnectString)))
     )
 
-    cloudSolrServer = new CloudSolrClient(zk.getConnectString)
+    cloudSolrServer = new CloudSolrClient.Builder().withZkHost(zk.getConnectString).build()
     cloudSolrServer.setDefaultCollection("collection1")
 
     solrServers = new CloudSolrServers(

@@ -37,16 +37,17 @@ val tomcatVersion = "8.5.4"
 libraryDependencies ++= Seq(
   "org.apache.solr" % "solr-solrj" % solrVersion,
   "com.ning" % "async-http-client" % "1.8.16",
-  "com.codahale.metrics" % "metrics-core" % "3.0.2" % "optional",
+  "io.dropwizard.metrics" % "metrics-core" % "3.1.2" % "optional",
   "org.slf4j" % "slf4j-api" % slf4jVersion,
-  "com.typesafe.akka" %% "akka-actor" % "2.3.14",
+  // akka 2.3 is used for scala 2.10 support
+  "com.typesafe.akka" %% "akka-actor" % "2.3.15",
   "org.slf4j" % "slf4j-simple" % slf4jVersion % "test",
   "org.scalatest" %% "scalatest" % "2.2.6" % "test",
   "org.mockito" % "mockito-core" % "1.10.19" % "test",
-  "org.clapper" %% "grizzled-scala" % "1.4.0" % "test",
+  "org.clapper" %% "grizzled-scala" % "2.5.0" % "test",
   // Cloud testing, solr-core for ZkController (upconfig), curator-test for ZK TestingServer
   "org.apache.solr" % "solr-core" % solrVersion % "test",
-  "org.apache.curator" % "curator-test" % "2.9.1" % "test",
+  "org.apache.curator" % "curator-test" % "2.11.0" % "test",
   // tomcat
   "org.apache.tomcat" % "tomcat-catalina" % tomcatVersion % "test",
   "org.apache.tomcat" % "tomcat-jasper" % tomcatVersion % "test",

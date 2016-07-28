@@ -3,7 +3,7 @@ package io.ino.solrs
 import java.net.ConnectException
 import java.util.concurrent.{ExecutionException, TimeUnit, TimeoutException}
 
-import com.ning.http.client.{AsyncHttpClient, AsyncHttpClientConfig}
+import org.asynchttpclient.{DefaultAsyncHttpClient, DefaultAsyncHttpClientConfig}
 import org.apache.catalina.LifecycleState
 import org.scalatest.concurrent.Eventually
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
@@ -19,7 +19,7 @@ class PingStatusObserverIntegrationSpec extends FunSpec with RunningSolr with Ev
 
   private implicit val awaitTimeout = 2000 millis
   private val httpClientTimeout = 20
-  private val httpClient = new AsyncHttpClient(new AsyncHttpClientConfig.Builder().setRequestTimeoutInMs(httpClientTimeout).build)
+  private val httpClient = new DefaultAsyncHttpClient(new DefaultAsyncHttpClientConfig.Builder().setRequestTimeout(httpClientTimeout).build)
 
   private lazy val solrUrl = s"http://localhost:${solrRunner.port}/solr/collection1"
 
@@ -79,14 +79,14 @@ class PingStatusObserverIntegrationSpec extends FunSpec with RunningSolr with Ev
 
     }
 
-    it("should disable server on idle connection timeout") {
+    it("should disable server on read timeout") {
 
       await(pingStatusObserver.checkServerStatus())
       solrServers(0).status should be (Enabled)
 
       solrRunner.tomcat.getConnector.pause()
-      val httpClientConfig = new AsyncHttpClientConfig.Builder().setIdleConnectionTimeoutInMs(1).build()
-      val asyncHttpClient = new AsyncHttpClient(httpClientConfig)
+      val httpClientConfig = new DefaultAsyncHttpClientConfig.Builder().setReadTimeout(1).build()
+      val asyncHttpClient = new DefaultAsyncHttpClient(httpClientConfig)
       try {
 
         eventually {
@@ -99,7 +99,7 @@ class PingStatusObserverIntegrationSpec extends FunSpec with RunningSolr with Ev
         awaitReady(pingStatusObserver2.checkServerStatus())
         solrServers(0).status should be(Failed)
       } finally {
-        asyncHttpClient.closeAsynchronously()
+        asyncHttpClient.close()
         solrRunner.tomcat.getConnector.resume()
       }
     }

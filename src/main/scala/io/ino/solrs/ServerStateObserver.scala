@@ -1,7 +1,7 @@
 package io.ino.solrs
 
 import akka.actor.ActorSystem
-import com.ning.http.client.{Response, AsyncCompletionHandler, AsyncHttpClient}
+import org.asynchttpclient.{Response, AsyncCompletionHandler, AsyncHttpClient}
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration._

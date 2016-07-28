@@ -1,16 +1,20 @@
 package io.ino.solrs
 
-import java.io.IOException
 import java.net.ConnectException
 
-import com.ning.http.client.AsyncHttpClient
+import org.asynchttpclient.DefaultAsyncHttpClient
 import org.apache.solr.client.solrj.SolrQuery
+import org.asynchttpclient.AsyncHandler
+import org.asynchttpclient.AsyncHttpClient
+import org.asynchttpclient.Request
+import org.asynchttpclient.Response
 import org.mockito.Matchers.any
 import org.mockito.Mockito.{doThrow, spy, times, verify}
 import org.scalatest.mock.MockitoSugar
 import org.scalatest.{FunSpec, Matchers}
 
 import scala.concurrent.duration._
+import scala.util.control.NoStackTrace
 
 class AsyncSolrClientSpec extends FunSpec with Matchers with FutureAwaits with MockitoSugar {
 
@@ -30,21 +34,19 @@ class AsyncSolrClientSpec extends FunSpec with Matchers with FutureAwaits with M
     }
 
     it("should return failed future on AHC IOException") {
-      val ahc = new AsyncHttpClient()
+      val ahc = new DefaultAsyncHttpClient()
       val ahcSpy = spy(ahc)
       val solr = AsyncSolrClient.Builder("http://localhost:12345/solr").withHttpClient(ahcSpy).build
 
-      val ioe = new IOException("Closed") {
-        override def fillInStackTrace(): Throwable = this
-      }
-      doThrow(ioe).when(ahcSpy).executeRequest(any, any)
+      val ex = new RuntimeException("Unexpected?!") with NoStackTrace
+      doThrow(ex).when(ahcSpy).executeRequest(any[Request], any[AsyncHandler[Response]])
 
       val response = solr.query(query)
 
       awaitReady(response)
-      a [IOException] should be thrownBy await(response)
+      a [RuntimeException] should be thrownBy await(response)
 
-      ahc.closeAsynchronously()
+      ahc.close()
     }
 
     it("should shutdown http client if it was not provided") {
@@ -55,7 +57,7 @@ class AsyncSolrClientSpec extends FunSpec with Matchers with FutureAwaits with M
 
       solr.shutdown()
 
-      verify(ahcMock).closeAsynchronously()
+      verify(ahcMock).close()
     }
 
     it("should not shutdown http client if it was provided") {
@@ -64,7 +66,7 @@ class AsyncSolrClientSpec extends FunSpec with Matchers with FutureAwaits with M
 
       solr.shutdown()
 
-      verify(ahcMock, times(0)).closeAsynchronously()
+      verify(ahcMock, times(0)).close()
     }
 
   }

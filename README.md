@@ -27,8 +27,7 @@ solrs is published to maven central for both scala 2.10 and 2.11.
 
 ## Usage
 
-At first an instance of `AsyncSolrClient` must be created with the url to the Solr server, an `AsyncHttpClient`
-instance and the response parser to use.
+At first an instance of `AsyncSolrClient` must be created with the url to the Solr server.
 This client can then be used to query solr and process future responses.
 
 A complete example:
@@ -56,12 +55,12 @@ The `AsyncSolrClient` can further be configured with an `AsyncHttpClient` instan
 via the `AsyncSolrClient.Builder` (other configuration properties are described in greater detail below):
 
 ```scala
-import com.ning.http.client.AsyncHttpClient
+import org.asynchttpclient.DefaultAsyncHttpClient
 import io.ino.solrs.{CodaHaleMetrics, AsyncSolrClient}
 import org.apache.solr.client.solrj.impl.XMLResponseParser
 
 val solr = AsyncSolrClient.Builder("http://localhost:8983/solr/collection1")
-            .withHttpClient(new AsyncHttpClient())
+            .withHttpClient(new DefaultAsyncHttpClient())
             .withResponseParser(new XMLResponseParser())
             .build
 ```

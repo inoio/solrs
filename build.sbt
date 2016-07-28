@@ -6,7 +6,7 @@ homepage := Some(url("https://github.com/inoio/solrs"))
 
 organization := "io.ino"
 
-version := "1.5.0"
+version := "2.0.0-SNAPSHOT"
 
 licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.html"))
 
@@ -31,12 +31,12 @@ libraryDependencies := {
 }
 
 val solrVersion = "6.1.0"
-val slf4jVersion = "1.7.14"
+val slf4jVersion = "1.7.21"
 val tomcatVersion = "8.5.4"
 
 libraryDependencies ++= Seq(
   "org.apache.solr" % "solr-solrj" % solrVersion,
-  "com.ning" % "async-http-client" % "1.8.16",
+  "org.asynchttpclient" % "async-http-client" % "2.0.11",
   "io.dropwizard.metrics" % "metrics-core" % "3.1.2" % "optional",
   "org.slf4j" % "slf4j-api" % slf4jVersion,
   // akka 2.3 is used for scala 2.10 support

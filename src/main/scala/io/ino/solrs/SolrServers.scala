@@ -2,7 +2,7 @@ package io.ino.solrs
 
 import java.util.concurrent.{Executors, ScheduledExecutorService, ThreadFactory}
 
-import com.ning.http.client.{AsyncCompletionHandler, AsyncHttpClient, Response}
+import org.asynchttpclient.{AsyncCompletionHandler, AsyncHttpClient, Response}
 import io.ino.solrs.CloudSolrServers.WarmupQueries
 import io.ino.solrs.ServerStateChangeObservable.StateChange
 import org.apache.solr.client.solrj.response.QueryResponse

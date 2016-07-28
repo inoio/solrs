@@ -9,12 +9,10 @@ import org.apache.solr.client.solrj.ResponseParser
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.SolrServerException
 import org.apache.solr.client.solrj.response.QueryResponse
-
 import org.apache.solr.common.params.{CommonParams, ModifiableSolrParams}
 import org.apache.solr.common.util.NamedList
 import org.slf4j.LoggerFactory
-
-import com.ning.http.client.{AsyncCompletionHandler, AsyncHttpClient, Response}
+import org.asynchttpclient.{AsyncCompletionHandler, AsyncHttpClient, Response}
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -24,8 +22,10 @@ import scala.util.Try
 import org.apache.solr.common.SolrException
 import org.apache.solr.client.solrj.impl.BinaryResponseParser
 import java.util.Locale
+
 import org.apache.commons.io.IOUtils
 import HttpUtils._
+import org.asynchttpclient.DefaultAsyncHttpClient
 
 object AsyncSolrClient {
 
@@ -81,7 +81,7 @@ object AsyncSolrClient {
       copy(retryPolicy = retryPolicy)
     }
 
-    protected def createHttpClient: AsyncHttpClient = new AsyncHttpClient()
+    protected def createHttpClient: AsyncHttpClient = new DefaultAsyncHttpClient()
 
     protected def createResponseParser: ResponseParser = new BinaryResponseParser
 
@@ -163,7 +163,7 @@ class AsyncSolrClient private (val loadBalancer: LoadBalancer,
   def shutdown() = {
     cancellableObservation.foreach(_.cancel())
     if(shutdownHttpClient) {
-      httpClient.closeAsynchronously()
+      httpClient.close()
     }
     loadBalancer.shutdown()
   }

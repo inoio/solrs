@@ -3,7 +3,7 @@ package io.ino.solrs
 import java.util.Arrays.asList
 
 import akka.actor.ActorSystem
-import com.ning.http.client.AsyncHttpClient
+import org.asynchttpclient.DefaultAsyncHttpClient
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.SolrQuery.SortClause
 import org.apache.solr.client.solrj.impl.XMLResponseParser
@@ -24,7 +24,7 @@ import scala.language.postfixOps
 class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with BeforeAndAfterEach with Matchers with FutureAwaits with MockitoSugar {
 
   private implicit val timeout = 1.second
-  private val httpClient = new AsyncHttpClient()
+  private val httpClient = new DefaultAsyncHttpClient()
 
   private lazy val solrUrl = s"http://localhost:${solrRunner.port}/solr/collection1"
   private lazy val solrs = AsyncSolrClient(solrUrl)
@@ -99,7 +99,7 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
 
     it("should allow to set the http client") {
 
-      val solr = AsyncSolrClient.Builder(solrUrl).withHttpClient(new AsyncHttpClient()).build
+      val solr = AsyncSolrClient.Builder(solrUrl).withHttpClient(new DefaultAsyncHttpClient()).build
 
       val response = solr.query(new SolrQuery("cat:cat1"))
 

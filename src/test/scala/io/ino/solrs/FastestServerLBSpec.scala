@@ -261,7 +261,7 @@ class FastestServerLBSpec extends StandardFunSpec {
       // verify that the lb ran the test query (in this case for all servers)
       // ... and we accept a slight delay because the scheduler might be a bit inaccurate...
       eventually {
-        solrServers.all.foreach(verify(spyClient, times(1)).doQuery(_, testQuery))
+        solrServers.all.foreach(verify(spyClient, atLeastOnce()).doQuery(_, testQuery))
       }(PatienceConfig(timeout = maxDelay * 2, interval = maxDelay/10))
     }
   }

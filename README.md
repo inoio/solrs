@@ -1,10 +1,12 @@
-# solrs - async solr client for scala
+# solrs - async solr client for java/scala
 
 [![Build Status](https://travis-ci.org/inoio/solrs.png?branch=master)](https://travis-ci.org/inoio/solrs)
 [![Maven Central](https://maven-badges.herokuapp.com/maven-central/io.ino/solrs_2.11/badge.svg)](http://search.maven.org/#search%7Cga%7C1%7Cg%3A%22io.ino%22%20AND%20a%3Asolrs*_2.11)
 [![Join the chat at https://gitter.im/inoio/solrs](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/inoio/solrs)
 
-This is a solr client for scala providing a query interface like SolrJ, just asynchronously / non-blocking.
+This is a java/scala solr client providing a query interface like SolrJ, just asynchronously / non-blocking
+(built on top of [async-http-client](https://github.com/AsyncHttpClient/async-http-client) / [netty](https://github.com/netty/netty)).
+For java it supports `CompletableFuture`, for scala you can choose between twitter's `Future` or the standard/SDK `Future`.
 
 ## Contents
 
@@ -23,41 +25,101 @@ You must add the library to the dependencies of the build file, e.g. add to `bui
 
     libraryDependencies += "io.ino" %% "solrs" % "1.5.0"
 
+or for java projects to pom.xml:
+
+    <dependency>
+      <groupId>io.ino</groupId>
+      <artifactId>solrs_2.11</artifactId>
+      <version>1.5.0</version>
+    </dependency>
+
 solrs is published to maven central for both scala 2.10 and 2.11.
 
 ## Usage
 
-At first an instance of `AsyncSolrClient` must be created with the url to the Solr server.
-This client can then be used to query solr and process future responses.
+Solrs supports different `Future` implementations, which affects the result type of `AsyncSolrClient.query`.
+For scala there's support for the standard `scala.concurrent.Future` and for twitters `com.twitter.util.Future`.
+Which one is chosen is defined by the `io.ino.solrs.future.FutureFactory` that's in scope when building the `AsyncSolrClient` (as shown
+below in the code samples).
 
-A complete example:
+For java there's support for `CompletableFuture`. Because java does not support higher kinded types there's
+a separate class `JavaAsyncSolrClient` that allows to create new instances and to perform a `query`.
 
+In the following it's shown how to use `JavaAsyncSolrClient`/`AsyncSolrClient`:
+
+[java]
+```java
+import io.ino.solrs.JavaAsyncSolrClient;
+import org.apache.solr.client.solrj.SolrQuery;
+import org.apache.solr.client.solrj.response.QueryResponse;
+import java.util.concurrent.CompletableFuture;
+
+JavaAsyncSolrClient solr = JavaAsyncSolrClient.create("http://localhost:8983/solr/collection1");
+CompletableFuture<QueryResponse> response = solr.query(new SolrQuery("java"));
+response.thenAccept(r -> System.out.println("found " + r.getResults().getNumFound() + " docs"));
+
+// At EOL...
+solr.shutdown();
+```
+
+[scala/SDK]
 ```scala
 import io.ino.solrs.AsyncSolrClient
+import io.ino.solrs.future.ScalaFutureFactory.Implicit // or TwitterFutureFactory
 import org.apache.solr.client.solrj.response.QueryResponse
 import org.apache.solr.client.solrj.SolrQuery
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
 val solr = AsyncSolrClient("http://localhost:8983/solr/collection1")
-
-val query = new SolrQuery("scala")
-val response: Future[QueryResponse] = solr.query(query)
-
+val response: Future[QueryResponse] = solr.query(new SolrQuery("scala"))
 response.onSuccess {
   case qr => println(s"found ${qr.getResults.getNumFound} docs")
 }
 
-solr.shutdown
+// Don't forget...
+solr.shutdown()
+```
+
+[scala/twitter]
+```scala
+import io.ino.solrs.AsyncSolrClient
+import io.ino.solrs.future.TwitterFutureFactory.Implicit
+import org.apache.solr.client.solrj.SolrQuery
+import org.apache.solr.client.solrj.response.QueryResponse
+import com.twitter.util.Future
+
+val solr = AsyncSolrClient("http://localhost:8983/solr")
+val response: Future[QueryResponse] = solr.query(new SolrQuery("scala"))
+response.onSuccess {
+  qr => println(s"found ${qr.getResults.getNumFound} docs")
+}
+
+// Finally...
+solr.shutdown()
 ```
 
 The `AsyncSolrClient` can further be configured with an `AsyncHttpClient` instance and the response parser
 via the `AsyncSolrClient.Builder` (other configuration properties are described in greater detail below):
 
+[java]
+```java
+import io.ino.solrs.JavaAsyncSolrClient;
+import org.apache.solr.client.solrj.impl.XMLResponseParser;
+import org.asynchttpclient.DefaultAsyncHttpClient;
+
+JavaAsyncSolrClient solr = JavaAsyncSolrClient.builder("http://localhost:8983/solr/collection1")
+            .withHttpClient(new DefaultAsyncHttpClient())
+            .withResponseParser(new XMLResponseParser())
+            .build();
+```
+
+[scala]
 ```scala
-import org.asynchttpclient.DefaultAsyncHttpClient
-import io.ino.solrs.{CodaHaleMetrics, AsyncSolrClient}
+import io.ino.solrs.AsyncSolrClient
+import io.ino.solrs.future.ScalaFutureFactory.Implicit
 import org.apache.solr.client.solrj.impl.XMLResponseParser
+import org.asynchttpclient.DefaultAsyncHttpClient
 
 val solr = AsyncSolrClient.Builder("http://localhost:8983/solr/collection1")
             .withHttpClient(new DefaultAsyncHttpClient())
@@ -79,8 +141,19 @@ reading them from ZooKeeper (see [Solr Cloud Support](#solr-cloud-support) for m
 
 To run solrs with a `RoundRobinLB` you have to pass it to the `Builder`
 
+[java]
+```java
+import io.ino.solrs.*;
+import java.util.Arrays;
+
+RoundRobinLB lb = RoundRobinLB.create(Arrays.asList("http://localhost:8983/solr/collection1", "http://localhost:8984/solr/collection1"));
+JavaAsyncSolrClient solr = JavaAsyncSolrClient.builder(lb).build();
+```
+
+[scala]
 ```scala
 import io.ino.solrs._
+import io.ino.solrs.future.ScalaFutureFactory.Implicit
 
 val lb = RoundRobinLB(IndexedSeq("http://localhost:8983/solr/collection1", "http://localhost:8984/solr/collection1"))
 val solr = AsyncSolrClient.Builder(lb).build
@@ -119,6 +192,25 @@ This can be overridden with `initialTestRuns`.
 
 Here's  a code sample of the `FastestServerLB`:
 
+[java]
+```java
+import io.ino.solrs.*;
+import java.util.Arrays;
+import scala.Tuple2;
+import static java.util.concurrent.TimeUnit.*;
+
+StaticSolrServers servers = StaticSolrServers.create(Arrays.asList("http://localhost:8983/solr/collection1", "http://localhost:8984/solr/collection1"));
+Tuple2<String, SolrQuery> col1TestQuery = new Tuple2<>("collection1", new SolrQuery("*:*").setRows(0));
+Function<SolrServer, Tuple2<String, SolrQuery>> collectionAndTestQuery = server -> col1TestQuery;
+FastestServerLB<?> lb = FastestServerLB.builder(servers, collectionAndTestQuery)
+    .withMinDelay(50, MILLISECONDS)
+    .withMaxDelay(5, SECONDS)
+    .withInitialTestRuns(50)
+    .build();
+JavaAsyncSolrClient solr = JavaAsyncSolrClient.builder(lb).build();
+```
+
+[scala]
 ```scala
 import io.ino.solrs._
 import scala.concurrent.duration._
@@ -159,8 +251,18 @@ Solr Cloud is supported with the following properties / restrictions:
 To run solrs connected to SolrCloud / ZooKeeper, you pass an instance of `CloudSolrServers` to `RoundRobinLB`/`FastestServerLB`.
 The simplest case looks like this:
 
+[java]
+```java
+import io.ino.solrs.*;
+
+CloudSolrServers<?> servers = CloudSolrServers.builder("localhost:2181").build();
+JavaAsyncSolrClient solr = JavaAsyncSolrClient.builder(new RoundRobinLB(servers)).build();
+```
+
+[scala]
 ```scala
 import io.ino.solrs._
+import io.ino.solrs.future.ScalaFutureFactory.Implicit
 
 val servers = new CloudSolrServers("localhost:2181")
 val solr = AsyncSolrClient.Builder(RoundRobinLB(servers)).build
@@ -168,21 +270,41 @@ val solr = AsyncSolrClient.Builder(RoundRobinLB(servers)).build
 
 Here's an example that shows all configuration properties in use:
 
+[java]
+```java
+import io.ino.solrs.*;
+import java.util.Collections;
+import static java.util.concurrent.TimeUnit.*;
+
+CloudSolrServers<?> servers = CloudSolrServers.builder("host1:2181,host2:2181")
+    .withZkClientTimeout(15, SECONDS)
+    .withZkConnectTimeout(10, SECONDS)
+    .withClusterStateUpdateInterval(1, SECONDS)
+    .withDefaultCollection("collection1")
+    .withWarmupQueries((collection) -> Collections.singletonList(new SolrQuery("*:*")), 10)
+    .build();
+JavaAsyncSolrClient solr = JavaAsyncSolrClient.builder(new RoundRobinLB(servers)).build();
+```
+
+[scala]
 ```scala
 import io.ino.solrs._
+import io.ino.solrs.future.ScalaFutureFactory.Implicit
 import scala.concurrent.duration._
 
-val servers = new CloudSolrServers(zkHost = "host1:2181,host2:2181",
-                                   zkClientTimeout = 15 seconds,
-                                   zkConnectTimeout = 10 seconds,
-                                   clusterStateUpdateInterval = 1 second,
-                                   defaultCollection = Some("collection1"),
-                                   warmupQueries: WarmupQueries("collection1" => Seq(new SolrQuery("*:*")), count = 10))
+val servers = new CloudSolrServers(
+    zkHost = "host1:2181,host2:2181",
+    zkClientTimeout = 15 seconds,
+    zkConnectTimeout = 10 seconds,
+    clusterStateUpdateInterval = 1 second,
+    defaultCollection = Some("collection1"),
+    warmupQueries = WarmupQueries("collection1" => Seq(new SolrQuery("*:*")), count = 10))
 val solr = AsyncSolrClient.Builder(RoundRobinLB(servers)).build
 ```
 
-Remember to either specify a default collection or set the collection to use per query:
+Remember to either specify a default collection (as shown above) or set the collection to use per query:
 
+[scala]
 ```scala
 import org.apache.solr.client.solrj.SolrQuery
 
@@ -207,12 +329,23 @@ currently provided (you can implement your own of course):
 
 The retry policy can be configured via the `Builder`, like this:
 
+[java]
+```java
+import io.ino.solrs.*;
+
+JavaAsyncSolrClient solr = JavaAsyncSolrClient.builder(new RoundRobinLB(CloudSolrServers.builder("host1:2181,host2:2181").build()))
+    .withRetryPolicy(RetryPolicy.TryAvailableServers())
+    .build();
+```
+
+[scala]
 ```scala
 import io.ino.solrs._
+import io.ino.solrs.future.ScalaFutureFactory.Implicit
 
 val solr = AsyncSolrClient.Builder(RoundRobinLB(new CloudSolrServers("host1:2181,host2:2181")))
-             .withRetryPolicy(RetryPolicy.TryAvailableServers)
-             .build
+    .withRetryPolicy(RetryPolicy.TryAvailableServers)
+    .build
 ```
 
 There's not yet support for delaying retries, raise an issue or submit a pull request for this if you need it.
@@ -221,8 +354,10 @@ There's not yet support for delaying retries, raise an issue or submit a pull re
 
 Solrs allows to intercept queries sent to Solr, here's an example that shows how to log details about each request:
 
+[scala]
 ```scala
 import io.ino.solrs._
+import io.ino.solrs.future.ScalaFutureFactory.Implicit
 
 val loggingInterceptor = new RequestInterceptor {
   override def interceptQuery(f: (SolrServer, SolrQuery) => Future[QueryResponse])
@@ -248,8 +383,10 @@ happy with this great [metrics library](http://metrics.codahale.com/) :-)
 
 To configure solrs with the `Metrics` implementation just pass an initialized instance like this:
 
+[scala]
 ```scala
 import io.ino.solrs._
+import io.ino.solrs.future.ScalaFutureFactory.Implicit
 
 val solr = AsyncSolrClient.Builder("http://localhost:8983/solr/collection1")
              .withMetrics(new CodaHaleMetrics()).build

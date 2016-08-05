@@ -5,7 +5,7 @@ import scala.annotation.tailrec
 /**
  * Specifies a policy for retrying query failures.
  */
-trait RetryPolicy {
+abstract class RetryPolicy {
   /**
    * Determines whether the framework should retry a query for the given
    * exception, the failed server and the query context (provides information about previously failed

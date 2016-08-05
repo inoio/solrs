@@ -1,10 +1,14 @@
 package io.ino.solrs
 
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.{Executors, TimeUnit}
 
-import io.ino.concurrent.Execution
-import io.ino.solrs.ServerStateChangeObservable.{StateChanged, Removed, StateChange}
+import io.ino.solrs.CloudSolrServers.Builder
+import io.ino.solrs.CloudSolrServers.WarmupQueries
+import io.ino.solrs.ServerStateChangeObservable.{Removed, StateChange, StateChanged}
+import io.ino.solrs.future.JavaFutureFactory
+import io.ino.solrs.future.{Future, FutureFactory}
 import io.ino.time.Clock
 import io.ino.time.Units.Millisecond
 import org.apache.solr.client.solrj.SolrQuery
@@ -13,14 +17,12 @@ import org.slf4j.LoggerFactory
 
 import scala.annotation.tailrec
 import scala.collection.concurrent.TrieMap
-import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.language.postfixOps
+import scala.language.{higherKinds, postfixOps}
 
-trait LoadBalancer extends RequestInterceptor with AsyncSolrClientAware {
+trait LoadBalancer extends RequestInterceptor {
 
   val solrServers: SolrServers
-
 
   /**
    * Determines the solr server to use for a new request.
@@ -92,6 +94,10 @@ class RoundRobinLB(override val solrServers: SolrServers) extends LoadBalancer {
 object RoundRobinLB {
   def apply(solrServers: SolrServers): RoundRobinLB = new RoundRobinLB(solrServers)
   def apply(baseUrls: IndexedSeq[String]): RoundRobinLB = new RoundRobinLB(StaticSolrServers(baseUrls))
+
+  /* Java API */
+  import scala.collection.JavaConversions._
+  def create(baseUrls: java.lang.Iterable[String]): RoundRobinLB = apply(baseUrls.toIndexedSeq)
 }
 
 /**
@@ -143,21 +149,22 @@ object RoundRobinLB {
  * @param clock the clock to get the current time from. The tests using the maxDelay are
  *              run using a scheduled executor, therefore this interval uses the system clock
  */
-class FastestServerLB(override val solrServers: SolrServers,
-                      val collectionAndTestQuery: SolrServer => (String, SolrQuery),
-                      minDelay: Duration = 100 millis,
-                      maxDelay: Duration = 10 seconds,
-                      initialTestRuns: Int = 10,
-                      filterFastServers: Long => ((SolrServer, Long)) => Boolean =
-                        average => { case (_, duration) => duration <= average * 1.1 + 5 },
-                      val mapPredictedResponseTime: Long => Long = identity,
-                      clock: Clock = Clock.systemDefault) extends LoadBalancer with FastestServerLBJmxSupport {
+class FastestServerLB[F[_]](override val solrServers: SolrServers,
+                            val collectionAndTestQuery: SolrServer => (String, SolrQuery),
+                            minDelay: Duration = 100 millis,
+                            maxDelay: Duration = 10 seconds,
+                            initialTestRuns: Int = 10,
+                            filterFastServers: Long => ((SolrServer, Long)) => Boolean =
+                            average => { case (_, duration) => duration <= average * 1.1 + 5 },
+                            val mapPredictedResponseTime: Long => Long = identity,
+                            clock: Clock = Clock.systemDefault)
+                           (implicit futureFactory: FutureFactory[F]) extends LoadBalancer with AsyncSolrClientAware[F] with FastestServerLBJmxSupport[F] {
 
   import FastestServerLB._
 
   private val logger = LoggerFactory.getLogger(getClass)
 
-  private var client: AsyncSolrClient = _
+  private var client: AsyncSolrClient[F] = _
 
   private val scheduler = Executors.newSingleThreadScheduledExecutor()
 
@@ -212,8 +219,7 @@ class FastestServerLB(override val solrServers: SolrServers,
         val maybeTestFutures = solrServers.all.filter(_.status == Enabled).map(testWithMinDelay)
         val testFutures = maybeTestFutures.collect { case Some(future) => future }
 
-        import Execution.Implicits.sameThreadContext
-        Future.sequence(testFutures).onComplete {
+        FutureFactory.sequence(testFutures).onComplete {
           _ => scheduleTests()
         }
 
@@ -236,17 +242,16 @@ class FastestServerLB(override val solrServers: SolrServers,
     }, initialDelay, 1000, TimeUnit.MILLISECONDS)
   }
 
-  override def setAsyncSolrClient(client: AsyncSolrClient): Unit = {
+  override def setAsyncSolrClient(client: AsyncSolrClient[F]): Unit = {
     this.client = client
-    
+
     // gather initial stats
-    import Execution.Implicits.sameThreadContext
     val futures = solrServers.all.filter(_.status == Enabled).map { server =>
-      (1 to initialTestRuns).foldLeft(Future.successful(Unit))((res, i) =>
+      (1 to initialTestRuns).foldLeft(futureFactory.successful(Unit))((res, i) =>
         res.flatMap(_ => test(server).map(_ => Unit))
       )
     }
-    Future.sequence(futures).onComplete(_ =>
+    FutureFactory.sequence(futures).onComplete(_ =>
       updateStats()
     )
   }
@@ -325,7 +330,7 @@ class FastestServerLB(override val solrServers: SolrServers,
       // start of the new test. Otherwise, when test queries are running for a long time, we would send more
       // and more test queries to the server
       serverTestTimestamp.update(server, Millisecond(clock.millis()))
-    }(Execution.Implicits.sameThreadContext)
+    }
 
     res
   }
@@ -379,6 +384,78 @@ object FastestServerLB {
 
   val TestQueryClass = "testQuery"
 
+  /* Java API */
+  import java.lang.{Boolean => JBoolean}
+  import java.lang.{Long => JLong}
+  import java.util.function.{Function => JFunction}
+  import java.util.function.BiFunction
+  import java.util.function.LongFunction
+  case class Builder(solrServers: SolrServers,
+                     collectionAndTestQuery: SolrServer => (String, SolrQuery),
+                     minDelay: Duration = 100 millis,
+                     maxDelay: Duration = 10 seconds,
+                     initialTestRuns: Int = 10,
+                     filterFastServers: Long => ((SolrServer, Long)) => Boolean =
+                     average => {
+                       case (_, duration) => duration <= average * 1.1 + 5
+                     },
+                     mapPredictedResponseTime: Long => Long = identity,
+                     clock: Clock = Clock.systemDefault) {
+
+    /** The minimum delay between the response of a test and the start of the next test (to limit test frequency) */
+    def withMinDelay(value: Long, unit: TimeUnit): Builder = copy(minDelay = FiniteDuration(value, unit))
+
+    /** The delay between tests for slow servers (or all servers if there are no real requests) */
+    def withMaxDelay(value: Long, unit: TimeUnit): Builder = copy(maxDelay = FiniteDuration(value, unit))
+
+    /** On start each active server is tested the given number of times to gather initial stats and determine fast/slow servers. */
+    def withInitialTestRuns(count: Int): Builder = copy(initialTestRuns = count)
+
+    /** A function to filter fast / preferred servers. The function takes the calculated average duration of all servers
+      * of a collection, and returns a function for a SolrServer->Duration tuple that returns true/false to indicate if
+      * a server should be considered "fast".<br/>
+      * The default value for filterFastServers uses `duration <= average * 1.1 + 5` (use 1.1 as multiplier to accept
+      * some deviation, for smaller values like 1 or 2 millis also add some fix value to allow normal deviation). */
+    def withFilterFastServers(filter: LongFunction[BiFunction[SolrServer, JLong, JBoolean]]): Builder = copy(
+      filterFastServers = average => {
+        case (server, duration) => filter(average)(server, duration)
+      }
+    )
+
+    /** A function that's applied to the predicted response time. This can e.g. be used to quantize the time so that minor differences are ignored. */
+    def withMapPredictedResponseTime(mapPredictedResponseTime: JFunction[JLong, JLong]): Builder = copy(mapPredictedResponseTime = input => mapPredictedResponseTime(input))
+
+    /** The clock to get the current time from. */
+    def withClock(clock: Clock): Builder = copy(clock = clock)
+
+    def build(): FastestServerLB[CompletableFuture] = build(JavaFutureFactory)
+
+    def build[F[_]](implicit futureFactory: FutureFactory[F]) = new FastestServerLB[F](
+      solrServers,
+      collectionAndTestQuery,
+      minDelay,
+      maxDelay,
+      initialTestRuns,
+      filterFastServers,
+      mapPredictedResponseTime,
+      clock
+    )
+
+  }
+
+  /**
+    *
+    * @param solrServers solr servers to load balance, those are regularly tested.
+    * @param collectionAndTestQuery a function that returns the collection name and a testQuery for the given server.
+    *                               The collection is used to partition server when classifying "fast"/"slow" servers,
+    *                               because for different collections response times will be different.
+    *                               It's somehow similar with the testQuery: it might be different per server, e.g.
+    *                               some server might only provide a /suggest handler while others provide /select
+    *                               (which can be specified via the "qt" query param in the test query).
+    */
+  def builder(solrServers: SolrServers, collectionAndTestQuery: JFunction[SolrServer, (String, SolrQuery)]): Builder =
+    Builder(solrServers, server => collectionAndTestQuery(server))
+
 }
 
 import javax.management.openmbean.{CompositeData, TabularData}
@@ -411,7 +488,7 @@ import scala.collection.JavaConversions._
 /**
  * JMX support for FastestServerLB, implementation of FastestServerLBMBean, to be mixed into FastestServerLB.
  */
-trait FastestServerLBJmxSupport extends FastestServerLBMBean { self: FastestServerLB =>
+trait FastestServerLBJmxSupport[F[_]] extends FastestServerLBMBean { self: FastestServerLB[F] =>
 
   import FastestServerLB._
   import FastestServerLBJmxSupport._

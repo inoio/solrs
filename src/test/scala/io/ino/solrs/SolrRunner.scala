@@ -1,9 +1,15 @@
 package io.ino.solrs
 
 import java.io.File
-import java.net.{URL, URLDecoder}
-import java.nio.file.{Files, Path, Paths}
-import java.util.jar.{Attributes, JarFile}
+import java.net.URL
+import java.net.URLDecoder
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.Paths
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
+import java.util.jar.Attributes
+import java.util.jar.JarFile
 import java.util.logging.Level
 
 import org.apache.catalina.Context
@@ -11,8 +17,14 @@ import org.apache.catalina.LifecycleState
 import org.apache.catalina.startup.Tomcat
 import org.apache.commons.io.FileUtils
 import org.apache.curator.test.TestingServer
+import org.apache.solr.client.solrj.SolrQuery
+import org.apache.solr.client.solrj.impl.HttpSolrClient
 import org.apache.solr.common.cloud.ZkStateReader
-import org.slf4j.{Logger, LoggerFactory}
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
+
+import scala.concurrent.duration._
+import scala.util.control.NonFatal
 
 case class ZooKeeperOptions(zkHost: String, bootstrapConfig: Option[String] = None)
 
@@ -67,6 +79,30 @@ class SolrRunner(val port: Int,
     processZkOptionsAfterStart()
 
     this
+  }
+
+  def awaitReady(value: Long, unit: TimeUnit): SolrRunner = {
+    awaitReady(Duration(value, unit))
+  }
+
+  def awaitReady(timeout: Duration): SolrRunner = {
+    val solrClient = new HttpSolrClient.Builder(s"http://localhost:$port/solr/collection1").build()
+
+    def await(left: Duration): SolrRunner = {
+      if(left.toMillis <= 0) {
+        throw new TimeoutException(s"Solr not available after $timeout")
+      }
+      try {
+        solrClient.query(new SolrQuery("*:*"))
+        this
+      } catch {
+        case NonFatal(e) =>
+          Thread.sleep(50)
+          await(left - 50.millis)
+      }
+    }
+
+    await(timeout)
   }
 
   protected def processZkOptionsBeforeStart(): Unit = {
@@ -227,18 +263,18 @@ object SolrRunner {
    * Also registers a shutdown hook to shutdown tomcat when the jvm exits.
    */
   def startOnce(port: Int, zkOptions: Option[ZooKeeperOptions] = None): SolrRunner = {
-    solrRunners.get(port).getOrElse {
+    solrRunners.getOrElse(port, {
       val solrRunner = start(port, zkOptions)
       solrRunners += port -> solrRunner
 
-      Runtime.getRuntime().addShutdownHook(new Thread() {
+      Runtime.getRuntime.addShutdownHook(new Thread() {
         override def run() {
           solrRunner.stop()
         }
       })
 
       solrRunner
-    }
+    })
   }
 
   private def initSolrHome(port: Int): File = {

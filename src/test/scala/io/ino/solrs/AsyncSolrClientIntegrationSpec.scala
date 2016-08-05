@@ -13,15 +13,13 @@ import org.mockito.Mockito.verify
 import org.scalatest.concurrent.Eventually._
 import org.scalatest.concurrent.Eventually.eventually
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
-import org.scalatest.mock.MockitoSugar
-import org.scalatest.{BeforeAndAfterEach, FunSpec, Matchers}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with BeforeAndAfterEach with Matchers with FutureAwaits with MockitoSugar {
+class AsyncSolrClientIntegrationSpec extends StandardFunSpec with RunningSolr {
 
   private implicit val timeout = 1.second
   private val httpClient = new DefaultAsyncHttpClient()
@@ -155,8 +153,8 @@ class AsyncSolrClientIntegrationSpec extends FunSpec with RunningSolr with Befor
       var capturedServer: SolrServer = null
       var capturedQuery: SolrQuery = null
       val interceptor = new RequestInterceptor {
-        override def interceptQuery(f: (SolrServer, SolrQuery) => Future[QueryResponse])
-                                   (solrServer: SolrServer, q: SolrQuery): Future[QueryResponse] = {
+        override def interceptQuery(f: (SolrServer, SolrQuery) => future.Future[QueryResponse])
+                                   (solrServer: SolrServer, q: SolrQuery): future.Future[QueryResponse] = {
           capturedServer = solrServer
           capturedQuery = q
           f(solrServer, q)

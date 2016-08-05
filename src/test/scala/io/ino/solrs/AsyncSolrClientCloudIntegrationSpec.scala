@@ -8,7 +8,6 @@ import org.apache.solr.client.solrj.impl.CloudSolrClient
 import org.scalatest._
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
-import org.scalatest.mock.MockitoSugar
 import org.slf4j.LoggerFactory
 
 import scala.annotation.tailrec
@@ -23,16 +22,15 @@ import scala.util.control.NonFatal
  * RetryPolicy.TryAvailableServers is needed because for a restarted server the status is not updated
  * fast enough.
  */
-class AsyncSolrClientCloudIntegrationSpec extends FunSpec with BeforeAndAfterAll with BeforeAndAfterEach with Matchers with FutureAwaits with MockitoSugar
-  with Eventually with IntegrationPatience {
+class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventually with IntegrationPatience {
 
   private implicit val timeout = 5.second
 
   private var zk: TestingServer = _
   private var solrRunners = List.empty[SolrRunner]
 
-  private var solrServers: CloudSolrServers = _
-  private var cut: AsyncSolrClient = _
+  private var solrServers: CloudSolrServers[Future] = _
+  private var cut: AsyncSolrClient[Future] = _
   private var cloudSolrServer: CloudSolrClient = _
 
   private val q = new SolrQuery("*:*").setRows(Int.MaxValue)

@@ -10,13 +10,11 @@ import org.asynchttpclient.Request
 import org.asynchttpclient.Response
 import org.mockito.Matchers.any
 import org.mockito.Mockito.{doThrow, spy, times, verify}
-import org.scalatest.mock.MockitoSugar
-import org.scalatest.{FunSpec, Matchers}
 
 import scala.concurrent.duration._
 import scala.util.control.NoStackTrace
 
-class AsyncSolrClientSpec extends FunSpec with Matchers with FutureAwaits with MockitoSugar {
+class AsyncSolrClientSpec extends StandardFunSpec {
 
   private val query = new SolrQuery("*:*")
   private implicit val timeout = 1.second
@@ -51,7 +49,7 @@ class AsyncSolrClientSpec extends FunSpec with Matchers with FutureAwaits with M
 
     it("should shutdown http client if it was not provided") {
       val ahcMock = mock[AsyncHttpClient]
-      val solr = new AsyncSolrClient.Builder("http://localhost:12345/solr") {
+      val solr = new AsyncSolrClient.Builder("http://localhost:12345/solr", ascFactory) {
         override def createHttpClient = ahcMock
       }.build
 

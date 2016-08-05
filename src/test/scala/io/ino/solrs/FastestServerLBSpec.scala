@@ -7,14 +7,15 @@ import org.apache.solr.client.solrj.SolrQuery
 import org.mockito.Matchers.{eq => mockEq, _}
 import org.mockito.Mockito._
 import org.scalatest.concurrent.Eventually._
-import org.scalatest.concurrent.PatienceConfiguration.Timeout
-import org.scalatest.mock.MockitoSugar
-import org.scalatest.{BeforeAndAfterEach, FunSpec, Matchers}
 
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class FastestServerLBSpec extends FunSpec with Matchers with MockitoSugar with BeforeAndAfterEach {
+class FastestServerLBSpec extends StandardFunSpec {
+
+  type FastestServerLB = io.ino.solrs.FastestServerLB[Future]
+  type AsyncSolrClient = io.ino.solrs.AsyncSolrClient[Future]
 
   // use class under test as field so that we can safely shutdown it after each test
   private var cut: FastestServerLB = _
@@ -260,7 +261,7 @@ class FastestServerLBSpec extends FunSpec with Matchers with MockitoSugar with B
       // verify that the lb ran the test query (in this case for all servers)
       // ... and we accept a slight delay because the scheduler might be a bit inaccurate...
       eventually {
-        solrServers.all.foreach(verify(spyClient, times(1)).doQuery(_, testQuery))
+        solrServers.all.foreach(verify(spyClient, atLeastOnce()).doQuery(_, testQuery))
       }(PatienceConfig(timeout = maxDelay * 2, interval = maxDelay/10))
     }
   }
@@ -273,7 +274,7 @@ class FastestServerLBSpec extends FunSpec with Matchers with MockitoSugar with B
     cut = new FastestServerLB(solrServers, _ => ("collection1", testQuery), minDelay, maxDelay, clock = clock)
     // we use a spy to have a real async solr client for that we can verify interactions
     var spyClient: AsyncSolrClient = null
-    val realClient: AsyncSolrClient = new AsyncSolrClient.Builder(cut) {
+    val realClient: AsyncSolrClient = new AsyncSolrClient.Builder(cut, ascFactory) {
       override protected def setOnAsyncSolrClientAwares(solr: AsyncSolrClient): Unit = {
         spyClient = spy(solr)
         mockQueries(spyClient)

@@ -48,7 +48,7 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
       SolrRunner.start(18889, Some(ZooKeeperOptions(zk.getConnectString)))
     )
 
-    cloudSolrServer = new CloudSolrClient.Builder().withZkHost(zk.getConnectString).build()
+    cloudSolrServer = new CloudSolrClient(zk.getConnectString)
     cloudSolrServer.setDefaultCollection("collection1")
 
     solrServers = new CloudSolrServers(

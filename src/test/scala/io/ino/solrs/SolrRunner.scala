@@ -86,7 +86,7 @@ class SolrRunner(val port: Int,
   }
 
   def awaitReady(timeout: Duration): SolrRunner = {
-    val solrClient = new HttpSolrClient.Builder(s"http://localhost:$port/solr/collection1").build()
+    val solrClient = new HttpSolrClient(s"http://localhost:$port/solr/collection1")
 
     def await(left: Duration): SolrRunner = {
       if(left.toMillis <= 0) {
@@ -199,7 +199,7 @@ object RunSolrCloud extends App {
   }
 
   import scala.collection.JavaConversions._
-  println("Started ZkStateReader, read cluster props: " + zk.getClusterProperties.mkString(", ") + ", cluster state: " + zk.getClusterState)
+  println("Started ZkStateReader, read cluster props: " + zk.getClusterProps.mkString(", ") + ", cluster state: " + zk.getClusterState)
 
   /*
   solrRunner1.stop()

@@ -300,14 +300,14 @@ object CloudSolrServers {
   private[solrs] def getCollectionToServers(clusterState: ClusterState): Map[String, IndexedSeq[SolrServer]] = {
     import scala.collection.JavaConversions._
 
-    clusterState.getCollectionsMap.foldLeft(
+    clusterState.getCollections.foldLeft(
       Map.empty[String, IndexedSeq[SolrServer]].withDefaultValue(IndexedSeq.empty)
-    ) { case (res, (name, collection)) =>
-      val slices = collection.getSlices
+    ) { (res, collection) =>
+      val slices = clusterState.getCollection(collection).getSlices
       val servers = slices.flatMap(_.getReplicas.map(repl =>
         SolrServer(ZkCoreNodeProps.getCoreUrl(repl), serverStatus(repl))
       )).toIndexedSeq
-      res.updated(name, res(name) ++ servers)
+      res.updated(collection, res(collection) ++ servers)
     }
   }
 

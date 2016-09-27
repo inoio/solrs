@@ -12,7 +12,7 @@ trait RunningSolr extends BeforeAndAfterAll {
   override def beforeAll(configMap: ConfigMap) {
     solrRunner = SolrRunner.startOnce(8888)
 
-    solr = new HttpSolrClient.Builder("http://localhost:" + solrRunner.port + "/solr/collection1").build()
+    solr = new HttpSolrClient("http://localhost:" + solrRunner.port + "/solr/collection1")
   }
 
   override def afterAll(configMap: ConfigMap) {

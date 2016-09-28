@@ -54,6 +54,9 @@ class SolrRunner(val port: Int,
     logger.info("Starting solr on port {} with solr home {}", port, solrHome.getAbsolutePath)
     System.setProperty("solr.solr.home", solrHome.getAbsolutePath)
     System.setProperty("solr.lock.type", "single")
+    // Skip scanning JARs in Tomcat since this might lead to unnecessary exception logging
+    System.setProperty(org.apache.tomcat.util.scan.Constants.SKIP_JARS_PROPERTY, "*")
+
     java.util.logging.Logger.getLogger("org.apache.catalina.util.LifecycleMBeanBase").setLevel(Level.SEVERE)
 
     // ZooKeeper / SolrCloud support

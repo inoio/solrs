@@ -39,7 +39,7 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
 
   import io.ino.solrs.SolrUtils._
 
-  override def beforeAll(configMap: ConfigMap) {
+  override def beforeAll() {
     zk = new TestingServer()
     zk.start()
 
@@ -77,7 +77,7 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
     }
   }
 
-  override def afterAll(configMap: ConfigMap) {
+  override def afterAll() {
     cloudSolrServer.close()
     cut.shutdown()
     solrServers.shutdown
@@ -185,7 +185,7 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
     case false => res
     case true =>
       val response = cut.query(q).map(getIds)
-      response.onFailure {
+      response.failed.foreach {
         case NonFatal(e) => logger.error("Query failed.", e)
       }
       runQueries(q, run, awaitReady(response) :: res)

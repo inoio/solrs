@@ -5,7 +5,7 @@ import java.util.concurrent.{CompletionStage, ExecutionException, TimeUnit}
 
 import com.twitter.util.{Future => TFuture}
 import io.ino.solrs.FutureAwaits
-import org.scalatest.mock.MockitoSugar
+import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{FunSpec, Matchers}
 
 import scala.concurrent.{Future => SFuture}

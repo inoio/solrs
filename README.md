@@ -73,8 +73,8 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 val solr = AsyncSolrClient("http://localhost:8983/solr/collection1")
 val response: Future[QueryResponse] = solr.query(new SolrQuery("scala"))
-response.onSuccess {
-  case qr => println(s"found ${qr.getResults.getNumFound} docs")
+response.foreach {
+  qr => println(s"found ${qr.getResults.getNumFound} docs")
 }
 
 // Don't forget...

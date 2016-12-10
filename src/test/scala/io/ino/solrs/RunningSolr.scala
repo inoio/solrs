@@ -9,13 +9,13 @@ trait RunningSolr extends BeforeAndAfterAll {
   protected var solrRunner: SolrRunner = _
   protected var solr: HttpSolrClient = _
 
-  override def beforeAll(configMap: ConfigMap) {
+  override def beforeAll() {
     solrRunner = SolrRunner.startOnce(8888)
 
     solr = new HttpSolrClient.Builder("http://localhost:" + solrRunner.port + "/solr/collection1").build()
   }
 
-  override def afterAll(configMap: ConfigMap) {
+  override def afterAll() {
     solr.close()
   }
 

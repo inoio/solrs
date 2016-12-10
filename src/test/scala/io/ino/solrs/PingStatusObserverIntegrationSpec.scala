@@ -7,7 +7,7 @@ import org.asynchttpclient.{DefaultAsyncHttpClient, DefaultAsyncHttpClientConfig
 import org.apache.catalina.LifecycleState
 import org.scalatest.concurrent.Eventually
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
-import org.scalatest.mock.MockitoSugar
+import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{BeforeAndAfterEach, FunSpec, Matchers}
 import org.scalatest.concurrent.IntegrationPatience
 

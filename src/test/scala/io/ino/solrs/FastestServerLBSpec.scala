@@ -6,6 +6,7 @@ import io.ino.time.Clock
 import org.apache.solr.client.solrj.SolrQuery
 import org.mockito.Matchers.{eq => mockEq, _}
 import org.mockito.Mockito._
+import org.scalactic.source.Position
 import org.scalatest.concurrent.Eventually._
 
 import scala.concurrent.Future
@@ -262,7 +263,7 @@ class FastestServerLBSpec extends StandardFunSpec {
       // ... and we accept a slight delay because the scheduler might be a bit inaccurate...
       eventually {
         solrServers.all.foreach(verify(spyClient, atLeastOnce()).doQuery(_, testQuery))
-      }(PatienceConfig(timeout = maxDelay * 2, interval = maxDelay/10))
+      }(PatienceConfig(timeout = maxDelay * 2, interval = maxDelay/10), Position.here)
     }
   }
 

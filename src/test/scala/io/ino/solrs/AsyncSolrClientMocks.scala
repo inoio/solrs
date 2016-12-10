@@ -29,7 +29,7 @@ object AsyncSolrClientMocks {
     mock
   }
 
-  def   delayedResponse(delay: Long)(implicit clock: MutableClock): future.Future[QueryResponse] = {
+  def delayedResponse(delay: Long)(implicit clock: MutableClock): future.Future[QueryResponse] = {
     val response = new QueryResponse()
     new ScalaFuture(new Future[QueryResponse] {
       override def onComplete[U](func: (Try[QueryResponse]) => U)(implicit executor: ExecutionContext): Unit = {
@@ -47,6 +47,9 @@ object AsyncSolrClientMocks {
       @throws(classOf[InterruptedException])
       @throws(classOf[TimeoutException])
       override def ready(atMost: Duration)(implicit permit: CanAwait): this.type = this
+
+      def transform[S](f: Try[QueryResponse] => Try[S])(implicit executor: ExecutionContext): Future[S] = Future.fromTry(f(Success(response)))
+      def transformWith[S](f: Try[QueryResponse] => Future[S])(implicit executor: ExecutionContext): Future[S] = f(Success(response))
     })
   }
 

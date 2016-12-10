@@ -10,9 +10,9 @@ version := "2.0.0-RC1"
 
 licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.html"))
 
-scalaVersion := "2.10.6"
+scalaVersion := "2.11.8"
 
-crossScalaVersions := Seq("2.10.6", "2.11.8")
+crossScalaVersions := Seq("2.11.8", "2.12.1")
 
 scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature")
 
@@ -29,17 +29,6 @@ resolvers ++= Seq(
   "Restlet Repositories" at "http://maven.restlet.org"
 )
 
-// add scala-xml dependency when needed (for Scala 2.11 and newer)
-// this mechanism supports cross-version publishing
-libraryDependencies := {
-  CrossVersion.partialVersion(scalaVersion.value) match {
-    case Some((2, scalaMajor)) if scalaMajor >= 11 =>
-      libraryDependencies.value :+ "org.scala-lang.modules" %% "scala-xml" % "1.0.2"
-    case _ =>
-      libraryDependencies.value
-  }
-}
-
 val solrVersion = "6.1.0"
 val slf4jVersion = "1.7.21"
 val tomcatVersion = "8.5.9"
@@ -47,15 +36,16 @@ val tomcatVersion = "8.5.9"
 libraryDependencies ++= Seq(
   "org.apache.solr"         % "solr-solrj"        % solrVersion,
   "org.asynchttpclient"     % "async-http-client" % "2.0.24",
+  "org.scala-lang.modules" %% "scala-xml"         % "1.0.6",
   "io.dropwizard.metrics"   % "metrics-core"      % "3.1.2" % "optional",
   "org.slf4j"               % "slf4j-api"         % slf4jVersion,
   // akka 2.3 is used for scala 2.10 support
-  "com.typesafe.akka"      %% "akka-actor"        % "2.3.16",
+  "com.typesafe.akka"      %% "akka-actor"        % "2.4.14",
   "org.slf4j"               % "slf4j-simple"      % slf4jVersion % "test",
-  "org.scalatest"          %% "scalatest"         % "2.2.6" % "test",
+  "org.scalatest"          %% "scalatest"         % "3.0.1" % "test",
   "com.novocode"            % "junit-interface"   % "0.11" % "test",
   "org.mockito"             % "mockito-core"      % "1.10.19" % "test",
-  "org.clapper"            %% "grizzled-scala"    % "2.8.0" % "test",
+  "org.clapper"            %% "grizzled-scala"    % "4.0.0" % "test",
   // Cloud testing, solr-core for ZkController (upconfig), curator-test for ZK TestingServer
   "org.apache.solr"         % "solr-core"         % solrVersion % "test",
   "org.apache.curator"      % "curator-test"      % "2.11.1" % "test",
@@ -63,7 +53,7 @@ libraryDependencies ++= Seq(
   "org.apache.tomcat"       % "tomcat-catalina"   % tomcatVersion % "test",
   "org.apache.tomcat"       % "tomcat-jasper"     % tomcatVersion % "test",
   "org.apache.tomcat.embed" % "tomcat-embed-core" % tomcatVersion % "test",
-  "com.twitter"            %% "util-core"         % "6.34.0" % "optional",
+  "com.twitter"            %% "util-core"         % "6.39.0" % "optional",
   "commons-logging"         % "commons-logging"   % "1.2"
 )
 

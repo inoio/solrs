@@ -14,8 +14,8 @@ class UsageScala1 {
 
     val solr = AsyncSolrClient("http://localhost:8983/solr")
     val response: Future[QueryResponse] = solr.query(new SolrQuery("scala"))
-    response.onSuccess {
-      case qr => println(s"found ${qr.getResults.getNumFound} docs")
+    response.foreach {
+      qr => println(s"found ${qr.getResults.getNumFound} docs")
     }
 
     // Just included to present the 'shutdown'...

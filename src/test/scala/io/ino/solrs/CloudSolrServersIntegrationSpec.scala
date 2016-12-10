@@ -41,7 +41,7 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
 
   import io.ino.solrs.SolrUtils._
 
-  override def beforeAll(configMap: ConfigMap) {
+  override def beforeAll() {
     zk = new TestingServer()
     zk.start()
 
@@ -67,7 +67,7 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
     cloudSolrServer.commit()
   }
 
-  override def afterAll(configMap: ConfigMap) {
+  override def afterAll() {
     cloudSolrServer.close()
     cut.shutdown
     solrs.values.foreach(_.shutdown())

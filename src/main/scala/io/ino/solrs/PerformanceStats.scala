@@ -1,7 +1,6 @@
 package io.ino.solrs
 
 import java.util
-import java.util.NavigableSet
 import java.util.concurrent.ConcurrentSkipListSet
 import java.util.concurrent.TimeUnit._
 

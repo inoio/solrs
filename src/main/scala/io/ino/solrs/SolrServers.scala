@@ -51,8 +51,8 @@ object StaticSolrServers {
   def apply(baseUrls: IndexedSeq[String]): StaticSolrServers = new StaticSolrServers(baseUrls.map(SolrServer(_)))
 
   /* Java API */
-  import scala.collection.JavaConversions._
-  def create(baseUrls: java.lang.Iterable[String]): StaticSolrServers = apply(baseUrls.toIndexedSeq)
+  import scala.collection.JavaConverters._
+  def create(baseUrls: java.lang.Iterable[String]): StaticSolrServers = apply(baseUrls.asScala.toIndexedSeq)
 }
 
 import java.util.concurrent.TimeUnit
@@ -292,8 +292,8 @@ object CloudSolrServers {
     def withWarmupQueries(queriesByCollection: JFunction[String, JIterable[SolrQuery]], count: Int): Builder = {
       def delegate(collection: String): Seq[SolrQuery] = {
         val res = queriesByCollection(collection)
-        import scala.collection.convert.WrapAsScala._
-        res.toList
+        import scala.collection.JavaConverters._
+        res.asScala.toList
       }
       copy(warmupQueries = Some(WarmupQueries(delegate, count)))
     }
@@ -308,13 +308,13 @@ object CloudSolrServers {
   def builder(zkHost: String): Builder = Builder(zkHost)
 
   private[solrs] def getCollectionToServers(clusterState: ClusterState): Map[String, IndexedSeq[SolrServer]] = {
-    import scala.collection.JavaConversions._
+    import scala.collection.JavaConverters._
 
-    clusterState.getCollectionsMap.foldLeft(
+    clusterState.getCollectionsMap.asScala.foldLeft(
       Map.empty[String, IndexedSeq[SolrServer]].withDefaultValue(IndexedSeq.empty)
     ) { case (res, (name, collection)) =>
       val slices = collection.getSlices
-      val servers = slices.flatMap(_.getReplicas.map(repl =>
+      val servers = slices.asScala.flatMap(_.getReplicas.asScala.map(repl =>
         SolrServer(ZkCoreNodeProps.getCoreUrl(repl), serverStatus(repl))
       )).toIndexedSeq
       res.updated(name, res(name) ++ servers)

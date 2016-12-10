@@ -42,10 +42,10 @@ class CloudSolrServersSpec extends FunSpec with Matchers {
     }
 
     it("should read all servers from ClusterState with multiple shards") {
-      import scala.collection.JavaConversions._
+      import scala.collection.JavaConverters._
 
       val bytes = Files.readAllBytes(Paths.get(this.getClass.getResource("/cluster_status.json").toURI))
-      val cs = ClusterState.load(1, bytes, Set("server1:8983_solr"))
+      val cs = ClusterState.load(1, bytes, Set("server1:8983_solr").asJava)
 
       val collectionToServers = CloudSolrServers.getCollectionToServers(cs)
       collectionToServers("my-collection").map(_.baseUrl) should contain allOf(

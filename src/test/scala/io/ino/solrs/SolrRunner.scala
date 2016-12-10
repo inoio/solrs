@@ -201,8 +201,8 @@ object RunSolrCloud extends App {
     case e: Throwable => println("Caught " + e)
   }
 
-  import scala.collection.JavaConversions._
-  println("Started ZkStateReader, read cluster props: " + zk.getClusterProperties.mkString(", ") + ", cluster state: " + zk.getClusterState)
+  import scala.collection.JavaConverters._
+  println("Started ZkStateReader, read cluster props: " + zk.getClusterProperties.asScala.mkString(", ") + ", cluster state: " + zk.getClusterState)
 
   /*
   solrRunner1.stop()

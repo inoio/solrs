@@ -99,8 +99,8 @@ object RoundRobinLB {
   def apply(baseUrls: IndexedSeq[String]): RoundRobinLB = new RoundRobinLB(StaticSolrServers(baseUrls))
 
   /* Java API */
-  import scala.collection.JavaConversions._
-  def create(baseUrls: java.lang.Iterable[String]): RoundRobinLB = apply(baseUrls.toIndexedSeq)
+  import scala.collection.JavaConverters._
+  def create(baseUrls: java.lang.Iterable[String]): RoundRobinLB = apply(baseUrls.asScala.toIndexedSeq)
 }
 
 /**
@@ -487,7 +487,7 @@ import java.lang.management.ManagementFactory
 import javax.management.ObjectName
 import javax.management.openmbean._
 
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 
 /**
  * JMX support for FastestServerLB, implementation of FastestServerLBMBean, to be mixed into FastestServerLB.
@@ -510,8 +510,8 @@ trait FastestServerLBJmxSupport[F[_]] extends FastestServerLBMBean { self: Faste
     val itemNames = Array("Second") ++ servers.map(_.baseUrl)
     val (ct, table) = compositeTypeAndTable(itemNames)
     for (second <- -20 to 0) {
-      table.put(new CompositeDataSupport(ct, Map("Second" -> "-%02d".format(-second)) ++
-        servers.map(s => s.baseUrl -> stats(s).averageDurationForSecond(TestQueryClass, second).map(_.toString).getOrElse("-")).toMap[String, String]))
+      table.put(new CompositeDataSupport(ct, (Map("Second" -> "-%02d".format(-second)) ++
+        servers.map(s => s.baseUrl -> stats(s).averageDurationForSecond(TestQueryClass, second).map(_.toString).getOrElse("-")).toMap[String, String]).asJava))
     }
     table
   }
@@ -521,8 +521,8 @@ trait FastestServerLBJmxSupport[F[_]] extends FastestServerLBMBean { self: Faste
     val itemNames = Array("10 Seconds") ++ servers.map(_.baseUrl)
     val (ct, table) = compositeTypeAndTable(itemNames)
     for (tenSeconds <- 0 to 5) {
-      table.put(new CompositeDataSupport(ct, Map("10 Seconds" -> s"-$tenSeconds") ++
-        servers.map(s => s.baseUrl -> stats(s).averageDurationFor10Seconds(TestQueryClass, tenSeconds).map(_.toString).getOrElse("-")).toMap[String, String]))
+      table.put(new CompositeDataSupport(ct, (Map("10 Seconds" -> s"-$tenSeconds") ++
+        servers.map(s => s.baseUrl -> stats(s).averageDurationFor10Seconds(TestQueryClass, tenSeconds).map(_.toString).getOrElse("-")).toMap[String, String]).asJava))
     }
     table
   }
@@ -531,28 +531,28 @@ trait FastestServerLBJmxSupport[F[_]] extends FastestServerLBMBean { self: Faste
     val (servers, serverNames) = serversAndNames(collection)
     new CompositeDataSupport(
       compositeType(serverNames),
-      servers.map(s => s.baseUrl -> stats(s).totalAverageDuration(TestQueryClass, -1).toString).toMap[String, String])
+      servers.map(s => s.baseUrl -> stats(s).totalAverageDuration(TestQueryClass, -1).toString).toMap[String, String].asJava)
   }
 
   override def predictDurations(collection: String): CompositeData = {
     val (servers, serverNames) = serversAndNames(collection)
     new CompositeDataSupport(
       compositeType(serverNames),
-      servers.map(s => s.baseUrl -> stats(s).predictDuration(TestQueryClass).toString).toMap[String, String])
+      servers.map(s => s.baseUrl -> stats(s).predictDuration(TestQueryClass).toString).toMap[String, String].asJava)
   }
 
   override def quantizePredictedDurations(collection: String): CompositeData = {
     val (servers, serverNames) = serversAndNames(collection)
     new CompositeDataSupport(
       compositeType(serverNames),
-      servers.map(s => s.baseUrl -> mapPredictedResponseTime(stats(s).predictDuration(TestQueryClass)).toString).toMap[String, String])
+      servers.map(s => s.baseUrl -> mapPredictedResponseTime(stats(s).predictDuration(TestQueryClass)).toString).toMap[String, String].asJava)
   }
 
   override def fastServers(collection: String): CompositeData = {
     val servers = fastServersByCollection(collection).toArray
     new CompositeDataSupport(
       compositeType(servers.map(_.baseUrl)),
-      servers.map(s => s.baseUrl -> stats(s).totalAverageDuration(TestQueryClass, -1).toString).toMap[String, String])
+      servers.map(s => s.baseUrl -> stats(s).totalAverageDuration(TestQueryClass, -1).toString).toMap[String, String].asJava)
   }
 
   private def serversAndNames(collection: String): (Array[SolrServer], Array[String]) = {

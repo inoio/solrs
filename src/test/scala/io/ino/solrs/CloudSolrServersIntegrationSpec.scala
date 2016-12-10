@@ -62,8 +62,8 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
     eventually(Timeout(10 seconds)) {
       cloudSolrServer.deleteByQuery("*:*")
     }
-    import scala.collection.JavaConversions._
-    cloudSolrServer.add(someDocs)
+    import scala.collection.JavaConverters._
+    cloudSolrServer.add(someDocs.asJava)
     cloudSolrServer.commit()
   }
 

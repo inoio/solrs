@@ -1,20 +1,21 @@
 package io.ino.solrs.future
 
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionStage
 import java.util.function.BiConsumer
 
 import scala.util.Try
 
-/** Factory for java 8 CompletableFuture */
-class JavaFutureFactory extends FutureFactory[CompletableFuture] {
+/** Factory for java 8 CompletionStage */
+class JavaFutureFactory extends FutureFactory[CompletionStage] {
   import scala.util.{Failure, Success}
 
-  def toBase[T]: (Future[T]) => CompletableFuture[T] = {
+  def toBase[T]: (Future[T]) => CompletionStage[T] = {
     case sf: JavaFuture[T] => sf.inner
     case _ => throw new Exception("Wrong future type")
   }
 
-  class JavaFuture[T](private[JavaFutureFactory] val inner: CompletableFuture[T]) extends FutureBase[T] {
+  class JavaFuture[T](private[JavaFutureFactory] val inner: CompletionStage[T]) extends FutureBase[T] {
 
     override def onComplete[U](func: (Try[T]) => U): Unit = {
       inner.whenComplete(new BiConsumer[T, Throwable] {
@@ -86,8 +87,8 @@ class JavaFutureFactory extends FutureFactory[CompletableFuture] {
 
   }
 
-  class JavaPromise[T] extends Promise[T] {
-    val inner = new CompletableFuture[T]
+  private[JavaFutureFactory] class JavaPromise[T] extends Promise[T] {
+    private val inner = new CompletableFuture[T]
     override lazy val future: Future[T] = new JavaFuture(inner)
     def success(value: T): Unit = inner.complete(value)
     def failure(exception: Throwable): Unit = inner.completeExceptionally(exception)

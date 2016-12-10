@@ -13,7 +13,7 @@ import scala.concurrent.duration.FiniteDuration;
 
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
@@ -37,9 +37,9 @@ public class JavaAPITest extends JUnitSuite {
     @Test
     public void testAsyncSolrClient() throws ExecutionException, InterruptedException {
         JavaAsyncSolrClient solr = JavaAsyncSolrClient.create("http://localhost:" + solrRunner.port() + "/solr/collection1");
-        CompletableFuture<QueryResponse> response = solr.query(new SolrQuery("*:*"));
+        CompletionStage<QueryResponse> response = solr.query(new SolrQuery("*:*"));
         response.thenAccept(r -> System.out.println("found "+ r.getResults().getNumFound() +" docs"));
-        assertNotNull(response.get().getResults());
+        assertNotNull(response.toCompletableFuture().get().getResults());
     }
 
     @Test
@@ -48,9 +48,9 @@ public class JavaAPITest extends JUnitSuite {
                 .withHttpClient(new DefaultAsyncHttpClient())
                 .withResponseParser(new XMLResponseParser())
                 .build();
-        CompletableFuture<QueryResponse> response = solr.query(new SolrQuery("*:*"));
+        CompletionStage<QueryResponse> response = solr.query(new SolrQuery("*:*"));
         response.thenAccept(r -> System.out.println("found "+ r.getResults().getNumFound() +" docs"));
-        assertNotNull(response.get().getResults());
+        assertNotNull(response.toCompletableFuture().get().getResults());
     }
 
     @Test
@@ -90,9 +90,9 @@ public class JavaAPITest extends JUnitSuite {
                 .withHttpClient(new DefaultAsyncHttpClient())
                 .withResponseParser(new XMLResponseParser())
                 .build();
-        CompletableFuture<QueryResponse> response = solr.query(new SolrQuery("*:*"));
+        CompletionStage<QueryResponse> response = solr.query(new SolrQuery("*:*"));
         response.thenAccept(r -> System.out.println("found "+ r.getResults().getNumFound() +" docs"));
-        assertNotNull(response.get().getResults());
+        assertNotNull(response.toCompletableFuture().get().getResults());
     }
 
     @Test

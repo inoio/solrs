@@ -1,23 +1,33 @@
 package io.ino.solrs
 
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.{Executors, ScheduledExecutorService, ThreadFactory}
+import java.util.concurrent.CompletionStage
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.ThreadFactory
 
-import org.asynchttpclient.{AsyncCompletionHandler, AsyncHttpClient, Response}
 import io.ino.solrs.CloudSolrServers.WarmupQueries
 import io.ino.solrs.ServerStateChangeObservable.StateChange
 import io.ino.solrs.future.JavaFutureFactory
+import io.ino.solrs.future.Future
+import io.ino.solrs.future.FutureFactory
+import io.ino.solrs.future.ScalaFutureFactory
 import org.apache.solr.client.solrj.response.QueryResponse
-import org.apache.solr.client.solrj.{SolrQuery, SolrServerException}
+import org.apache.solr.client.solrj.SolrQuery
+import org.apache.solr.client.solrj.SolrServerException
 import org.apache.solr.common.cloud._
+import org.asynchttpclient.AsyncCompletionHandler
+import org.asynchttpclient.AsyncHttpClient
+import org.asynchttpclient.Response
 import org.slf4j.LoggerFactory
-import io.ino.solrs.future.{Future, FutureFactory, ScalaFutureFactory}
 
 import scala.collection.mutable
 import scala.language.postfixOps
-import scala.language.{higherKinds, postfixOps}
+import scala.language.higherKinds
+import scala.language.postfixOps
 import scala.util.control.NonFatal
-import scala.util.{Failure, Success, Try}
+import scala.util.Failure
+import scala.util.Success
+import scala.util.Try
 
 /**
  * Provides the list of solr servers.
@@ -277,8 +287,8 @@ object CloudSolrServers {
     def withZkConnectTimeout(value: Long, unit: TimeUnit): Builder = copy(zkConnectTimeout = FiniteDuration(value, unit))
     def withClusterStateUpdateInterval(value: Long, unit: TimeUnit): Builder = copy(clusterStateUpdateInterval = FiniteDuration(value, unit))
     def withDefaultCollection(collection: String): Builder = copy(defaultCollection = Some(collection))
-    import java.util.function.{Function => JFunction}
     import java.lang.{Iterable => JIterable}
+    import java.util.function.{Function => JFunction}
     def withWarmupQueries(queriesByCollection: JFunction[String, JIterable[SolrQuery]], count: Int): Builder = {
       def delegate(collection: String): Seq[SolrQuery] = {
         val res = queriesByCollection(collection)
@@ -288,7 +298,7 @@ object CloudSolrServers {
       copy(warmupQueries = Some(WarmupQueries(delegate, count)))
     }
 
-    def build(): CloudSolrServers[CompletableFuture] = new CloudSolrServers(zkHost, zkConnectTimeout, zkConnectTimeout, clusterStateUpdateInterval, defaultCollection, warmupQueries)(JavaFutureFactory)
+    def build(): CloudSolrServers[CompletionStage] = new CloudSolrServers(zkHost, zkConnectTimeout, zkConnectTimeout, clusterStateUpdateInterval, defaultCollection, warmupQueries)(JavaFutureFactory)
 
     def build[F[_]](implicit futureFactory: FutureFactory[F]): CloudSolrServers[F] =
       new CloudSolrServers(zkHost, zkConnectTimeout, zkConnectTimeout, clusterStateUpdateInterval, defaultCollection, warmupQueries)

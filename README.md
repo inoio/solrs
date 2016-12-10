@@ -52,10 +52,10 @@ In the following it's shown how to use `JavaAsyncSolrClient`/`AsyncSolrClient`:
 import io.ino.solrs.JavaAsyncSolrClient;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.response.QueryResponse;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 JavaAsyncSolrClient solr = JavaAsyncSolrClient.create("http://localhost:8983/solr/collection1");
-CompletableFuture<QueryResponse> response = solr.query(new SolrQuery("java"));
+CompletionStage<QueryResponse> response = solr.query(new SolrQuery("java"));
 response.thenAccept(r -> System.out.println("found " + r.getResults().getNumFound() + " docs"));
 
 // At EOL...

@@ -1,7 +1,7 @@
 package io.ino.solrs.future
 
 import java.util.concurrent.atomic.AtomicReference
-import java.util.concurrent.{CompletableFuture, ExecutionException, TimeUnit}
+import java.util.concurrent.{CompletionStage, ExecutionException, TimeUnit}
 
 import com.twitter.util.{Future => TFuture}
 import io.ino.solrs.FutureAwaits
@@ -24,11 +24,11 @@ class TwitterFutureFactorySpec extends FutureFactorySpec[TFuture] with FutureAwa
   override protected def awaitBase[T](future: TFuture[T]): T = Await.result(future, 1.second)
 }
 
-class JavaFutureFactorySpec extends FutureFactorySpec[CompletableFuture] with FutureAwaits {
+class JavaFutureFactorySpec extends FutureFactorySpec[CompletionStage] with FutureAwaits {
   override protected lazy val factory = new JavaFutureFactory
-  override protected def awaitBase[T](future: CompletableFuture[T]): T = {
+  override protected def awaitBase[T](future: CompletionStage[T]): T = {
     try {
-      future.get(1, TimeUnit.SECONDS)
+      future.toCompletableFuture.get(1, TimeUnit.SECONDS)
     } catch {
       case e: ExecutionException => throw e.getCause
     }

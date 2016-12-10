@@ -1,27 +1,21 @@
 package io.ino.solrs.usage;
 
-import io.ino.solrs.AsyncSolrClient;
 import io.ino.solrs.CloudSolrServers;
 import io.ino.solrs.FastestServerLB;
 import io.ino.solrs.JavaAsyncSolrClient;
-import io.ino.solrs.RequestInterceptor;
 import io.ino.solrs.RetryPolicy;
 import io.ino.solrs.RoundRobinLB;
 import io.ino.solrs.SolrServer;
 import io.ino.solrs.StaticSolrServers;
-import io.ino.solrs.future.Future;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.impl.XMLResponseParser;
 import org.apache.solr.client.solrj.response.QueryResponse;
 import org.asynchttpclient.DefaultAsyncHttpClient;
-import scala.Function1;
-import scala.Function2;
 import scala.Tuple2;
 
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
 
 import static java.util.concurrent.TimeUnit.*;
@@ -30,7 +24,7 @@ public class Usage {
 
 	{
 		JavaAsyncSolrClient solr = JavaAsyncSolrClient.create("http://localhost:8983/solr/collection1");
-		CompletableFuture<QueryResponse> response = solr.query(new SolrQuery("java"));
+		CompletionStage<QueryResponse> response = solr.query(new SolrQuery("java"));
 		response.thenAccept(r -> System.out.println("found " + r.getResults().getNumFound() + " docs"));
 	}
 

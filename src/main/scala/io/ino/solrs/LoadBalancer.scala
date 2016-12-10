@@ -1,14 +1,16 @@
 package io.ino.solrs
 
-import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionStage
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.{Executors, TimeUnit}
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
-import io.ino.solrs.CloudSolrServers.Builder
-import io.ino.solrs.CloudSolrServers.WarmupQueries
-import io.ino.solrs.ServerStateChangeObservable.{Removed, StateChange, StateChanged}
+import io.ino.solrs.ServerStateChangeObservable.Removed
+import io.ino.solrs.ServerStateChangeObservable.StateChange
+import io.ino.solrs.ServerStateChangeObservable.StateChanged
 import io.ino.solrs.future.JavaFutureFactory
-import io.ino.solrs.future.{Future, FutureFactory}
+import io.ino.solrs.future.Future
+import io.ino.solrs.future.FutureFactory
 import io.ino.time.Clock
 import io.ino.time.Units.Millisecond
 import org.apache.solr.client.solrj.SolrQuery
@@ -18,7 +20,8 @@ import org.slf4j.LoggerFactory
 import scala.annotation.tailrec
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration._
-import scala.language.{higherKinds, postfixOps}
+import scala.language.higherKinds
+import scala.language.postfixOps
 
 trait LoadBalancer extends RequestInterceptor {
 
@@ -387,9 +390,9 @@ object FastestServerLB {
   /* Java API */
   import java.lang.{Boolean => JBoolean}
   import java.lang.{Long => JLong}
-  import java.util.function.{Function => JFunction}
   import java.util.function.BiFunction
   import java.util.function.LongFunction
+  import java.util.function.{Function => JFunction}
   case class Builder(solrServers: SolrServers,
                      collectionAndTestQuery: SolrServer => (String, SolrQuery),
                      minDelay: Duration = 100 millis,
@@ -428,7 +431,7 @@ object FastestServerLB {
     /** The clock to get the current time from. */
     def withClock(clock: Clock): Builder = copy(clock = clock)
 
-    def build(): FastestServerLB[CompletableFuture] = build(JavaFutureFactory)
+    def build(): FastestServerLB[CompletionStage] = build(JavaFutureFactory)
 
     def build[F[_]](implicit futureFactory: FutureFactory[F]) = new FastestServerLB[F](
       solrServers,
@@ -458,7 +461,8 @@ object FastestServerLB {
 
 }
 
-import javax.management.openmbean.{CompositeData, TabularData}
+import javax.management.openmbean.CompositeData
+import javax.management.openmbean.TabularData
 
 /**
  * JMX MBean for FastestServerLB.

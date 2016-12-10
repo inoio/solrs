@@ -5,7 +5,7 @@ import io.ino.solrs.RetryDecision.Result
 import org.apache.solr.client.solrj.SolrQuery
 import org.scalatest.{Inside, FunSpec, Matchers}
 import scala.concurrent.duration._
-import scala.languageFeature.postfixOps
+import scala.language.postfixOps
 
 class RetryPolicySpec extends FunSpec with Matchers with Inside {
 

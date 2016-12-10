@@ -25,6 +25,7 @@ object NoopMetrics extends Metrics {
 import com.codahale.metrics.MetricRegistry
 import com.codahale.metrics.MetricRegistry._
 import java.util.concurrent.TimeUnit._
+import scala.language.higherKinds
 
 class CodaHaleMetrics[F[_]](val registry: MetricRegistry = new MetricRegistry()) extends Metrics {
 

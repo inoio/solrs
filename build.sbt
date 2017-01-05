@@ -29,7 +29,7 @@ resolvers ++= Seq(
   "Restlet Repositories" at "http://maven.restlet.org"
 )
 
-val solrVersion = "6.1.0"
+val solrVersion = "6.3.0"
 val slf4jVersion = "1.7.21"
 val tomcatVersion = "8.5.9"
 
@@ -40,7 +40,7 @@ libraryDependencies ++= Seq(
   "io.dropwizard.metrics"   % "metrics-core"      % "3.1.2" % "optional",
   "org.slf4j"               % "slf4j-api"         % slf4jVersion,
   // akka 2.3 is used for scala 2.10 support
-  "com.typesafe.akka"      %% "akka-actor"        % "2.4.14",
+  "com.typesafe.akka"      %% "akka-actor"        % "2.4.16",
   "org.slf4j"               % "slf4j-simple"      % slf4jVersion % "test",
   "org.scalatest"          %% "scalatest"         % "3.0.1" % "test",
   "com.novocode"            % "junit-interface"   % "0.11" % "test",

@@ -11,7 +11,6 @@ import io.ino.solrs.RetryDecision.Result
 import io.ino.solrs.SolrResponseFactory._
 import io.ino.solrs.future.Future
 import io.ino.solrs.future.FutureFactory
-import io.ino.solrs.future.ScalaFutureFactory
 import org.apache.commons.io.IOUtils
 import org.apache.solr.client.solrj.beans.DocumentObjectBinder
 import org.apache.solr.client.solrj.impl.BinaryRequestWriter
@@ -63,9 +62,9 @@ object AsyncSolrClient {
   private[solrs] type ASCFactory[F[_], ASC <: AsyncSolrClient[F]] = (LoadBalancer, AsyncHttpClient, /*shutdownHttpClient*/ Boolean,
     Option[RequestInterceptor], RequestWriter, ResponseParser, Metrics, Option[ServerStateObservation[F]], RetryPolicy) => ASC
 
-  def apply[F[_]](baseUrl: String)(implicit futureFactory: FutureFactory[F] = ScalaFutureFactory) =
+  def apply[F[_]](baseUrl: String)(implicit futureFactory: FutureFactory[F]): AsyncSolrClient[F] =
     new Builder(new SingleServerLB(baseUrl), ascFactory[F] _).build
-  def apply[F[_]](loadBalancer: LoadBalancer)(implicit futureFactory: FutureFactory[F]) =
+  def apply[F[_]](loadBalancer: LoadBalancer)(implicit futureFactory: FutureFactory[F]): AsyncSolrClient[F] =
     new Builder(loadBalancer, ascFactory[F] _).build
 
   object Builder {

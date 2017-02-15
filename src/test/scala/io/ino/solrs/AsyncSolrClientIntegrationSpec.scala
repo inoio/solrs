@@ -5,8 +5,10 @@ import java.util.Arrays.asList
 import akka.actor.ActorSystem
 import org.asynchttpclient.DefaultAsyncHttpClient
 import org.apache.solr.client.solrj.SolrQuery
-import org.apache.solr.client.solrj.SolrQuery.SortClause
+import org.apache.solr.client.solrj.SolrRequest
+import org.apache.solr.client.solrj.SolrResponse
 import org.apache.solr.client.solrj.impl.XMLResponseParser
+import org.apache.solr.client.solrj.request.QueryRequest
 import org.apache.solr.client.solrj.response.QueryResponse
 import org.mockito.Matchers._
 import org.mockito.Mockito.verify
@@ -45,21 +47,6 @@ class AsyncSolrClientIntegrationSpec extends StandardFunSpec with RunningSolr {
   }
 
   describe("Solr") {
-
-    it("should query async with SolrQuery") {
-
-      val query = new SolrQuery()
-      query.setQuery("cat:cat1")
-      query.addSort(SortClause.asc("price"))
-
-      val response: Future[QueryResponse] = solrs.query(query)
-
-      val docs = await(response).getResults
-      docs.getNumFound should be (2)
-      docs.size should be (2)
-      docs.get(0).getFieldValue("price") should be (10f)
-      docs.get(1).getFieldValue("price") should be (20f)
-    }
 
     it("should allow to transform the response") {
       val response: Future[List[String]] = solrs.query(new SolrQuery("cat:cat1")).map(getIds)
@@ -151,13 +138,13 @@ class AsyncSolrClientIntegrationSpec extends StandardFunSpec with RunningSolr {
 
     it("should allow to intercept requests") {
       var capturedServer: SolrServer = null
-      var capturedQuery: SolrQuery = null
+      var capturedRequest: SolrRequest[_] = null
       val interceptor = new RequestInterceptor {
-        override def interceptQuery(f: (SolrServer, SolrQuery) => future.Future[QueryResponse])
-                                   (solrServer: SolrServer, q: SolrQuery): future.Future[QueryResponse] = {
+        override def interceptRequest[T <: SolrResponse](f: (SolrServer, SolrRequest[_ <: T]) => future.Future[T])
+                                                        (solrServer: SolrServer, r: SolrRequest[_ <: T]): future.Future[T] = {
           capturedServer = solrServer
-          capturedQuery = q
-          f(solrServer, q)
+          capturedRequest = r
+          f(solrServer, r)
         }
       }
       val solr = AsyncSolrClient.Builder(solrUrl).withRequestInterceptor(interceptor).build
@@ -166,7 +153,7 @@ class AsyncSolrClientIntegrationSpec extends StandardFunSpec with RunningSolr {
       await(solr.query(q))
 
       capturedServer should be (SolrServer(solrUrl))
-      capturedQuery should be (q)
+      capturedRequest.asInstanceOf[QueryRequest].getParams should be (q)
 
       solr.shutdown()
     }

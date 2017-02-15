@@ -35,14 +35,6 @@ public class JavaAPITest extends JUnitSuite {
     }
 
     @Test
-    public void testAsyncSolrClient() throws ExecutionException, InterruptedException {
-        JavaAsyncSolrClient solr = JavaAsyncSolrClient.create("http://localhost:" + solrRunner.port() + "/solr/collection1");
-        CompletionStage<QueryResponse> response = solr.query(new SolrQuery("*:*"));
-        response.thenAccept(r -> System.out.println("found "+ r.getResults().getNumFound() +" docs"));
-        assertNotNull(response.toCompletableFuture().get().getResults());
-    }
-
-    @Test
     public void testAsyncSolrClientBuilderUrl() throws ExecutionException, InterruptedException {
         JavaAsyncSolrClient solr = JavaAsyncSolrClient.builder("http://localhost:" + solrRunner.port() + "/solr/collection1")
                 .withHttpClient(new DefaultAsyncHttpClient())

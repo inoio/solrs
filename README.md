@@ -4,7 +4,7 @@
 [![Maven Central](https://maven-badges.herokuapp.com/maven-central/io.ino/solrs_2.11/badge.svg)](http://search.maven.org/#search%7Cga%7C1%7Cg%3A%22io.ino%22%20AND%20a%3Asolrs*_2.11)
 [![Join the chat at https://gitter.im/inoio/solrs](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/inoio/solrs)
 
-This is a java/scala solr client providing a query interface like SolrJ, just asynchronously / non-blocking
+This is a java/scala solr client providing an interface like SolrJ, just asynchronously / non-blocking
 (built on top of [async-http-client](https://github.com/AsyncHttpClient/async-http-client) / [netty](https://github.com/netty/netty)).
 For java it supports `CompletableFuture`, for scala you can choose between twitter's `Future` or the standard/SDK `Future`.
 
@@ -12,6 +12,7 @@ For java it supports `CompletableFuture`, for scala you can choose between twitt
 
 - [Installation](#installation)
 - [Usage](#usage)
+ - [Adding Data to Solr](#adding-data-to-solr)
  - [Load Balancing](#load-balancing)
  - [Solr Cloud / ZooKeeper Support](#solr-cloud--zookeeper-support)
  - [Retry Policy](#retry-policy)
@@ -37,13 +38,13 @@ solrs is published to maven central for both scala 2.11 and 2.12.
 
 ## Usage
 
-Solrs supports different `Future` implementations, which affects the result type of `AsyncSolrClient.query`.
+Solrs supports different `Future` implementations, which affects the result type of `AsyncSolrClient` methods.
 For scala there's support for the standard `scala.concurrent.Future` and for twitters `com.twitter.util.Future`.
 Which one is chosen is defined by the `io.ino.solrs.future.FutureFactory` that's in scope when building the `AsyncSolrClient` (as shown
 below in the code samples).
 
 For java there's support for `CompletableFuture`. Because java does not support higher kinded types there's
-a separate class `JavaAsyncSolrClient` that allows to create new instances and to perform a `query`.
+a separate class `JavaAsyncSolrClient` that allows to create new instances and to perform a request.
 
 In the following it's shown how to use `JavaAsyncSolrClient`/`AsyncSolrClient`:
 
@@ -125,6 +126,113 @@ val solr = AsyncSolrClient.Builder("http://localhost:8983/solr/collection1")
             .withHttpClient(new DefaultAsyncHttpClient())
             .withResponseParser(new XMLResponseParser())
             .build
+```
+
+### Adding Data to Solr
+
+[java]
+```java
+import static java.util.Arrays.asList;
+import io.ino.solrs.JavaAsyncSolrClient;
+import org.apache.solr.common.SolrInputDocument;
+
+JavaAsyncSolrClient solr = JavaAsyncSolrClient.create("http://localhost:8983/solr/collection1");
+SolrInputDocument doc1 = new SolrInputDocument();
+doc1.addField("id", "id1");
+doc1.addField("name", "doc1");
+doc1.addField("cat", "cat1");
+doc1.addField("price", 10);
+SolrInputDocument doc2 = new SolrInputDocument();
+doc2.addField("id", "id2");
+doc2.addField("name", "doc2");
+doc2.addField("cat", "cat1");
+doc2.addField("price", 20);
+solr.addDocs(asList(doc1, doc2))
+    .thenCompose(r -> solr.commit())
+    .thenAccept(r -> System.out.println("docs added"));
+```
+
+[scala]
+```scala
+import io.ino.solrs.AsyncSolrClient
+import io.ino.solrs.future.ScalaFutureFactory.Implicit // or TwitterFutureFactory
+import org.apache.solr.common.SolrInputDocument
+
+val solr = AsyncSolrClient("http://localhost:8983/solr/collection1")
+val doc1 = new SolrInputDocument()
+doc1.addField("id", "id1")
+doc1.addField("name", "doc1")
+doc1.addField("cat", "cat1")
+doc1.addField("price", 10)
+val doc2 = new SolrInputDocument()
+doc2.addField("id", "id2")
+doc2.addField("name", "doc2")
+doc2.addField("cat", "cat1")
+doc2.addField("price", 20)
+for {
+  _ <- solr.addDocs(docs = Iterable(doc1, doc2))
+  _ <- solr.commit()
+} yield print("docs added")
+```
+
+#### Directly adding POJOs to Solr
+
+[java]
+```java
+import static java.util.Arrays.asList;
+import io.ino.solrs.JavaAsyncSolrClient;
+import org.apache.solr.client.solrj.beans.Field;
+
+class Item {
+    @Field
+    String id;
+    
+    @Field
+    String name;
+
+    @Field("cat")
+    String category;
+
+    @Field
+    float price;
+    
+    TestBean(String id, String name, String category, float price) {
+        this.id = id;
+        this.name = name;
+        this.category = category;
+        this.price = price;
+    }    
+}
+
+JavaAsyncSolrClient solr = JavaAsyncSolrClient.create("http://localhost:8983/solr/collection1");
+Item item1 = new Item("id1", "doc1", "cat1", 10);
+Item item2 = new Item("id2", "doc2", "cat1", 20);
+solr.addBeans(asList(item1, item2))
+    .thenCompose(r -> solr.commit())
+    .thenAccept(r -> System.out.println("beans added"));
+```
+
+[scala]
+```scala
+import io.ino.solrs.AsyncSolrClient
+import io.ino.solrs.future.ScalaFutureFactory.Implicit // or TwitterFutureFactory
+import org.apache.solr.client.solrj.beans.Field
+import scala.annotation.meta.field
+
+case class Item(@(Field @field) id: String,
+                @(Field @field) name: String,
+                @(Field @field)("cat") category: String,
+                @(Field @field) price: Float) {
+  def this() = this(null, null, null, 0)
+}
+
+val solr = AsyncSolrClient("http://localhost:8983/solr/collection1")
+val item1 = Item("id1", "doc1", "cat1", 10)
+val item2 = Item("id2", "doc2", "cat1", 20)
+for {
+  _ <- solr.addBeans(beans = Iterable(item1, item2))
+  _ <- solr.commit()
+} yield print("beans added")
 ```
 
 ### Load Balancing

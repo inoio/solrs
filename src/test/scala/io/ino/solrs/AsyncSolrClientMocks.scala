@@ -2,6 +2,7 @@ package io.ino.solrs
 
 import io.ino.solrs.future.ScalaFutureFactory.ScalaFuture
 import io.ino.time.Clock.MutableClock
+import org.apache.solr.client.solrj.SolrResponse
 import org.apache.solr.client.solrj.response.QueryResponse
 import org.mockito.Matchers._
 import org.mockito.Mockito._
@@ -13,19 +14,19 @@ import scala.util.{Success, Try}
 
 object AsyncSolrClientMocks {
 
-  def mockDoQuery[F[_]](mock: AsyncSolrClient[F],
-                        solrServer: => SolrServer = any[SolrServer](),
-                        responseDelay: Duration = 1 milli)
-                       (implicit clock: MutableClock): AsyncSolrClient[F] = {
+  def mockDoRequest[F[_]](mock: AsyncSolrClient[F],
+                          solrServer: => SolrServer = any[SolrServer](),
+                          responseDelay: Duration = 1 milli)
+                         (implicit clock: MutableClock): AsyncSolrClient[F] = {
     // for spies doReturn should be used...
-    doReturn(delayedResponse(responseDelay.toMillis)).when(mock).doQuery(solrServer, any())
+    doReturn(delayedResponse(responseDelay.toMillis)).when(mock).doExecute(solrServer, any())(any())
     mock
   }
 
-  def mockDoQuery[F[_]](mock: AsyncSolrClient[F],
-                        futureResponse: future.Future[QueryResponse]): AsyncSolrClient[F] = {
+  def mockDoRequest[F[_]](mock: AsyncSolrClient[F],
+                          futureResponse: future.Future[SolrResponse]): AsyncSolrClient[F] = {
     // for spies doReturn should be used...
-    doReturn(futureResponse).when(mock).doQuery(any[SolrServer](), any())
+    doReturn(futureResponse).when(mock).doExecute(any[SolrServer](), any())(any())
     mock
   }
 

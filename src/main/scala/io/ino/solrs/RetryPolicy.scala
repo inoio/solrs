@@ -3,20 +3,20 @@ package io.ino.solrs
 import scala.annotation.tailrec
 
 /**
- * Specifies a policy for retrying query failures.
+ * Specifies a policy for retrying request failures.
  */
 abstract class RetryPolicy {
   /**
-   * Determines whether the framework should retry a query for the given
-   * exception, the failed server and the query context (provides information about previously failed
+   * Determines whether the framework should retry a request for the given
+   * exception, the failed server and the request context (provides information about previously failed
    * requests, e.g. with previously failed servers).
    *
    * @param e The exception that caused the method to fail
    * @param server The server that was used for the failed request
-   * @param queryContext The context of the query initiated by the client, e.g. provides the servers already tried
+   * @param requestContext The context of the request initiated by the client, e.g. provides the servers already tried
    * @param lb The configured load balancer 
    */
-  def shouldRetry(e: Throwable, server: SolrServer, queryContext: QueryContext, lb: LoadBalancer): RetryDecision
+  def shouldRetry(e: Throwable, server: SolrServer, requestContext: RequestContext[_], lb: LoadBalancer): RetryDecision
 }
 
 /**
@@ -45,7 +45,7 @@ object RetryDecision {
 }
 
 /**
- * Predefined query retry policies.
+ * Predefined request retry policies.
  */
 object RetryPolicy {
 
@@ -53,7 +53,7 @@ object RetryPolicy {
    * Don't retry, propagate the first failure.
    */
   val TryOnce: RetryPolicy = new RetryPolicy {
-    override def shouldRetry(e: Throwable, server: SolrServer, queryContext: QueryContext, lb: LoadBalancer): StandardRetryDecision = RetryDecision.Fail
+    override def shouldRetry(e: Throwable, server: SolrServer, requestContext: RequestContext[_], lb: LoadBalancer): StandardRetryDecision = RetryDecision.Fail
   }
 
   /**
@@ -62,11 +62,11 @@ object RetryPolicy {
    */
   val TryAvailableServers: RetryPolicy = new RetryPolicy {
 
-    override def shouldRetry(e: Throwable, server: SolrServer, queryContext: QueryContext, lb: LoadBalancer): RetryDecision = {
+    override def shouldRetry(e: Throwable, server: SolrServer, requestContext: RequestContext[_], lb: LoadBalancer): RetryDecision = {
 
       val countServers = lb.solrServers.all.length
-      val preferred = queryContext.preferred.flatMap(p =>
-        if(queryContext.triedServers.contains(p)) None else queryContext.preferred
+      val preferred = requestContext.preferred.flatMap(p =>
+        if(requestContext.triedServers.contains(p)) None else requestContext.preferred
       )
 
       @tailrec
@@ -74,10 +74,10 @@ object RetryPolicy {
         if(round >= countServers) {
           None
         } else {
-          val maybeServer = lb.solrServer(queryContext.q, preferred)
+          val maybeServer = lb.solrServer(requestContext.r, preferred)
           maybeServer match {
             case None => None
-            case Some(s) if s == server || queryContext.triedServers.contains(s) => findAvailable(round + 1)
+            case Some(s) if s == server || requestContext.triedServers.contains(s) => findAvailable(round + 1)
             case s@Some(_) => s
           }
         }
@@ -94,8 +94,8 @@ object RetryPolicy {
    * Retries the given number of times.
    */
   def AtMost(times: Int) = new RetryPolicy {
-    override def shouldRetry(e: Throwable, server: SolrServer, queryContext: QueryContext, lb: LoadBalancer): RetryDecision = {
-      if(queryContext.triedServers.length < times) RetryDecision.Retry
+    override def shouldRetry(e: Throwable, server: SolrServer, requestContext: RequestContext[_], lb: LoadBalancer): RetryDecision = {
+      if(requestContext.triedServers.length < times) RetryDecision.Retry
       else RetryDecision.Fail
     }
   }

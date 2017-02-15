@@ -53,7 +53,7 @@ class CloudSolrServersUninitializedIntegrationSpec extends StandardFunSpec {
     it("should be able to start and stop with unavailable ZK") {
       // Create CUT when there's no ZK available
       cut = Some(new CloudSolrServers("localhost:2181", zkConnectTimeout = 1 second, clusterStateUpdateInterval = 100 millis))
-      val asyncSolrClient = mockDoQuery(mock[AsyncSolrClient])(Clock.mutable)
+      val asyncSolrClient = mockDoRequest(mock[AsyncSolrClient])(Clock.mutable)
       cut.foreach(_.setAsyncSolrClient(asyncSolrClient))
 
       // Just see that shutdown doesn't block
@@ -71,7 +71,7 @@ class CloudSolrServersUninitializedIntegrationSpec extends StandardFunSpec {
       // Create CUT when there's no ZK available. There are also no solr servers started, so that initially the
       // zkStateReader.createClusterStateWatchersAndUpdate will fail as well...
       cut = Some(new CloudSolrServers(zkConnectString, zkConnectTimeout = 1 second, clusterStateUpdateInterval = 100 millis))
-      val asyncSolrClient = mockDoQuery(mock[AsyncSolrClient])(Clock.mutable)
+      val asyncSolrClient = mockDoRequest(mock[AsyncSolrClient])(Clock.mutable)
       cut.foreach(_.setAsyncSolrClient(asyncSolrClient))
 
       // Now start ZK

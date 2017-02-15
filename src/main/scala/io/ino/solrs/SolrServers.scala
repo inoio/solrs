@@ -11,9 +11,11 @@ import io.ino.solrs.future.JavaFutureFactory
 import io.ino.solrs.future.Future
 import io.ino.solrs.future.FutureFactory
 import io.ino.solrs.future.ScalaFutureFactory
-import org.apache.solr.client.solrj.response.QueryResponse
 import org.apache.solr.client.solrj.SolrQuery
+import org.apache.solr.client.solrj.SolrRequest
 import org.apache.solr.client.solrj.SolrServerException
+import org.apache.solr.client.solrj.request.QueryRequest
+import org.apache.solr.client.solrj.response.QueryResponse
 import org.apache.solr.common.cloud._
 import org.asynchttpclient.AsyncCompletionHandler
 import org.asynchttpclient.AsyncHttpClient
@@ -39,13 +41,13 @@ trait SolrServers {
   def all: Seq[SolrServer]
 
   /**
-   * Determines Solr servers matching the given solr query (e.g. based on the "collection" param).
+   * Determines Solr servers matching the given solr request (e.g. based on the "collection" param).
    */
-  def matching(q: SolrQuery): IndexedSeq[SolrServer]
+  def matching(r: SolrRequest[_]): IndexedSeq[SolrServer]
 }
 
 class StaticSolrServers(override val all: IndexedSeq[SolrServer]) extends SolrServers {
-  override def matching(q: SolrQuery): IndexedSeq[SolrServer] = all
+  override def matching(r: SolrRequest[_]): IndexedSeq[SolrServer] = all
 }
 object StaticSolrServers {
   def apply(baseUrls: IndexedSeq[String]): StaticSolrServers = new StaticSolrServers(baseUrls.map(SolrServer(_)))
@@ -101,7 +103,7 @@ object ServerStateChangeObservable {
  *                         also used for ZkStateReader initialization attempt interval.
  *                         Note that we're NOT stopping connection retries after connect timeout!
  * @param clusterStateUpdateInterval Used for pulling the ClusterState from ZkStateReader
- * @param defaultCollection Optional default collection to use when the query does not specify the "collection" param.
+ * @param defaultCollection Optional default collection to use when the request does not specify the "collection" param.
  */
 class CloudSolrServers[F[_]](zkHost: String,
                              zkClientTimeout: Duration = 15 seconds, /* default from Solr Core, see also SOLR-5221*/
@@ -220,7 +222,7 @@ class CloudSolrServers[F[_]](zkHost: String,
     (1 to count).foldLeft(futureFactory.successful(Seq.empty[Try[QueryResponse]])) { (res, round) =>
       res.flatMap { _ =>
         val warmupResponses = queries.map(q =>
-          asyncSolrClient.doQuery(s, q)
+          asyncSolrClient.doExecute[QueryResponse](s, new QueryRequest(q))
             .map(Success(_))
             .handle {
             case NonFatal(e) =>
@@ -249,8 +251,8 @@ class CloudSolrServers[F[_]](zkHost: String,
    * it should start from the first one again. When the known solr servers change,
    * the iterator must reflect this.
    */
-  override def matching(q: SolrQuery): IndexedSeq[SolrServer] = {
-    val collection = Option(q.get("collection")).orElse(defaultCollection).getOrElse(
+  override def matching(r: SolrRequest[_]): IndexedSeq[SolrServer] = {
+    val collection = Option(r.getParams.get("collection")).orElse(defaultCollection).getOrElse(
       throw new SolrServerException("No collection param specified on request and no default collection has been set.")
     )
     collectionToServers.getOrElse(collection, Vector.empty)
@@ -390,7 +392,7 @@ class ReloadingSolrServers[F[_]](url: String, extractor: Array[Byte] => IndexedS
    * it should start from the first one again. When the known solr servers change,
    * the iterator must reflect this.
    */
-  override def matching(q: SolrQuery): IndexedSeq[SolrServer] = solrServers
+  override def matching(r: SolrRequest[_]): IndexedSeq[SolrServer] = solrServers
 
   def reload(): F[IndexedSeq[SolrServer]] = {
     val f = loadUrl().map { data =>

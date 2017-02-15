@@ -26,18 +26,19 @@ class UsageScala1 {
     import io.ino.solrs._
     import io.ino.solrs.future.Future
     import io.ino.solrs.future.ScalaFutureFactory.Implicit
-    import org.apache.solr.client.solrj.SolrQuery
-    import org.apache.solr.client.solrj.response.QueryResponse
+    import org.apache.solr.client.solrj.response.SolrResponseBase
+    import org.apache.solr.client.solrj.SolrRequest
+    import org.apache.solr.client.solrj.SolrResponse
 
     val logger = LoggerFactory.getLogger(getClass)
 
     val loggingInterceptor = new RequestInterceptor {
-      override def interceptQuery(f: (SolrServer, SolrQuery) => Future[QueryResponse])
-                                 (solrServer: SolrServer, q: SolrQuery): Future[QueryResponse] = {
+      override def interceptRequest[T <: SolrResponse](f: (SolrServer, SolrRequest[_ <: T]) => Future[T])
+                                                      (solrServer: SolrServer, r: SolrRequest[_ <: T]): Future[T] = {
         val start = System.currentTimeMillis()
-        f(solrServer, q).map { qr =>
+        f(solrServer, r).map { qr =>
           val requestTime = System.currentTimeMillis() - start
-          logger.info(s"Query $q to $solrServer took $requestTime ms (query time in solr: ${qr.getQTime} ms).")
+          logger.info(s"Request $r to $solrServer took $requestTime ms (query time in solr: ${qr.asInstanceOf[SolrResponseBase].getQTime} ms).")
           qr
         }
       }

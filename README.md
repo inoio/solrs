@@ -24,14 +24,14 @@ For java it supports `CompletableFuture`, for scala you can choose between twitt
 
 You must add the library to the dependencies of the build file, e.g. add to `build.sbt`:
 
-    libraryDependencies += "io.ino" %% "solrs" % "2.0.0-RC3"
+    libraryDependencies += "io.ino" %% "solrs" % "2.0.0-RC4"
 
 or for java projects to pom.xml:
 
     <dependency>
       <groupId>io.ino</groupId>
       <artifactId>solrs_2.12</artifactId>
-      <version>2.0.0-RC3</version>
+      <version>2.0.0-RC4</version>
     </dependency>
 
 solrs is published to maven central for both scala 2.11 and 2.12.

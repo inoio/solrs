@@ -14,6 +14,9 @@ import io.ino.solrs.future.FutureFactory
 import io.ino.time.Clock
 import io.ino.time.Units.Millisecond
 import org.apache.solr.client.solrj.SolrQuery
+import org.apache.solr.client.solrj.SolrRequest
+import org.apache.solr.client.solrj.SolrResponse
+import org.apache.solr.client.solrj.request.QueryRequest
 import org.apache.solr.client.solrj.response.QueryResponse
 import org.slf4j.LoggerFactory
 
@@ -30,14 +33,14 @@ trait LoadBalancer extends RequestInterceptor {
   /**
    * Determines the solr server to use for a new request.
    */
-  def solrServer(q: SolrQuery, preferred: Option[SolrServer]): Option[SolrServer]
+  def solrServer(r: SolrRequest[_], preferred: Option[SolrServer]): Option[SolrServer]
 
   /**
-   * Intercept the given query, allows implementations to monitor solr server performance.
-   * This default implementation use invokes the query function.
+   * Intercept the given request, allows implementations to monitor solr server performance.
+   * This default implementation use invokes the request function.
    */
-  override def interceptQuery(f: (SolrServer, SolrQuery) => Future[QueryResponse])
-                             (solrServer: SolrServer, q: SolrQuery): Future[QueryResponse] = {
+  override def interceptRequest[T <: SolrResponse](f: (SolrServer, SolrRequest[_ <: T]) => Future[T])
+                                                  (solrServer: SolrServer, q: SolrRequest[_ <: T]): Future[T] = {
     f(solrServer, q)
   }
 
@@ -50,7 +53,7 @@ trait LoadBalancer extends RequestInterceptor {
 class SingleServerLB(val server: SolrServer) extends LoadBalancer {
   def this(baseUrl: String) = this(SolrServer(baseUrl))
   private val someServer = Some(server)
-  override def solrServer(q: SolrQuery, preferred: Option[SolrServer] = None) = someServer
+  override def solrServer(r: SolrRequest[_], preferred: Option[SolrServer] = None) = someServer
   override val solrServers: SolrServers = new StaticSolrServers(IndexedSeq(server))
 }
 
@@ -76,8 +79,8 @@ class RoundRobinLB(override val solrServers: SolrServers) extends LoadBalancer {
     }
   }
 
-  override def solrServer(q: SolrQuery, preferred: Option[SolrServer] = None): Option[SolrServer] = {
-    val servers = solrServers.matching(q)
+  override def solrServer(r: SolrRequest[_], preferred: Option[SolrServer] = None): Option[SolrServer] = {
+    val servers = solrServers.matching(r)
     if(servers.isEmpty) {
       None
     } else {
@@ -262,8 +265,8 @@ class FastestServerLB[F[_]](override val solrServers: SolrServers,
   /**
    * Determines the solr server to use for a new request.
    */
-  override def solrServer(q: SolrQuery, preferred: Option[SolrServer] = None): Option[SolrServer] = {
-    val servers = solrServers.matching(q).filter(_.status == Enabled)
+  override def solrServer(r: SolrRequest[_], preferred: Option[SolrServer] = None): Option[SolrServer] = {
+    val servers = solrServers.matching(r).filter(_.status == Enabled)
     if(servers.isEmpty) {
       None
     } else {
@@ -276,12 +279,12 @@ class FastestServerLB[F[_]](override val solrServers: SolrServers,
   /**
    * Intercept user queries to trigger test queries based on the current request rate.
    */
-  override def interceptQuery(f: (SolrServer, SolrQuery) => Future[QueryResponse])
-                             (solrServer: SolrServer, q: SolrQuery): Future[QueryResponse] = {
-    val res = f(solrServer, q)
+  override def interceptRequest[T <: SolrResponse](f: (SolrServer, SolrRequest[_ <: T]) => Future[T])
+                             (solrServer: SolrServer, r: SolrRequest[_ <: T]): Future[T] = {
+    val res = f(solrServer, r)
     // test each (fast) server matching the given query
     solrServers
-      .matching(q)
+      .matching(r)
       .filter { server =>
         val fastServers = fastServersByCollection(collection(server))
         server.status == Enabled &&  fastServers.contains(server)
@@ -325,7 +328,7 @@ class FastestServerLB[F[_]](override val solrServers: SolrServers,
     serverTestTimestamp.update(server, Millisecond(clock.millis()))
 
     val request = stats(server).requestStarted(TestQueryClass)
-    val res = client.doQuery(server, testQuery(server))
+    val res = client.doExecute[QueryResponse](server, new QueryRequest(testQuery(server)))
 
     res.onComplete { _ =>
       request.finished()

@@ -1,24 +1,49 @@
 package io.ino.solrs
 
 import java.io.IOException
+import java.util.Arrays.asList
 import java.util.Locale
 
 import akka.actor.ActorSystem
 import io.ino.solrs.AsyncSolrClient.Builder
 import io.ino.solrs.HttpUtils._
 import io.ino.solrs.RetryDecision.Result
+import io.ino.solrs.SolrResponseFactory._
 import io.ino.solrs.future.Future
 import io.ino.solrs.future.FutureFactory
 import io.ino.solrs.future.ScalaFutureFactory
 import org.apache.commons.io.IOUtils
+import org.apache.solr.client.solrj.beans.DocumentObjectBinder
+import org.apache.solr.client.solrj.impl.BinaryRequestWriter
 import org.apache.solr.client.solrj.impl.BinaryResponseParser
+import org.apache.solr.client.solrj.impl.StreamingBinaryResponseParser
+import org.apache.solr.client.solrj.request.AbstractUpdateRequest.ACTION.COMMIT
+import org.apache.solr.client.solrj.request.AbstractUpdateRequest.ACTION.OPTIMIZE
+import org.apache.solr.client.solrj.request.QueryRequest
+import org.apache.solr.client.solrj.request.RequestWriter
+import org.apache.solr.client.solrj.request.SolrPing
+import org.apache.solr.client.solrj.request.UpdateRequest
 import org.apache.solr.client.solrj.response.QueryResponse
+import org.apache.solr.client.solrj.response.SolrPingResponse
+import org.apache.solr.client.solrj.response.UpdateResponse
 import org.apache.solr.client.solrj.ResponseParser
 import org.apache.solr.client.solrj.SolrQuery
+import org.apache.solr.client.solrj.SolrRequest
+import org.apache.solr.client.solrj.SolrRequest.METHOD
+import org.apache.solr.client.solrj.SolrRequest.METHOD.GET
+import org.apache.solr.client.solrj.SolrRequest.METHOD.POST
+import org.apache.solr.client.solrj.SolrResponse
 import org.apache.solr.client.solrj.SolrServerException
+import org.apache.solr.client.solrj.StreamingResponseCallback
+import org.apache.solr.common.SolrDocument
+import org.apache.solr.common.SolrDocumentList
 import org.apache.solr.common.SolrException
+import org.apache.solr.common.SolrException.ErrorCode.BAD_REQUEST
+import org.apache.solr.common.SolrInputDocument
+import org.apache.solr.common.StringUtils
 import org.apache.solr.common.params.CommonParams
 import org.apache.solr.common.params.ModifiableSolrParams
+import org.apache.solr.common.params.SolrParams
 import org.apache.solr.common.util.NamedList
 import org.asynchttpclient.DefaultAsyncHttpClient
 import org.asynchttpclient.AsyncCompletionHandler
@@ -27,6 +52,7 @@ import org.asynchttpclient.Response
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration._
+import scala.collection.JavaConverters._
 import scala.language.higherKinds
 import scala.language.postfixOps
 import scala.util.control.NonFatal
@@ -35,7 +61,7 @@ object AsyncSolrClient {
 
   /* The function that creates that actual instance of AsyncSolrClient */
   private[solrs] type ASCFactory[F[_], ASC <: AsyncSolrClient[F]] = (LoadBalancer, AsyncHttpClient, /*shutdownHttpClient*/ Boolean,
-    Option[RequestInterceptor], ResponseParser, Metrics, Option[ServerStateObservation[F]], RetryPolicy) => ASC
+    Option[RequestInterceptor], RequestWriter, ResponseParser, Metrics, Option[ServerStateObservation[F]], RetryPolicy) => ASC
 
   def apply[F[_]](baseUrl: String)(implicit futureFactory: FutureFactory[F] = ScalaFutureFactory) =
     new Builder(new SingleServerLB(baseUrl), ascFactory[F] _).build
@@ -53,6 +79,7 @@ object AsyncSolrClient {
                                       httpClient: AsyncHttpClient,
                                       shutdownHttpClient: Boolean,
                                       requestInterceptor: Option[RequestInterceptor],
+                                      requestWriter: RequestWriter,
                                       responseParser: ResponseParser,
                                       metrics: Metrics,
                                       serverStateObservation: Option[ServerStateObservation[F]],
@@ -62,6 +89,7 @@ object AsyncSolrClient {
       httpClient,
       shutdownHttpClient,
       requestInterceptor,
+      requestWriter,
       responseParser,
       metrics,
       serverStateObservation,
@@ -72,6 +100,7 @@ object AsyncSolrClient {
                                     httpClient: Option[AsyncHttpClient],
                                     shutdownHttpClient: Boolean,
                                     requestInterceptor: Option[RequestInterceptor] = None,
+                                    requestWriter: Option[RequestWriter] = None,
                                     responseParser: Option[ResponseParser] = None,
                                     metrics: Option[Metrics] = None,
                                     serverStateObservation: Option[ServerStateObservation[F]] = None,
@@ -87,6 +116,10 @@ object AsyncSolrClient {
 
     def withRequestInterceptor(requestInterceptor: RequestInterceptor): Builder[F, ASC] = {
       copy(requestInterceptor = Some(requestInterceptor))
+    }
+
+    def withRequestWriter(requestWriter: RequestWriter): Builder[F, ASC] = {
+      copy(requestWriter = Some(requestWriter))
     }
 
     def withResponseParser(responseParser: ResponseParser): Builder[F, ASC] = {
@@ -115,6 +148,8 @@ object AsyncSolrClient {
 
     protected def createHttpClient: AsyncHttpClient = new DefaultAsyncHttpClient()
 
+    protected def createRequestWriter: RequestWriter = new BinaryRequestWriter
+
     protected def createResponseParser: ResponseParser = new BinaryResponseParser
 
     protected def createMetrics: Metrics = NoopMetrics
@@ -140,6 +175,7 @@ object AsyncSolrClient {
         httpClient.getOrElse(createHttpClient),
         shutdownHttpClient,
         requestInterceptor,
+        requestWriter.getOrElse(createRequestWriter),
         responseParser.getOrElse(createResponseParser),
         metrics.getOrElse(createMetrics),
         serverStateObservation,
@@ -153,9 +189,9 @@ object AsyncSolrClient {
 }
 
 /**
- * Async, non-blocking Solr Server that just allows to {@link #query(SolrQuery)}.
+ * Async, non-blocking Solr Server that allows to make requests to Solr.
  * The usage shall be similar to the <a href="https://wiki.apache.org/solr/Solrj">solrj SolrServer</a>,
- * so query returns a future of a {@link QueryResponse}.
+ * so request returns a future of a {@link SolrResponse}.
  *
  * @author <a href="martin.grotzke@inoio.de">Martin Grotzke</a>
  */
@@ -163,6 +199,7 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
                                        httpClient: AsyncHttpClient,
                                        shutdownHttpClient: Boolean,
                                        requestInterceptor: Option[RequestInterceptor] = None,
+                                       requestWriter: RequestWriter = new BinaryRequestWriter,
                                        responseParser: ResponseParser = new BinaryResponseParser,
                                        metrics: Metrics = NoopMetrics,
                                        serverStateObservation: Option[ServerStateObservation[F]] = None,
@@ -184,6 +221,8 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
     }(scala.concurrent.ExecutionContext.global)
   }
 
+  private lazy val binder = new DocumentObjectBinder
+
   private def sanitize(baseUrl: String): String = {
     if (baseUrl.endsWith("/")) {
       baseUrl.substring(0, baseUrl.length() - 1)
@@ -193,6 +232,19 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
     }
     else
       baseUrl
+  }
+
+  private def updateRequest(collection: Option[String], commitWithinMs: Int = -1): UpdateRequest = {
+    val req = new UpdateRequest
+    collection.foreach(req.setParam("collection", _))
+    req.setCommitWithin(commitWithinMs)
+    req
+  }
+
+  private def queryParams(collection: Option[String], q: Option[SolrParams]): ModifiableSolrParams = {
+    val reqParams = new ModifiableSolrParams(q.orNull)
+    collection.foreach(reqParams.set("collection", _))
+    reqParams
   }
 
   /**
@@ -207,13 +259,281 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
   }
 
   /**
-   * Performs a query to a solr server.
-   * @param q the query to send to solr.
-   * @return
-   */
-  def query(q: SolrQuery): F[QueryResponse] = futureFactory.toBase(
-    loadBalanceQuery(QueryContext(q)).map(_._1)
+    * Performs a request to a solr server.
+    * @param r the request to send to solr.
+    * @return
+    */
+  def execute[T <: SolrResponse : SolrResponseFactory](r: SolrRequest[_ <: T]): F[T] = futureFactory.toBase[T](
+    loadBalanceRequest(RequestContext[T](r)).map(_._1)
   )
+
+  /**
+    * Performs a request to a solr server taking the preferred server into account if provided.
+    * @param r the request to send to the solr server.
+    * @param preferred the server that should be preferred to process the request. Specific [[io.ino.solrs.LoadBalancer LoadBalancer]]
+    *                  implementations have to support this and might add their own semantics.
+    * @return the response and the server that handled the request.
+    */
+  def executePreferred[T <: SolrResponse : SolrResponseFactory](r: SolrRequest[_ <: T], preferred: Option[SolrServer]): F[(T, SolrServer)] =
+    futureFactory.toBase[(T, SolrServer)](loadBalanceRequest(RequestContext[T](r, preferred)))
+
+  /**
+    * Adds a collection of documents, specifying max time before they become committed
+    *
+    * @param collection     the Solr collection to add documents to
+    * @param docs           the collection of documents
+    * @param commitWithinMs max time (in ms) before a commit will happen
+    * @return an { @link org.apache.solr.client.solrj.response.UpdateResponse} from the server
+    */
+  def addDocs(collection: Option[String] = None, docs: Iterable[SolrInputDocument], commitWithinMs: Int = -1): F[UpdateResponse] =
+    execute(updateRequest(collection, commitWithinMs).add(docs.asJavaCollection))
+
+  /**
+    * Adds the documents supplied by the given iterator.
+    *
+    * @param collection  the Solr collection to add documents to
+    * @param docIterator the iterator which returns SolrInputDocument instances
+    * @return an { @link org.apache.solr.client.solrj.response.UpdateResponse} from the server
+    */
+  def addDocs(collection: String, docIterator: Iterator[SolrInputDocument]): F[UpdateResponse] = {
+    val req = updateRequest(Some(collection))
+    req.setDocIterator(docIterator.asJava)
+    execute(req)
+  }
+
+  /**
+    * Adds the documents supplied by the given iterator.
+    *
+    * @param docIterator the iterator which returns SolrInputDocument instances
+    * @return an { @link org.apache.solr.client.solrj.response.UpdateResponse} from the server
+    */
+  def addDocs(docIterator: Iterator[SolrInputDocument]): F[UpdateResponse] = {
+    val req = updateRequest(None)
+    req.setDocIterator(docIterator.asJava)
+    execute(req)
+  }
+
+  /**
+    * Adds a single document specifying max time before it becomes committed
+    *
+    * @param collection     the Solr collection to add the document to
+    * @param doc            the input document
+    * @param commitWithinMs max time (in ms) before a commit will happen
+    * @return an { @link org.apache.solr.client.solrj.response.UpdateResponse} from the server
+    */
+  def addDoc(collection: Option[String] = None, doc: SolrInputDocument, commitWithinMs: Int = -1): F[UpdateResponse] =
+    execute(updateRequest(collection, commitWithinMs).add(doc))
+
+  /**
+    * Adds a single bean specifying max time before it becomes committed
+    * The bean is converted to a {@link SolrInputDocument} by the client's
+    * {@link org.apache.solr.client.solrj.beans.DocumentObjectBinder}
+    *
+    * @param collection to Solr collection to add documents to
+    * @param obj        the input bean
+    * @return an { @link org.apache.solr.client.solrj.response.UpdateResponse} from the server
+    */
+  def addBean(collection: Option[String] = None, obj: Any, commitWithinMs: Int = -1): F[UpdateResponse] =
+    addDoc(collection, binder.toSolrInputDocument(obj), commitWithinMs)
+
+  /**
+    * Adds a collection of beans specifying max time before they become committed
+    * The beans are converted to {@link SolrInputDocument}s by the client's
+    * {@link org.apache.solr.client.solrj.beans.DocumentObjectBinder}
+    *
+    * @param collection     the Solr collection to add documents to
+    * @param beans          the collection of beans
+    * @param commitWithinMs max time (in ms) before a commit will happen
+    * @return an { @link org.apache.solr.client.solrj.response.UpdateResponse} from the server
+    */
+  def addBeans(collection: Option[String] = None, beans: Iterable[_], commitWithinMs: Int = -1): F[UpdateResponse] =
+    addDocs(collection, beans.map(binder.toSolrInputDocument), commitWithinMs)
+
+  /**
+    * Adds the beans supplied by the given iterator.
+    *
+    * @param collection   the Solr collection to add the documents to
+    * @param beanIterator the iterator which returns Beans
+    * @return an { @link org.apache.solr.client.solrj.response.UpdateResponse} from the server
+    */
+  def addBeans(collection: String, beanIterator: Iterator[_]): F[UpdateResponse] =
+    addDocs(collection, beanIterator.map(binder.toSolrInputDocument))
+
+  /**
+    * Adds the beans supplied by the given iterator.
+    *
+    * @param beanIterator the iterator which returns Beans
+    * @return an { @link org.apache.solr.client.solrj.response.UpdateResponse} from the server
+    */
+  def addBeans(beanIterator: Iterator[_]): F[UpdateResponse] =
+    addDocs(beanIterator.map(binder.toSolrInputDocument))
+
+  /**
+    * Performs an explicit commit, causing pending documents to be committed for indexing
+    *
+    * @param collection   the Solr collection to send the commit to
+    * @param waitFlush    block until index changes are flushed to disk
+    * @param waitSearcher block until a new searcher is opened and registered as the
+    *                     main query searcher, making the changes visible
+    * @param softCommit   makes index changes visible while neither fsync-ing index files
+    *                     nor writing a new index descriptor
+    * @return an { @link org.apache.solr.client.solrj.response.UpdateResponse} containing the response
+    *         from the server
+    */
+  def commit(collection: Option[String] = None, waitFlush: Boolean = true, waitSearcher: Boolean = true, softCommit: Boolean = false): F[UpdateResponse] =
+    execute(updateRequest(collection).setAction(COMMIT, waitFlush, waitSearcher, softCommit))
+
+  /**
+    * Performs an explicit optimize, causing a merge of all segments to one.
+    * Note: In most cases it is not required to do explicit optimize
+    *
+    * @param collection   the Solr collection to send the optimize to
+    * @param waitFlush    block until index changes are flushed to disk
+    * @param waitSearcher block until a new searcher is opened and registered as
+    *                     the main query searcher, making the changes visible
+    * @param maxSegments  optimizes down to at most this number of segments
+    * @return an { @link org.apache.solr.client.solrj.response.UpdateResponse} containing the response
+    *         from the server
+    */
+  def optimize(collection: Option[String] = None, waitFlush: Boolean = true, waitSearcher: Boolean = true, maxSegments: Int = 1): F[UpdateResponse] =
+    execute(updateRequest(collection).setAction(OPTIMIZE, waitFlush, waitSearcher, maxSegments))
+
+  /**
+    * Performs a rollback of all non-committed documents pending.
+    * Note that this is not a true rollback as in databases. Content you have previously
+    * added may have been committed due to autoCommit, buffer full, other client performing
+    * a commit etc.
+    *
+    * @param collection the Solr collection to send the rollback to
+    * @return an { @link org.apache.solr.client.solrj.response.UpdateResponse} containing the response
+    *         from the server
+    */
+  def rollback(collection: Option[String] = None): F[UpdateResponse] =
+    execute(updateRequest(collection).rollback())
+
+  /**
+    * Deletes a single document by unique ID, specifying max time before commit
+    *
+    * @param collection     the Solr collection to delete the document from
+    * @param id             the ID of the document to delete
+    * @param commitWithinMs max time (in ms) before a commit will happen
+    * @return an { @link org.apache.solr.client.solrj.response.UpdateResponse} containing the response
+    *         from the server
+    */
+  def deleteById(collection: Option[String] = None, id: String, commitWithinMs: Int = -1): F[UpdateResponse] =
+    execute(updateRequest(collection, commitWithinMs).deleteById(id))
+
+  /**
+    * Deletes a list of documents by unique ID, specifying max time before commit
+    *
+    * @param collection     the Solr collection to delete the documents from
+    * @param ids            the list of document IDs to delete
+    * @param commitWithinMs max time (in ms) before a commit will happen
+    * @return an { @link org.apache.solr.client.solrj.response.UpdateResponse} containing the response
+    *         from the server
+    */
+  def deleteByIds(collection: Option[String] = None, ids: Seq[String], commitWithinMs: Int = -1): F[UpdateResponse] =
+    execute(updateRequest(collection, commitWithinMs).deleteById(ids.asJava))
+
+  /**
+    * Deletes documents from the index based on a query, specifying max time before commit
+    *
+    * @param collection     the Solr collection to delete the documents from
+    * @param query          the query expressing what documents to delete
+    * @param commitWithinMs max time (in ms) before a commit will happen
+    * @return an { @link org.apache.solr.client.solrj.response.UpdateResponse} containing the response
+    *         from the server
+    */
+  def deleteByQuery(collection: Option[String] = None, query: String, commitWithinMs: Int = -1): F[UpdateResponse] =
+    execute(updateRequest(collection, commitWithinMs).deleteByQuery(query))
+
+  /**
+    * Issues a ping request to check if the server is alive
+    *
+    * @return a { @link org.apache.solr.client.solrj.response.SolrPingResponse} containing the response
+    *         from the server
+    */
+  def ping(): F[SolrPingResponse] = execute(new SolrPing())
+
+  /**
+    * Performs a query to the Solr server
+    *
+    * @param q an object holding all key/value parameters to send along the request
+    * @return a { @link org.apache.solr.client.solrj.response.QueryResponse} containing the response
+    *         from the server
+    */
+  def query(q: SolrParams): F[QueryResponse] = query(q, GET)
+
+  /**
+    * Performs a query to the Solr server
+    *
+    * @param q      an object holding all key/value parameters to send along the request
+    * @param method specifies the HTTP method to use for the request, such as GET or POST
+    * @return a { @link org.apache.solr.client.solrj.response.QueryResponse} containing the response
+    *         from the server
+    */
+  def query(q: SolrParams, method: METHOD): F[QueryResponse] = execute(new QueryRequest(q, method))
+
+  /**
+    * Performs a query to the Solr server
+    *
+    * @param collection the Solr collection to query
+    * @param q          an object holding all key/value parameters to send along the request
+    * @param method     specifies the HTTP method to use for the request, such as GET or POST
+    * @return a { @link org.apache.solr.client.solrj.response.QueryResponse} containing the response
+    *         from the server
+    */
+  def query(collection: String, q: SolrParams, method: METHOD = GET): F[QueryResponse] =
+    execute(new QueryRequest(queryParams(Some(collection), Some(q)), method))
+
+  /**
+    * Query solr, and stream the results.  Unlike the standard query, this will
+    * send events for each Document rather then add them to the QueryResponse.
+    *
+    * Although this function returns a 'QueryResponse' it should be used with care
+    * since it excludes anything that was passed to callback.  Also note that
+    * future version may pass even more info to the callback and may not return
+    * the results in the QueryResponse.
+    *
+    * @param collection the Solr collection to query
+    * @param q          an object holding all key/value parameters to send along the request
+    * @param callback   the callback to stream results to
+    * @return a { @link org.apache.solr.client.solrj.response.QueryResponse} containing the response
+    *         from the server
+    */
+  def queryAndStreamResponse(collection: Option[String] = None, q: SolrParams, callback: StreamingResponseCallback): F[QueryResponse] = {
+    val parser = new StreamingBinaryResponseParser(callback)
+    val req = new QueryRequest(queryParams(collection, Some(q)))
+    req.setStreamingResponseCallback(callback)
+    req.setResponseParser(parser)
+    execute(req)
+  }
+
+  /**
+    * Retrieves the SolrDocument associated with the given identifier and uses
+    * the SolrParams to execute the request.
+    *
+    * @param collection the Solr collection to query
+    * @param id         the id
+    * @param params     additional parameters to add to the query
+    * @return retrieved SolrDocument, or None if no document is found.
+    */
+  def getById(collection: Option[String] = None, id: String, params: Option[SolrParams] = None): F[Option[SolrDocument]] =
+    futureFactory.toBase[Option[SolrDocument]](doGetByIds(collection, Iterable(id), params).map(_.asScala.headOption))
+
+  /**
+    * Retrieves the SolrDocuments associated with the given identifiers and uses
+    * the SolrParams to execute the request.
+    *
+    * If a document was not found, it will not be added to the SolrDocumentList.
+    *
+    * @param collection the Solr collection to query
+    * @param ids        the ids
+    * @param params     additional parameters to add to the query
+    * @return a SolrDocumentList
+    */
+  def getByIds(collection: Option[String] = None, ids: Iterable[String], params: Option[SolrParams] = None): F[SolrDocumentList] =
+    futureFactory.toBase[SolrDocumentList](doGetByIds(collection, ids, params))
 
   /**
    * Performs a query to a solr server taking the preferred server into account if provided.
@@ -222,37 +542,44 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
    *                  implementations have to support this and might add their own semantics.
    * @return the response and the server that handled the query.
    */
-  def queryPreferred(q: SolrQuery, preferred: Option[SolrServer]): F[(QueryResponse, SolrServer)] = futureFactory.toBase(
-    loadBalanceQuery(QueryContext(q, preferred))
-  )
+  def queryPreferred(q: SolrQuery, preferred: Option[SolrServer]): F[(QueryResponse, SolrServer)] =
+    executePreferred(new QueryRequest(q), preferred)
 
-  private def loadBalanceQuery(queryContext: QueryContext): Future[(QueryResponse, SolrServer)] = {
-    loadBalancer.solrServer(queryContext.q, queryContext.preferred) match {
+  private def doGetByIds(collection: Option[String], ids: Iterable[String], params: Option[SolrParams]): Future[SolrDocumentList] = {
+    if (ids == null || ids.isEmpty) throw new IllegalArgumentException("Must provide an identifier of a document to retrieve.")
+    val reqParams = queryParams(collection, params)
+    if (StringUtils.isEmpty(reqParams.get(CommonParams.QT))) reqParams.set(CommonParams.QT, "/get")
+    reqParams.set("ids", ids.toArray: _*)
+    loadBalanceRequest(RequestContext(new QueryRequest(reqParams))).map(_._1).map(_.getResults)
+  }
+
+  private def loadBalanceRequest[T <: SolrResponse : SolrResponseFactory](requestContext: RequestContext[T]): Future[(T, SolrServer)] = {
+    loadBalancer.solrServer(requestContext.r, requestContext.preferred) match {
       case Some(solrServer) =>
-        queryWithRetries(solrServer, queryContext)
+        executeWithRetries(solrServer, requestContext)
       case None =>
         val msg =
-          if(queryContext.failedRequests.isEmpty) "No solr server available."
-          else s"No next solr server available. These requests failed:\n- ${queryContext.failedRequests.mkString("\n- ")}"
+          if(requestContext.failedRequests.isEmpty) "No solr server available."
+          else s"No next solr server available. These requests failed:\n- ${requestContext.failedRequests.mkString("\n- ")}"
         futureFactory.failed(new SolrServerException(msg))
     }
   }
 
-  private def queryWithRetries(server: SolrServer, queryContext: QueryContext): Future[(QueryResponse, SolrServer)] = {
+  private def executeWithRetries[T <: SolrResponse : SolrResponseFactory](server: SolrServer, requestContext: RequestContext[T]): Future[(T, SolrServer)] = {
     val start = System.currentTimeMillis()
-    query(server, queryContext.q)
+    execute[T](server, requestContext.r)
       .map(_ -> server)
       .handleWith { case NonFatal(e) =>
-        val updatedContext = queryContext.failedRequest(server, (System.currentTimeMillis() - start) millis, e)
+        val updatedContext = requestContext.failedRequest(server, (System.currentTimeMillis() - start) millis, e)
         retryPolicy.shouldRetry(e, server, updatedContext, loadBalancer) match {
           case RetryServer(s) =>
-            logger.warn(s"Query failed for server $server, trying next server $s. Exception was: $e")
-            queryWithRetries(s, updatedContext)
+            logger.warn(s"Request failed for server $server, trying next server $s. Exception was: $e")
+            executeWithRetries(s, updatedContext)
           case StandardRetryDecision(Result.Retry) =>
-            logger.warn(s"Query failed for server $server, trying to get another server from loadBalancer for retry. Exception was: $e")
-            loadBalanceQuery(updatedContext)
+            logger.warn(s"Request failed for server $server, trying to get another server from loadBalancer for retry. Exception was: $e")
+            loadBalanceRequest(updatedContext)
           case StandardRetryDecision(Result.Fail) =>
-            logger.warn(s"Query failed for server $server, not retrying. Exception was: $e", e)
+            logger.warn(s"Request failed for server $server, not retrying. Exception was: $e", e)
             // Wrap SolrException with solrs RemoteSolrException
             val ex = if(e.isInstanceOf[SolrException]) new RemoteSolrException(500, e.getMessage, e) else e
             futureFactory.failed(ex)
@@ -260,16 +587,16 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
       }
   }
 
-  private def query(solrServer: SolrServer, q: SolrQuery): Future[QueryResponse] = {
-    val monitoredQuery = loadBalancer.interceptQuery(doQuery _) _
+  private def execute[T <: SolrResponse : SolrResponseFactory](solrServer: SolrServer, r: SolrRequest[_ <: T]): Future[T] = {
+    val monitoredRequest = loadBalancer.interceptRequest[T](doExecute[T] _) _
     requestInterceptor.map(ri =>
-      ri.interceptQuery(monitoredQuery)(solrServer, q)
-    ).getOrElse(monitoredQuery(solrServer, q))
+      ri.interceptRequest[T](monitoredRequest)(solrServer, r)
+    ).getOrElse(monitoredRequest(solrServer, r))
   }
 
-  private[solrs] def doQuery(solrServer: SolrServer, q: SolrQuery): Future[QueryResponse] = {
+  private[solrs] def doExecute[T <: SolrResponse : SolrResponseFactory](solrServer: SolrServer, r: SolrRequest[_ <: T]): Future[T] = {
 
-    val wparams = new ModifiableSolrParams(q)
+    val wparams = new ModifiableSolrParams(r.getParams())
     if (responseParser != null) {
       wparams.set(CommonParams.WT, responseParser.getWriterType())
       wparams.set(CommonParams.VERSION, responseParser.getVersion())
@@ -277,17 +604,34 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
 
     implicit val s = solrServer
 
-    val promise = futureFactory.newPromise[QueryResponse]
+    val promise = futureFactory.newPromise[T]
     val startTime = System.currentTimeMillis()
 
-    val url = solrServer.baseUrl + getPath(q) + wparams.toQueryString
-    val request = httpClient.prepareGet(url).addHeader("User-Agent", AGENT).build()
+    val url = solrServer.baseUrl + getPath(r) + wparams.toQueryString
+    val streams = requestWriter.getContentStreams(r)
+    val requestBuilder = if (r.getMethod == GET) {
+      if (streams != null) {
+        throw new SolrException(BAD_REQUEST, "GET can't send streams!")
+      }
+      httpClient.prepareGet(url)
+    } else {
+      val req = if (r.getMethod == POST) httpClient.preparePost(url) else httpClient.preparePut(url)
+      if (streams == null) {
+        req.setFormParams(wparams.getMap.asScala.mapValues(asList[String](_: _*)).asJava)
+      } else {
+        val contentStream = streams.iterator.next
+        req
+          .setBody(contentStream.getStream)
+          .setHeader("Content-Type", contentStream.getContentType)
+      }
+    }
+    val request = requestBuilder.addHeader("User-Agent", AGENT).build()
 
     try {
       httpClient.executeRequest(request, new AsyncCompletionHandler[Response]() {
         override def onCompleted(response: Response): Response = {
           try {
-            val qr = toQueryResponse(response, url, startTime)
+            val qr = toSolrResponse[T](r, response, url, startTime)
             promise.success(qr)
           } catch {
             case NonFatal(e) => promise.failure(e)
@@ -309,13 +653,13 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
     promise.future
   }
 
-  protected def getPath(query: SolrQuery): String = {
-    val qt = query.get(CommonParams.QT)
-    if (qt != null && qt.startsWith("/")) qt else DEFAULT_PATH
+  protected def getPath(request: SolrRequest[_ <: SolrResponse]): String = {
+    val path = requestWriter.getPath(request)
+    if (path != null && path.startsWith("/")) path else DEFAULT_PATH
   }
 
   @throws[RemoteSolrException]
-  protected def toQueryResponse(response: Response, url: String, startTime: Long)(implicit server: SolrServer): QueryResponse = {
+  protected def toSolrResponse[T <: SolrResponse : SolrResponseFactory](r: SolrRequest[_ <: T], response: Response, url: String, startTime: Long)(implicit server: SolrServer): T = {
     var rsp: NamedList[Object] = null
 
     validateResponse(response, responseParser)
@@ -337,7 +681,8 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
       throw new RemoteSolrException(httpStatus, reason, null)
     }
 
-    val res = new QueryResponse(rsp, null)
+    val res = SolrResponseFactory[T].createResponse(r)
+    res.setResponse(rsp)
     val elapsedTime = System.currentTimeMillis() - startTime
     res.setElapsedTime(elapsedTime)
     metrics.requestTime(elapsedTime)
@@ -416,6 +761,7 @@ trait TypedAsyncSolrClient[F[_], ASC <: AsyncSolrClient[F]] {
                       httpClient: AsyncHttpClient,
                       shutdownHttpClient: Boolean,
                       requestInterceptor: Option[RequestInterceptor],
+                      requestWriter: RequestWriter,
                       responseParser: ResponseParser,
                       metrics: Metrics,
                       serverStateObservation: Option[ServerStateObservation[F]],
@@ -423,31 +769,6 @@ trait TypedAsyncSolrClient[F[_], ASC <: AsyncSolrClient[F]] {
 
   def builder(baseUrl: String) = new Builder[F, ASC](new SingleServerLB(baseUrl), build _)
   def builder(loadBalancer: LoadBalancer) = new Builder[F, ASC](loadBalancer, build _)
-
-}
-
-import scala.concurrent.{Future => SFuture}
-
-// TODO: can be removed?
-class ScalaAsyncSolrClient(override private[solrs] val loadBalancer: LoadBalancer,
-                           httpClient: AsyncHttpClient,
-                           shutdownHttpClient: Boolean,
-                           requestInterceptor: Option[RequestInterceptor] = None,
-                           responseParser: ResponseParser = new BinaryResponseParser,
-                           metrics: Metrics = NoopMetrics,
-                           serverStateObservation: Option[ServerStateObservation[SFuture]] = None,
-                           retryPolicy: RetryPolicy = RetryPolicy.TryOnce)
-  extends AsyncSolrClient[SFuture](loadBalancer, httpClient, shutdownHttpClient, requestInterceptor, responseParser, metrics, serverStateObservation, retryPolicy)(ScalaFutureFactory) {
-
-  /**
-    * @inheritdoc
-    */
-  override def query(q: SolrQuery): SFuture[QueryResponse] = super.query(q)
-
-  /**
-    * @inheritdoc
-    */
-  override def queryPreferred(q: SolrQuery, preferred: Option[SolrServer]): SFuture[(QueryResponse, SolrServer)] = super.queryPreferred(q, preferred)
 
 }
 

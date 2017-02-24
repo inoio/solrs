@@ -1,18 +1,20 @@
 package io.ino.solrs
 
+import org.apache.solr.client.solrj.request.QueryRequest
 import org.apache.solr.client.solrj.SolrQuery
+import org.apache.solr.client.solrj.SolrRequest
 import org.scalatest.{Matchers, FunSpec}
 
 class RoundRobinLBSpec extends FunSpec with Matchers {
 
-  private val q = new SolrQuery("foo")
+  private val q = new QueryRequest(new SolrQuery("foo"))
 
   describe("RoundRobinLB") {
 
     it("should return None if no solr server matches") {
       val nonMatchingServers = new SolrServers {
         override def all: Seq[SolrServer] = Nil
-        override def matching(q: SolrQuery): IndexedSeq[SolrServer] = Vector.empty
+        override def matching(r: SolrRequest[_]): IndexedSeq[SolrServer] = Vector.empty
       }
       val cut = RoundRobinLB(nonMatchingServers)
 

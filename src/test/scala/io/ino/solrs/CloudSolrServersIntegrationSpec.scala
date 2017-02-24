@@ -1,11 +1,13 @@
 package io.ino.solrs
 
 import io.ino.solrs.CloudSolrServers.WarmupQueries
+import io.ino.solrs.SolrMatchers.hasQuery
 import io.ino.time.Clock
 import org.apache.curator.test.TestingServer
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.impl.CloudSolrClient
 import org.apache.solr.client.solrj.response.QueryResponse
+import org.mockito.Matchers.{eq => mockEq, _}
 import org.mockito.Mockito._
 import org.scalatest._
 import org.scalatest.concurrent.Eventually._
@@ -34,7 +36,7 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
   private var solrs = Map.empty[SolrRunner, AsyncSolrClient]
 
   import AsyncSolrClientMocks._
-  private val asyncSolrClient = mockDoQuery(mock[AsyncSolrClient])(Clock.mutable)
+  private val asyncSolrClient = mockDoRequest(mock[AsyncSolrClient])(Clock.mutable)
 
   private var cut: CloudSolrServers[Future] = _
   private var cloudSolrServer: CloudSolrClient = _
@@ -130,7 +132,7 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
       val standardResponsePromise = futureFactory.newPromise[QueryResponse]
       val standardResponse = standardResponsePromise.future
 
-      val asyncSolrClient = mockDoQuery(mock[AsyncSolrClient], standardResponse)
+      val asyncSolrClient = mockDoRequest(mock[AsyncSolrClient], standardResponse)
       cut.setAsyncSolrClient(asyncSolrClient)
 
       // initially the list of servers should be empty
@@ -145,7 +147,7 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
       // and the servers should have been tested with queries
       solrRunnerUrls.map(SolrServer(_, Enabled)).foreach { solrServer =>
         warmupQueries.queriesByCollection("col1").foreach { q =>
-          verify(asyncSolrClient, times(warmupQueries.count)).doQuery(solrServer, q)
+          verify(asyncSolrClient, times(warmupQueries.count)).doExecute[QueryResponse](mockEq(solrServer), hasQuery(q))(any())
         }
       }
 

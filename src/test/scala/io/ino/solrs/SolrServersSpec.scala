@@ -1,6 +1,7 @@
 package io.ino.solrs
 
 import org.apache.solr.client.solrj.SolrQuery
+import org.apache.solr.client.solrj.request.QueryRequest
 import org.scalatest.{FunSpec, Matchers}
 
 import scala.concurrent.Future
@@ -9,7 +10,7 @@ import scala.language.postfixOps
 
 class SolrServersSpec extends FunSpec with Matchers with FutureAwaits {
 
-  private val q = new SolrQuery("foo")
+  private val q = new QueryRequest(new SolrQuery("foo"))
   private implicit val timeout = 1.second
 
   describe("StaticSolrServers") {

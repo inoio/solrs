@@ -2,8 +2,12 @@ package io.ino.solrs
 
 import java.util.concurrent.TimeUnit
 
+import io.ino.solrs.SolrMatchers.hasQuery
 import io.ino.time.Clock
+import org.apache.solr.client.solrj.request.QueryRequest
+import org.apache.solr.client.solrj.response.QueryResponse
 import org.apache.solr.client.solrj.SolrQuery
+import org.apache.solr.client.solrj.SolrRequest
 import org.mockito.Matchers.{eq => mockEq, _}
 import org.mockito.Mockito._
 import org.scalactic.source.Position
@@ -27,6 +31,7 @@ class FastestServerLBSpec extends StandardFunSpec {
   private val solrServers = new StaticSolrServers(IndexedSeq(server1, server2, server3))
 
   private val q = new SolrQuery("foo")
+  private val r = new QueryRequest(q)
   private val classifyQuery: (SolrQuery) => String = solrQuery => "foo"
 
   private implicit val clock = Clock.mutable
@@ -37,7 +42,7 @@ class FastestServerLBSpec extends StandardFunSpec {
 
   override def beforeEach(): Unit = {
     reset(solrs)
-    mockDoQuery(solrs)
+    mockDoRequest(solrs)
     clock.set(0)
   }
 
@@ -50,46 +55,46 @@ class FastestServerLBSpec extends StandardFunSpec {
     it("should return None if no solr server matches") {
       val nonMatchingServers = new SolrServers {
         override def all: Seq[SolrServer] = Nil
-        override def matching(q: SolrQuery): IndexedSeq[SolrServer] = Vector.empty
+        override def matching(r: SolrRequest[_]): IndexedSeq[SolrServer] = Vector.empty
       }
       val cut = newDynamicLB(nonMatchingServers)
-      cut.solrServer(q) should be (None)
+      cut.solrServer(r) should be (None)
     }
 
     it("should only return active solr servers") {
       val servers = IndexedSeq(SolrServer("host1"), SolrServer("host2"))
       val cut = newDynamicLB(new StaticSolrServers(servers))
 
-      cut.solrServer(q) should be (Some(SolrServer("host1")))
+      cut.solrServer(r) should be (Some(SolrServer("host1")))
       // we must create some performance stats for host1, so that host2 will be selected
-      runTests(cut, server1, q, fromSecond = 1, toSecond = 2, startResponseTime = 1000, endResponseTime = 1000)
-      cut.solrServer(q) should be (Some(SolrServer("host2")))
+      runTests(cut, server1, fromSecond = 1, toSecond = 2, startResponseTime = 1000, endResponseTime = 1000)
+      cut.solrServer(r) should be (Some(SolrServer("host2")))
 
       servers.head.status = Disabled
-      cut.solrServer(q) should be (Some(SolrServer("host2")))
+      cut.solrServer(r) should be (Some(SolrServer("host2")))
 
       servers.head.status = Enabled
       servers(1).status = Failed
-      cut.solrServer(q) should be (Some(SolrServer("host1")))
-      cut.solrServer(q) should be (Some(SolrServer("host1")))
+      cut.solrServer(r) should be (Some(SolrServer("host1")))
+      cut.solrServer(r) should be (Some(SolrServer("host1")))
 
       servers.head.status = Disabled
-      cut.solrServer(q) should be (None)
+      cut.solrServer(r) should be (None)
     }
 
     it("should return the fastest server by default") {
       val cut = newDynamicLB(solrServers)
 
-      when(solrs.doQuery(any(), any())).thenReturn(delayedResponse(1))
+      when(solrs.doExecute[QueryResponse](any(), any())(any())).thenReturn(delayedResponse(1))
       cut.test(server1)
-      when(solrs.doQuery(any(), any())).thenReturn(delayedResponse(10))
+      when(solrs.doExecute[QueryResponse](any(), any())(any())).thenReturn(delayedResponse(10))
       cut.test(server2)
-      when(solrs.doQuery(any(), any())).thenReturn(delayedResponse(20))
+      when(solrs.doExecute[QueryResponse](any(), any())(any())).thenReturn(delayedResponse(20))
       cut.test(server3)
 
-      cut.solrServer(q) should be (Some(server1))
-      cut.solrServer(q) should be (Some(server1))
-      cut.solrServer(q) should be (Some(server1))
+      cut.solrServer(r) should be (Some(server1))
+      cut.solrServer(r) should be (Some(server1))
+      cut.solrServer(r) should be (Some(server1))
     }
 
     /**
@@ -98,47 +103,47 @@ class FastestServerLBSpec extends StandardFunSpec {
     it("should round robin equally fast servers") {
       val cut = newDynamicLB(solrServers)
 
-      runTests(cut, server1, q, fromSecond = 1, toSecond = 5, startResponseTime = 1, endResponseTime = 1)
-      runTests(cut, server2, q, fromSecond = 1, toSecond = 5, startResponseTime = 1, endResponseTime = 1)
-      runTests(cut, server3, q, fromSecond = 1, toSecond = 5, startResponseTime = 1, endResponseTime = 1)
+      runTests(cut, server1, fromSecond = 1, toSecond = 5, startResponseTime = 1, endResponseTime = 1)
+      runTests(cut, server2, fromSecond = 1, toSecond = 5, startResponseTime = 1, endResponseTime = 1)
+      runTests(cut, server3, fromSecond = 1, toSecond = 5, startResponseTime = 1, endResponseTime = 1)
       cut.updateStats()
 
-      cut.solrServer(q) should be (Some(server1))
-      cut.solrServer(q) should be (Some(server2))
-      cut.solrServer(q) should be (Some(server3))
-      cut.solrServer(q) should be (Some(server1))
+      cut.solrServer(r) should be (Some(server1))
+      cut.solrServer(r) should be (Some(server2))
+      cut.solrServer(r) should be (Some(server3))
+      cut.solrServer(r) should be (Some(server1))
     }
 
     it("should consider the preferred server if it's one of the fastest servers") {
       val cut = newDynamicLB(solrServers)
       val preferred = Some(server2)
 
-      runTests(cut, server1, q, fromSecond = 1, toSecond = 5, startResponseTime = 1, endResponseTime = 1)
-      runTests(cut, server2, q, fromSecond = 1, toSecond = 5, startResponseTime = 1, endResponseTime = 1)
-      runTests(cut, server3, q, fromSecond = 1, toSecond = 5, startResponseTime = 10, endResponseTime = 10)
+      runTests(cut, server1, fromSecond = 1, toSecond = 5, startResponseTime = 1, endResponseTime = 1)
+      runTests(cut, server2, fromSecond = 1, toSecond = 5, startResponseTime = 1, endResponseTime = 1)
+      runTests(cut, server3, fromSecond = 1, toSecond = 5, startResponseTime = 10, endResponseTime = 10)
       cut.updateStats()
 
-      cut.solrServer(q, preferred = Some(server2)) should be (Some(server2))
-      cut.solrServer(q, preferred = Some(server2)) should be (Some(server2))
+      cut.solrServer(r, preferred = Some(server2)) should be (Some(server2))
+      cut.solrServer(r, preferred = Some(server2)) should be (Some(server2))
 
       // if the preferred server is too slow then the fastest ones should be round robin'ed
-      cut.solrServer(q, preferred = Some(server3)) should be (Some(server1))
-      cut.solrServer(q, preferred = Some(server3)) should be (Some(server2))
+      cut.solrServer(r, preferred = Some(server3)) should be (Some(server1))
+      cut.solrServer(r, preferred = Some(server3)) should be (Some(server2))
     }
 
     it("should return the server with a better predicted response time") {
       val cut = newDynamicLB(solrServers)
 
-      runTests(cut, server1, q, fromSecond = 1, toSecond = 5, startResponseTime = 10, endResponseTime = 10)
-      runTests(cut, server2, q, fromSecond = 1, toSecond = 5, startResponseTime = 20, endResponseTime = 20)
-      runTests(cut, server3, q, fromSecond = 1, toSecond = 5, startResponseTime = 20, endResponseTime = 20)
+      runTests(cut, server1, fromSecond = 1, toSecond = 5, startResponseTime = 10, endResponseTime = 10)
+      runTests(cut, server2, fromSecond = 1, toSecond = 5, startResponseTime = 20, endResponseTime = 20)
+      runTests(cut, server3, fromSecond = 1, toSecond = 5, startResponseTime = 20, endResponseTime = 20)
       cut.updateStats()
 
-      runTests(cut, server1, q, fromSecond = 6, toSecond = 10, startResponseTime = 10, endResponseTime = 20)
-      runTests(cut, server2, q, fromSecond = 6, toSecond = 10, startResponseTime = 20, endResponseTime = 10)
+      runTests(cut, server1, fromSecond = 6, toSecond = 10, startResponseTime = 10, endResponseTime = 20)
+      runTests(cut, server2, fromSecond = 6, toSecond = 10, startResponseTime = 20, endResponseTime = 10)
       cut.updateStats()
 
-      cut.solrServer(q) should be (Some(server2))
+      cut.solrServer(r) should be (Some(server2))
     }
 
     /**
@@ -149,27 +154,27 @@ class FastestServerLBSpec extends StandardFunSpec {
       // quantize to 5: 0 to 4 = 0, 5 to 9 = 1 etc.
       val cut = newDynamicLB(solrServers, mapPredictedResponseTime = t => t/5)
 
-      runTests(cut, server1, q, fromSecond = 1, toSecond = 5, startResponseTime = 1, endResponseTime = 1)
-      runTests(cut, server2, q, fromSecond = 1, toSecond = 5, startResponseTime = 2, endResponseTime = 2)
-      runTests(cut, server3, q, fromSecond = 1, toSecond = 5, startResponseTime = 3, endResponseTime = 3)
+      runTests(cut, server1, fromSecond = 1, toSecond = 5, startResponseTime = 1, endResponseTime = 1)
+      runTests(cut, server2, fromSecond = 1, toSecond = 5, startResponseTime = 2, endResponseTime = 2)
+      runTests(cut, server3, fromSecond = 1, toSecond = 5, startResponseTime = 3, endResponseTime = 3)
       cut.updateStats()
 
-      cut.solrServer(q) should be (Some(server1))
-      cut.solrServer(q) should be (Some(server2))
-      cut.solrServer(q) should be (Some(server3))
-      cut.solrServer(q) should be (Some(server1))
+      cut.solrServer(r) should be (Some(server1))
+      cut.solrServer(r) should be (Some(server2))
+      cut.solrServer(r) should be (Some(server3))
+      cut.solrServer(r) should be (Some(server1))
 
-      runTests(cut, server2, q, fromSecond = 6, toSecond = 10, startResponseTime = 10, endResponseTime = 10)
-      runTests(cut, server3, q, fromSecond = 6, toSecond = 10, startResponseTime = 10, endResponseTime = 10)
+      runTests(cut, server2, fromSecond = 6, toSecond = 10, startResponseTime = 10, endResponseTime = 10)
+      runTests(cut, server3, fromSecond = 6, toSecond = 10, startResponseTime = 10, endResponseTime = 10)
       cut.updateStats()
 
-      cut.solrServer(q) should be (Some(server1))
-      cut.solrServer(q) should be (Some(server1))
+      cut.solrServer(r) should be (Some(server1))
+      cut.solrServer(r) should be (Some(server1))
     }
 
     it("should initially test servers to gather performance stats") {
       val cut = newDynamicLB(solrServers, minDelay = 10 millis)
-      solrServers.all.foreach(verify(solrs).doQuery(_, q))
+      solrServers.all.foreach(s => verify(solrs).doExecute[QueryResponse](mockEq(s), hasQuery(q))(any()))
     }
 
     it("should test servers based on the real query rate restricted by min delay") {
@@ -177,52 +182,52 @@ class FastestServerLBSpec extends StandardFunSpec {
       val minDelay = 50 millis
       val (testQuery, cut, spyClient) = spiedClient(minDelay)
 
-      solrServers.all.foreach(verify(spyClient, atLeastOnce()).doQuery(_, testQuery))
+      solrServers.all.foreach(s => verify(spyClient, atLeastOnce()).doExecute[QueryResponse](mockEq(s), hasQuery(testQuery))(any()))
 
       // reset the mock to see which test queries are run after the initial ones
       reset(spyClient)
-      mockDoQuery(spyClient)
+      mockDoRequest(spyClient)
 
       // simulate a 10 second delay until the next request
       clock.set((10 seconds).toMillis)
-      solrServers.all.foreach(verify(spyClient, never()).doQuery(_, testQuery))
+      solrServers.all.foreach(s => verify(spyClient, never()).doExecute[QueryResponse](mockEq(s), hasQuery(testQuery))(any()))
 
       // now simulate the query
       var realQuery = new SolrQuery("foo")
       spyClient.query(realQuery)
-      verify(spyClient).doQuery(any(), mockEq(realQuery))
+      verify(spyClient).doExecute[QueryResponse](any(), hasQuery(realQuery))(any())
 
       // verify that the lb ran the test query against all servers
-      solrServers.all.foreach(verify(spyClient, times(1)).doQuery(_, testQuery))
+      solrServers.all.foreach(s => verify(spyClient, times(1)).doExecute[QueryResponse](mockEq(s), hasQuery(testQuery))(any()))
 
       // another real query must not directly trigger new test queries
       realQuery = new SolrQuery("bar")
       spyClient.query(realQuery)
-      verify(spyClient).doQuery(any(), mockEq(realQuery))
-      solrServers.all.foreach(verify(spyClient, times(1)).doQuery(_, testQuery))
+      verify(spyClient).doExecute[QueryResponse](any(), hasQuery(realQuery))(any())
+      solrServers.all.foreach(s => verify(spyClient, times(1)).doExecute[QueryResponse](mockEq(s), hasQuery(testQuery))(any()))
 
       // if a query comes in at least minDelay later, servers should be tested again
       clock.advance(minDelay.toMillis)
       realQuery = new SolrQuery("baz")
       spyClient.query(realQuery)
-      verify(spyClient).doQuery(any(), mockEq(realQuery))
-      solrServers.all.foreach(verify(spyClient, times(2)).doQuery(_, testQuery))
+      verify(spyClient).doExecute[QueryResponse](any(), hasQuery(realQuery))(any())
+      solrServers.all.foreach(s => verify(spyClient, times(2)).doExecute[QueryResponse](mockEq(s), hasQuery(testQuery))(any()))
     }
 
     it("should test slow servers less frequently") {
       clock.set(0)
       val minDelay = 50 millis
-      def mockQueries(spyClient: AsyncSolrClient) = {
+      def mockRequests(spyClient: AsyncSolrClient): Unit = {
         // mock server1/server2 with ~10 millis response time, and server3 significantly higher
-        mockDoQuery(spyClient, mockEq(server1), 8 millis)
-        mockDoQuery(spyClient, mockEq(server2), 12 millis)
-        mockDoQuery(spyClient, mockEq(server3), 30 millis)
+        mockDoRequest(spyClient, mockEq(server1), 8 millis)
+        mockDoRequest(spyClient, mockEq(server2), 12 millis)
+        mockDoRequest(spyClient, mockEq(server3), 30 millis)
       }
-      val (testQuery, cut, spyClient) = spiedClient(minDelay, mockQueries = mockQueries)
+      val (testQuery, cut, spyClient) = spiedClient(minDelay, mockRequests = mockRequests)
 
       // reset the mock to see which test queries are run after the initial ones
       reset(spyClient)
-      mockQueries(spyClient)
+      mockRequests(spyClient)
 
       // simulate a 10 second delay until the next request
       clock.set((10 seconds).toMillis)
@@ -230,28 +235,28 @@ class FastestServerLBSpec extends StandardFunSpec {
       // now simulate the query
       var realQuery = new SolrQuery("foo")
       spyClient.query(realQuery)
-      verify(spyClient).doQuery(any(), mockEq(realQuery))
+      verify(spyClient).doExecute[QueryResponse](any(), hasQuery(realQuery))(any())
 
       // verify that the lb ran the test query against fast server servers, but not against the slow server
-      List(server1, server2).foreach(verify(spyClient, times(1)).doQuery(_, testQuery))
-      verify(spyClient, never()).doQuery(server3, testQuery)
+      List(server1, server2).foreach(s => verify(spyClient, times(1)).doExecute[QueryResponse](mockEq(s), hasQuery(testQuery))(any()))
+      verify(spyClient, never()).doExecute[QueryResponse](mockEq(server3), hasQuery(testQuery))(any())
     }
 
     it("should test slow/all servers according to the specified maxDelay") {
       clock.set(0)
       val minDelay = 10 millis
       val maxDelay = 50 millis
-      def mockQueries(spyClient: AsyncSolrClient) = {
+      def mockRequests(spyClient: AsyncSolrClient): Unit = {
         // mock server1/server2 with ~5 millis response time, and server3 significantly higher
-        mockDoQuery(spyClient, mockEq(server1), 4 millis)
-        mockDoQuery(spyClient, mockEq(server2), 6 millis)
-        mockDoQuery(spyClient, mockEq(server3), 20 millis)
+        mockDoRequest(spyClient, mockEq(server1), 4 millis)
+        mockDoRequest(spyClient, mockEq(server2), 6 millis)
+        mockDoRequest(spyClient, mockEq(server3), 20 millis)
       }
-      val (testQuery, cut, spyClient) = spiedClient(minDelay, maxDelay, mockQueries)
+      val (testQuery, cut, spyClient) = spiedClient(minDelay, maxDelay, mockRequests)
 
       // reset the mock to see which test queries are run after the initial ones
       reset(spyClient)
-      mockQueries(spyClient)
+      mockRequests(spyClient)
 
       // we must also update the clock to that the internal, time based tests let the tests run
       clock.advance(maxDelay.toMillis)
@@ -262,14 +267,14 @@ class FastestServerLBSpec extends StandardFunSpec {
       // verify that the lb ran the test query (in this case for all servers)
       // ... and we accept a slight delay because the scheduler might be a bit inaccurate...
       eventually {
-        solrServers.all.foreach(verify(spyClient, atLeastOnce()).doQuery(_, testQuery))
+        solrServers.all.foreach(s => verify(spyClient, atLeastOnce()).doExecute[QueryResponse](mockEq(s), hasQuery(testQuery))(any()))
       }(PatienceConfig(timeout = maxDelay * 2, interval = maxDelay/10), Position.here)
     }
   }
 
   private def spiedClient(minDelay: Duration,
                           maxDelay: Duration = 10 seconds,
-                          mockQueries: AsyncSolrClient => Unit = (spyClient: AsyncSolrClient) => mockDoQuery(spyClient)
+                          mockRequests: AsyncSolrClient => Unit = (spyClient: AsyncSolrClient) => mockDoRequest(spyClient)
                          ):(SolrQuery, FastestServerLB, AsyncSolrClient) = {
     val testQuery = new SolrQuery("testQuery")
     cut = new FastestServerLB(solrServers, _ => ("collection1", testQuery), minDelay, maxDelay, clock = clock)
@@ -278,7 +283,7 @@ class FastestServerLBSpec extends StandardFunSpec {
     val realClient: AsyncSolrClient = new AsyncSolrClient.Builder(cut, ascFactory) {
       override protected def setOnAsyncSolrClientAwares(solr: AsyncSolrClient): Unit = {
         spyClient = spy(solr)
-        mockQueries(spyClient)
+        mockRequests(spyClient)
         super.setOnAsyncSolrClientAwares(spyClient)
       }
     }.build
@@ -302,14 +307,14 @@ class FastestServerLBSpec extends StandardFunSpec {
     f
   }
 
-  private def runTests(cut: FastestServerLB, server: SolrServer, query: SolrQuery,
+  private def runTests(cut: FastestServerLB, server: SolrServer,
                                   fromSecond: Long, toSecond: Long,
                                   startResponseTime: Long, endResponseTime: Long) = {
     val deltaPerStep = (endResponseTime - startResponseTime) / (toSecond - fromSecond)
     for(second <- fromSecond to toSecond) {
       atSecond(second) {
         val responseTime = startResponseTime + (second - fromSecond) * deltaPerStep
-        when(solrs.doQuery(any(), any())).thenReturn(delayedResponse(responseTime))
+        when(solrs.doExecute[QueryResponse](any(), any())(any())).thenReturn(delayedResponse(responseTime))
         cut.test(server)
       }
     }

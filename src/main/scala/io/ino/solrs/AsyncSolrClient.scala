@@ -606,8 +606,14 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
     val promise = futureFactory.newPromise[T]
     val startTime = System.currentTimeMillis()
 
-    val url = solrServer.baseUrl + getPath(r) + wparams.toQueryString
     val streams = requestWriter.getContentStreams(r)
+    val url = if (r.getMethod == POST && streams == null) {
+      // for POST (non-stream post), wparam should NOT be added to the url - wparam passed as form data in POST.
+      solrServer.baseUrl + getPath(r)
+    } else {
+      solrServer.baseUrl + getPath(r) + wparams.toQueryString
+    }
+
     val requestBuilder = if (r.getMethod == GET) {
       if (streams != null) {
         throw new SolrException(BAD_REQUEST, "GET can't send streams!")

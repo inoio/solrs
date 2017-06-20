@@ -61,7 +61,7 @@ libraryDependencies ++= Seq(
 fork in Test := true
 
 // Publish settings
-publishTo := {
+publishTo in ThisBuild := {
   val nexus = "https://oss.sonatype.org/"
   if (isSnapshot.value)
     Some("snapshots" at nexus + "content/repositories/snapshots")

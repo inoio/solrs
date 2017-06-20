@@ -16,6 +16,7 @@ import org.scalatest.concurrent.Eventually._
 import org.scalatest.concurrent.Eventually.eventually
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 
+import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -160,9 +161,19 @@ class AsyncSolrClientIntegrationSpec extends StandardFunSpec with RunningSolr {
 
   }
 
-  private def enable(solrUrl: String) = setStatus(solrUrl, "enable")
-  private def disable(solrUrl: String) = setStatus(solrUrl, "disable")
-  private def setStatus(solrUrl: String, action: String) =
-    httpClient.prepareGet(s"$solrUrl/admin/ping?action=$action").execute().get()
+  private def enable(solrUrl: String) = setStatus(solrUrl, "enable", expectedStatus = 200)
+  private def disable(solrUrl: String) = setStatus(solrUrl, "disable", expectedStatus = 503)
+  @tailrec
+  private def setStatus(solrUrl: String, action: String, expectedStatus: Int, attempt: Int = 1): Unit = {
+    val response = httpClient.prepareGet(s"$solrUrl/admin/ping?action=$action").execute().get()
+    response.getStatusCode shouldBe 200
+    val newStatusCode = httpClient.prepareGet(s"$solrUrl/admin/ping").execute().get().getStatusCode
+    if(newStatusCode != expectedStatus && attempt > 3) {
+      throw new IllegalStateException(s"Could not reach expected status $expectedStatus via action '$action', reached $newStatusCode instead.")
+    } else if (newStatusCode != expectedStatus) {
+      Thread.sleep(20)
+      setStatus(solrUrl, action, expectedStatus, attempt + 1)
+    }
+  }
 
 }

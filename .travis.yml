@@ -15,7 +15,7 @@ before_install:
 
 cache:
   directories:
-    - $HOME/.ivy2
+    - $HOME/.coursier
 
 # use container 
 sudo: false

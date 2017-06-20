@@ -3,6 +3,7 @@ package io.ino.solrs
 import java.util.Arrays.asList
 
 import org.apache.solr.client.solrj.SolrQuery
+import org.apache.solr.client.solrj.SolrRequest.METHOD.POST
 import org.apache.solr.client.solrj.beans.Field
 import org.scalatest.concurrent.Eventually.eventually
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
@@ -180,6 +181,24 @@ class AsyncSolrClientFunSpec extends StandardFunSpec with RunningSolr {
       docs.asScala should be (empty)
     }
 
+    it("should pass same query parameters") {
+      // POST method should pass parameters exactly once, not twice.
+      // check this via response header's parameter echo (params field)
+      val query = new SolrQuery("cat:cat1")
+      val paramEchoExpected = {
+        solr.query(query, POST).getHeader.get("params")
+      }
+      val paramEcho = await(solrs.query(query, POST)).getHeader.get("params")
+      paramEcho should be (paramEchoExpected)
+    }
+
+    it("should pass same query parameters in post and get") {
+      // Post query and Get query should pass exactly the same set of parameters to Solr.
+      val query = new SolrQuery("cat:cat1")
+      val paramEchoGet = await(solrs.query(query)).getHeader.get("params")
+      val paramEchoPost = await(solrs.query(query, POST)).getHeader.get("params")
+      paramEchoPost should be (paramEchoGet)
+    }
   }
 
 }

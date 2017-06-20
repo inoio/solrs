@@ -15,6 +15,8 @@ import org.mockito.Mockito.verify
 import org.scalatest.concurrent.Eventually._
 import org.scalatest.concurrent.Eventually.eventually
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
+import org.scalatest.time.Millis
+import org.scalatest.time.Span
 
 import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -23,6 +25,11 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 
 class AsyncSolrClientIntegrationSpec extends StandardFunSpec with RunningSolr {
+
+  private implicit val patienceConfig = PatienceConfig(
+    timeout = scaled(Span(10000, Millis)),
+    interval = scaled(Span(20, Millis))
+  )
 
   private implicit val timeout = 1.second
   private val httpClient = new DefaultAsyncHttpClient()

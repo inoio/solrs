@@ -18,7 +18,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 class PingStatusObserverIntegrationSpec extends FunSpec with RunningSolr with Eventually with IntegrationPatience with BeforeAndAfterEach with Matchers with FutureAwaits with MockitoSugar {
 
   private implicit val awaitTimeout = 2000 millis
-  private val httpClientTimeout = 20
+  private val httpClientTimeout = 100
   private val httpClient = new DefaultAsyncHttpClient(new DefaultAsyncHttpClientConfig.Builder().setRequestTimeout(httpClientTimeout).build)
 
   private lazy val solrUrl = s"http://localhost:${solrRunner.port}/solr/collection1"

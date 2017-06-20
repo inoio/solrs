@@ -15,6 +15,7 @@ before_install:
 
 cache:
   directories:
+    - $HOME/.sbt
     - $HOME/.coursier
 
 # use container 

@@ -117,7 +117,7 @@ class CloudSolrServers[F[_]](zkHost: String,
 
   private var maybeZk: Option[ZkStateReader] = None
 
-  private var lastClusterState: ClusterState = _
+  @volatile
   private var collectionToServers = Map.empty[String, IndexedSeq[SolrServer]].withDefaultValue(IndexedSeq.empty)
 
   private var scheduledExecutor: ScheduledExecutorService = Executors.newScheduledThreadPool(1, new ZkClusterStateUpdateTF)
@@ -172,35 +172,29 @@ class CloudSolrServers[F[_]](zkHost: String,
    * Updates the server list when the ZkStateReader clusterState changed
    */
   private def updateFromClusterState(zkStateReader: ZkStateReader): Unit = {
-
     // could perhaps be replaced with zkStateReader.registerCollectionStateWatcher(collection, watcher);
 
     val clusterState = zkStateReader.getClusterState
-    if(clusterState != lastClusterState) {
 
-      try {
+    def set(newCollectionToServers: Map[String, IndexedSeq[SolrServer]]): Unit = {
+      notifyObservers(collectionToServers, newCollectionToServers)
+      collectionToServers = newCollectionToServers
+      if (logger.isDebugEnabled) logger.debug (s"Updated server map: $collectionToServers from ClusterState $clusterState")
+      else logger.info (s"Updated server map: $collectionToServers")
+    }
 
-        // expect the new collection to servers map just for better readability on usage side...
-        def set(newCollectionToServers: Map[String, IndexedSeq[SolrServer]]): Unit = {
-          notifyObservers(collectionToServers, newCollectionToServers)
-          collectionToServers = newCollectionToServers
-          if (logger.isDebugEnabled) logger.debug (s"Updated server map: $collectionToServers from ClusterState $clusterState")
-          else logger.info (s"Updated server map: $collectionToServers")
-        }
+    try {
+      val newCollectionToServers = getCollectionToServers(clusterState)
 
-        val newCollectionToServers = getCollectionToServers(clusterState)
-        lastClusterState = clusterState
-
-        if(newCollectionToServers != collectionToServers) warmupQueries match {
-          case Some(warmup) => warmupNewServers(newCollectionToServers, warmup)
-            .onComplete(_ => set(newCollectionToServers))
-          case None => set(newCollectionToServers)
-        }
-
-      } catch {
-        case NonFatal(e) =>
-          logger.error(s"Could not process cluster state, server list might get outdated. Cluster state: $clusterState", e)
+      if (newCollectionToServers != collectionToServers) warmupQueries match {
+        case Some(warmup) => warmupNewServers(newCollectionToServers, warmup)
+          .onComplete(_ => set(newCollectionToServers))
+        case None => set(newCollectionToServers)
       }
+
+    } catch {
+      case NonFatal(e) =>
+        logger.error(s"Could not process cluster state, server list might get outdated. Cluster state: $clusterState", e)
     }
   }
 

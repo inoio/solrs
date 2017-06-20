@@ -189,7 +189,7 @@ class AsyncSolrClientFunSpec extends StandardFunSpec with RunningSolr {
         solr.query(query, POST).getHeader.get("params")
       }
       val paramEcho = await(solrs.query(query, POST)).getHeader.get("params")
-      paramEcho.equals(paramEchoExpected) should be (true)
+      paramEcho should be (paramEchoExpected)
     }
 
     it("should pass same query parameters in post and get") {
@@ -197,7 +197,7 @@ class AsyncSolrClientFunSpec extends StandardFunSpec with RunningSolr {
       val query = new SolrQuery("cat:cat1")
       val paramEchoGet = await(solrs.query(query)).getHeader.get("params")
       val paramEchoPost = await(solrs.query(query, POST)).getHeader.get("params")
-      paramEchoPost.equals(paramEchoGet) should be (true)
+      paramEchoPost should be (paramEchoGet)
     }
   }
 

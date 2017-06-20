@@ -101,8 +101,10 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
       }
 
       solrRunners.foreach { solrRunner =>
-        val response = solrs(solrRunner).query(new SolrQuery("*:*").setRows(Int.MaxValue)).map(getIds)
-        await(response) should contain theSameElementsAs someDocsIds
+        eventually {
+          val response = solrs(solrRunner).query(new SolrQuery("*:*").setRows(Int.MaxValue)).map(getIds)
+          await(response) should contain theSameElementsAs someDocsIds
+        }
       }
     }
 

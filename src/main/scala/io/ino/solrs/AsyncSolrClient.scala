@@ -3,8 +3,8 @@ package io.ino.solrs
 import java.io.IOException
 import java.util.Arrays.asList
 import java.util.Locale
+import java.util.concurrent.{ScheduledExecutorService, TimeUnit}
 
-import akka.actor.ActorSystem
 import io.ino.solrs.AsyncSolrClient.Builder
 import io.ino.solrs.HttpUtils._
 import io.ino.solrs.RetryDecision.Result
@@ -134,8 +134,8 @@ object AsyncSolrClient {
      */
     def withServerStateObservation(serverStateObserver: ServerStateObserver[F],
                               checkInterval: FiniteDuration,
-                              actorSystem: ActorSystem): Builder[F, ASC] = {
-      copy(serverStateObservation = Some(ServerStateObservation[F](serverStateObserver, checkInterval, actorSystem, futureFactory)))
+                              executorService: ScheduledExecutorService): Builder[F, ASC] = {
+      copy(serverStateObservation = Some(ServerStateObservation[F](serverStateObserver, checkInterval, executorService, futureFactory)))
     }
 
     /**
@@ -215,9 +215,12 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
   private val logger = LoggerFactory.getLogger(getClass())
 
   private val cancellableObservation = serverStateObservation.map { observation =>
-    observation.actorSystem.scheduler.schedule(0 seconds, observation.checkInterval) {
-      observation.serverStateObserver.checkServerStatus()
-    }(scala.concurrent.ExecutionContext.global)
+    val task: Runnable = new Runnable() {
+      override def run(): Unit = {
+        observation.serverStateObserver.checkServerStatus()
+      }
+    }
+    observation.executorService.scheduleWithFixedDelay(task, 0L, observation.checkInterval.toMillis, TimeUnit.MILLISECONDS)
   }
 
   private lazy val binder = new DocumentObjectBinder
@@ -249,8 +252,8 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
   /**
    * Closes the http client (asynchronously) if it was not provided but created by this class.
    */
-  def shutdown() = {
-    cancellableObservation.foreach(_.cancel())
+  def shutdown(): Unit = {
+    cancellableObservation.foreach(_.cancel(true))
     if(shutdownHttpClient) {
       httpClient.close()
     }

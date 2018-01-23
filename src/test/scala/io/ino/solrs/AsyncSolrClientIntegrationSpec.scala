@@ -1,6 +1,7 @@
 package io.ino.solrs
 
 import java.util.Arrays.asList
+import java.util.concurrent.Executors
 
 import akka.actor.ActorSystem
 import org.asynchttpclient.DefaultAsyncHttpClient
@@ -68,7 +69,7 @@ class AsyncSolrClientIntegrationSpec extends StandardFunSpec with RunningSolr {
       val solr = AsyncSolrClient.Builder(new SingleServerLB(solrUrl)).withServerStateObservation(
         new PingStatusObserver(solrServers, httpClient),
         20 millis,
-        ActorSystem("test-actorsystem")
+        Executors.newSingleThreadScheduledExecutor()
       ).build
 
       enable(solrUrl)

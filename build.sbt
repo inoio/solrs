@@ -40,7 +40,6 @@ libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-java8-compat"% "0.8.0",
   "io.dropwizard.metrics"   % "metrics-core"      % "3.2.2" % "optional",
   "org.slf4j"               % "slf4j-api"         % slf4jVersion,
-  "com.typesafe.akka"      %% "akka-actor"        % "2.4.19",
   "org.slf4j"               % "slf4j-simple"      % slf4jVersion % "test",
   "org.scalatest"          %% "scalatest"         % "3.0.3" % "test",
   "com.novocode"            % "junit-interface"   % "0.11" % "test",

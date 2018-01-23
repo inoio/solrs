@@ -1,7 +1,8 @@
 package io.ino.solrs
 
-import akka.actor.ActorSystem
-import org.asynchttpclient.{Response, AsyncCompletionHandler, AsyncHttpClient}
+import java.util.concurrent.ScheduledExecutorService
+
+import org.asynchttpclient.{AsyncCompletionHandler, AsyncHttpClient, Response}
 import io.ino.solrs.future.{Future, FutureFactory, ScalaFutureFactory}
 import org.slf4j.LoggerFactory
 
@@ -21,12 +22,12 @@ trait ServerStateObserver[F[_]] {
  * Configuration for scheduled server state observation.
  * @param serverStateObserver the observer that checks server state
  * @param checkInterval the interval to check server state
- * @param actorSystem used for scheduling
+ * @param executorService the scheduler used to poll for state changes
  * @param futureFactory factory to create promise/future types.
  */
 case class ServerStateObservation[F[_]](serverStateObserver: ServerStateObserver[F],
                                   checkInterval: FiniteDuration,
-                                  actorSystem: ActorSystem,
+                                  executorService: ScheduledExecutorService,
                                   futureFactory: FutureFactory[F])
 
 

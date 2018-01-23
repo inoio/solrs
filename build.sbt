@@ -37,6 +37,7 @@ libraryDependencies ++= Seq(
   "org.apache.solr"         % "solr-solrj"        % solrVersion,
   "org.asynchttpclient"     % "async-http-client" % "2.0.32",
   "org.scala-lang.modules" %% "scala-xml"         % "1.0.6",
+  "org.scala-lang.modules" %% "scala-java8-compat"% "0.8.0",
   "io.dropwizard.metrics"   % "metrics-core"      % "3.2.2" % "optional",
   "org.slf4j"               % "slf4j-api"         % slf4jVersion,
   "com.typesafe.akka"      %% "akka-actor"        % "2.4.19",

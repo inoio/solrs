@@ -31,7 +31,7 @@ class CloudSolrServersUninitializedIntegrationSpec extends StandardFunSpec {
   import SolrUtils._
 
   override def afterEach() {
-    cut.foreach(_.shutdown)
+    cut.foreach(_.shutdown())
     cut = None
 
     solrRunners.foreach(_.stop())
@@ -57,7 +57,7 @@ class CloudSolrServersUninitializedIntegrationSpec extends StandardFunSpec {
       cut.foreach(_.setAsyncSolrClient(asyncSolrClient))
 
       // Just see that shutdown doesn't block
-      cut.get.shutdown
+      cut.get.shutdown()
 
     }
 

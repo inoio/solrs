@@ -41,15 +41,16 @@ class AsyncSolrClientIntegrationSpec extends StandardFunSpec with RunningSolr {
 
   override def beforeEach() {
     eventually(Timeout(10 seconds)) {
-      solr.deleteByQuery("*:*")
+      solrJClient.deleteByQuery("*:*")
     }
     val doc1 = newInputDoc("id1", "doc1", "cat1", 10)
     val doc2 = newInputDoc("id2", "doc2", "cat1", 20)
-    solr.add(asList(doc1, doc2))
-    solr.commit()
+    solrJClient.add(asList(doc1, doc2))
+    solrJClient.commit()
   }
 
   override def afterAll(): Unit = {
+    super.afterAll()
     solrs.shutdown()
     httpClient.close()
   }

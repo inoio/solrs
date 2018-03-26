@@ -39,7 +39,7 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
   private val asyncSolrClient = mockDoRequest(mock[AsyncSolrClient])(Clock.mutable)
 
   private var cut: CloudSolrServers[Future] = _
-  private var cloudSolrServer: CloudSolrClient = _
+  private var solrJClient: CloudSolrClient = _
 
   import io.ino.solrs.SolrUtils._
 
@@ -55,23 +55,23 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
     solrs = solrRunners.foldLeft(Map.empty[SolrRunner, AsyncSolrClient])( (res, solrRunner) =>
       res + (solrRunner -> AsyncSolrClient(s"http://$hostName:${solrRunner.port}/solr/collection1")))
 
-    cloudSolrServer = new CloudSolrClient.Builder().withZkHost(zk.getConnectString).build()
-    cloudSolrServer.setDefaultCollection("collection1")
+    solrJClient = new CloudSolrClient.Builder().withZkHost(zk.getConnectString).build()
+    solrJClient.setDefaultCollection("collection1")
 
     cut = new CloudSolrServers(zk.getConnectString, clusterStateUpdateInterval = 100 millis)
     cut.setAsyncSolrClient(asyncSolrClient)
 
     eventually(Timeout(10 seconds)) {
-      cloudSolrServer.deleteByQuery("*:*")
+      solrJClient.deleteByQuery("*:*")
     }
     import scala.collection.JavaConverters._
-    cloudSolrServer.add(someDocs.asJava)
-    cloudSolrServer.commit()
+    solrJClient.add(someDocs.asJava)
+    solrJClient.commit()
   }
 
   override def afterAll() {
-    cloudSolrServer.close()
-    cut.shutdown
+    solrJClient.close()
+    cut.shutdown()
     solrs.values.foreach(_.shutdown())
     solrRunners.foreach(_.stop())
     zk.close()
@@ -153,7 +153,7 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
         }
       }
 
-      cut.shutdown
+      cut.shutdown()
     }
 
     it("should resolve server by collection alias") {

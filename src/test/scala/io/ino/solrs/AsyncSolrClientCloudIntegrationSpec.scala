@@ -31,7 +31,7 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
 
   private var solrServers: CloudSolrServers[Future] = _
   private var cut: AsyncSolrClient[Future] = _
-  private var cloudSolrServer: CloudSolrClient = _
+  private var solrJClient: CloudSolrClient = _
 
   private val q = new SolrQuery("*:*").setRows(Int.MaxValue)
 
@@ -48,8 +48,8 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
       SolrRunner.start(18889, Some(ZooKeeperOptions(zk.getConnectString)))
     )
 
-    cloudSolrServer = new CloudSolrClient.Builder().withZkHost(zk.getConnectString).build()
-    cloudSolrServer.setDefaultCollection("collection1")
+    solrJClient = new CloudSolrClient.Builder().withZkHost(zk.getConnectString).build()
+    solrJClient.setDefaultCollection("collection1")
 
     solrServers = new CloudSolrServers(
       zk.getConnectString,
@@ -60,12 +60,12 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
     cut = AsyncSolrClient.Builder(RoundRobinLB(solrServers)).withRetryPolicy(RetryPolicy.TryAvailableServers).build
 
     eventually(Timeout(10 seconds)) {
-      cloudSolrServer.deleteByQuery("*:*")
+      solrJClient.deleteByQuery("*:*")
     }
-    cloudSolrServer.commit()
+    solrJClient.commit()
 
-    cloudSolrServer.add(someDocsAsJList)
-    cloudSolrServer.commit()
+    solrJClient.add(someDocsAsJList)
+    solrJClient.commit()
 
     // Check that indexed data is available
     queryAndCheckResponse()
@@ -73,14 +73,14 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
 
   private def queryAndCheckResponse(): Unit = {
     eventually(Timeout(2 seconds)) {
-      getIds(cloudSolrServer.query(q)) should contain theSameElementsAs someDocsIds
+      getIds(solrJClient.query(q)) should contain theSameElementsAs someDocsIds
     }
   }
 
   override def afterAll() {
-    cloudSolrServer.close()
+    solrJClient.close()
     cut.shutdown()
-    solrServers.shutdown
+    solrServers.shutdown()
     solrRunners.foreach(_.stop())
     zk.close()
   }

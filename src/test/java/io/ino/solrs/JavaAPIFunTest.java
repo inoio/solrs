@@ -41,7 +41,7 @@ public class JavaAPIFunTest extends JUnitSuite {
 
     @BeforeClass
     public static void beforeClass() {
-        solrRunner = SolrRunner.startOnce(8888, Option.empty()).awaitReady(10, SECONDS);
+        solrRunner = SolrRunner.startOnce(8888).awaitReady(10, SECONDS);
         String url = "http://localhost:" + solrRunner.port() + "/solr/collection1";
         solr = new HttpSolrClient.Builder(url).build();
         solrs = JavaAsyncSolrClient.create(url);

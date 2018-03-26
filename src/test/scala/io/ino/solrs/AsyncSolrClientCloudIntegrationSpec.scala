@@ -2,12 +2,10 @@ package io.ino.solrs
 
 import java.util.concurrent.atomic.AtomicBoolean
 
-import org.apache.curator.test.TestingServer
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.impl.CloudSolrClient
-import org.scalatest._
-import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
+import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.slf4j.LoggerFactory
 
 import scala.annotation.tailrec
@@ -26,8 +24,8 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
 
   private implicit val timeout = 5.second
 
-  private var zk: TestingServer = _
-  private var solrRunners = List.empty[SolrRunner]
+  private var solrRunner: SolrCloudRunner = _
+  private def solrServerUrls = solrRunner.getCoreUrls
 
   private var solrServers: CloudSolrServers[Future] = _
   private var cut: AsyncSolrClient[Future] = _
@@ -40,19 +38,11 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
   import io.ino.solrs.SolrUtils._
 
   override def beforeAll() {
-    zk = new TestingServer()
-    zk.start()
-
-    solrRunners = List(
-      SolrRunner.start(18888, Some(ZooKeeperOptions(zk.getConnectString, bootstrapConfig = Some("collection1")))),
-      SolrRunner.start(18889, Some(ZooKeeperOptions(zk.getConnectString)))
-    )
-
-    solrJClient = new CloudSolrClient.Builder().withZkHost(zk.getConnectString).build()
-    solrJClient.setDefaultCollection("collection1")
+    solrRunner = SolrCloudRunner.start(2, List(SolrCollection("collection1", 2, 1)), Some("collection1"))
+    solrJClient = solrRunner.getClient
 
     solrServers = new CloudSolrServers(
-      zk.getConnectString,
+      solrRunner.getZkAddress,
       clusterStateUpdateInterval = 100 millis,
       defaultCollection = Some("collection1"))
     // We need to configure a retry policy as otherwise requests fail because server status is not
@@ -81,21 +71,7 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
     solrJClient.close()
     cut.shutdown()
     solrServers.shutdown()
-    solrRunners.foreach(_.stop())
-    zk.close()
-  }
-
-  override def afterEach() {
-    solrRunners.foreach { solrRunner =>
-      // if tomcat got stopped but not shut down, we must (and can) start it again
-      if(solrRunner.isStopped) {
-        solrRunner.tomcat.start()
-      }
-      // if tomcat got destroyed, we must use solrRunner.start to start from scratch
-      else if(solrRunner.isDestroyed) {
-        solrRunner.start
-      }
-    }
+    solrRunner.shutdown()
   }
 
   describe("AsyncSolrClient with CloudSolrServers + RoundRobinLB") {
@@ -103,7 +79,7 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
     it("should serve queries while solr server is restarted") {
 
       eventually {
-        cut.loadBalancer.solrServers.all should contain theSameElementsAs solrRunnerUrls.map(SolrServer(_, Enabled))
+        cut.loadBalancer.solrServers.all should contain theSameElementsAs solrServerUrls.map(SolrServer(_, Enabled))
       }
 
       // Run queries in the background
@@ -113,15 +89,15 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
       }
 
       // Stop solr
-      solrRunners.last.stop()
+      SolrRunner.stopJetty(solrRunner.getJettySolrRunners.last)
 
-      // Wait some time after tomcat was stopped
+      // Wait some time after Jetty was stopped
       Thread.sleep(100)
 
       // Restart solr
-      solrRunners.last.start
+      SolrRunner.startJetty(solrRunner.getJettySolrRunners.last)
 
-      // Wait some time after tomcat was restarted
+      // Wait some time after Jetty was restarted
       Thread.sleep(200)
 
       // Stop queries
@@ -137,14 +113,14 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
       }
 
       eventually {
-        cut.loadBalancer.solrServers.all should contain theSameElementsAs solrRunnerUrls.map(SolrServer(_, Enabled))
+        cut.loadBalancer.solrServers.all should contain theSameElementsAs solrServerUrls.map(SolrServer(_, Enabled))
       }
     }
 
     it("should serve queries when ZK is not available") {
 
       eventually {
-        cut.loadBalancer.solrServers.all should contain theSameElementsAs solrRunnerUrls.map(SolrServer(_, Enabled))
+        cut.loadBalancer.solrServers.all should contain theSameElementsAs solrServerUrls.map(SolrServer(_, Enabled))
       }
 
       // Run queries in the background
@@ -154,7 +130,7 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
       }
 
       // Stop ZK
-      zk.restart()
+      solrRunner.restartZookeeper()
 
       // Wait some time after ZK was stopped
       Thread.sleep(500)
@@ -172,13 +148,11 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
       }
 
       eventually(Timeout(10 seconds)) {
-        cut.loadBalancer.solrServers.all should contain theSameElementsAs solrRunnerUrls.map(SolrServer(_, Enabled))
+        cut.loadBalancer.solrServers.all should contain theSameElementsAs solrServerUrls.map(SolrServer(_, Enabled))
       }
     }
 
   }
-
-  private def solrRunnerUrls = solrRunners.map(solrRunner => s"http://$hostName:${solrRunner.port}/solr/collection1/")
 
   @tailrec
   private def runQueries(q: SolrQuery, run: AtomicBoolean, res: List[Future[List[String]]] = Nil): List[Future[List[String]]] = run.get() match {

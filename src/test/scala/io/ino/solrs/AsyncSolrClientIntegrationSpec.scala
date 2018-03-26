@@ -129,7 +129,8 @@ class AsyncSolrClientIntegrationSpec extends StandardFunSpec with RunningSolr {
 
       awaitReady(response)
       a [RemoteSolrException] should be thrownBy await(response)
-      (the [RemoteSolrException] thrownBy await(response)).getMessage should include ("parsing error")
+      // embedded Jetty returns 404 with text/html response with error message in body
+      (the [RemoteSolrException] thrownBy await(response)).getMessage should include ("Expected mime type [] but got [text/html]")
 
       solr.shutdown()
     }

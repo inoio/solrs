@@ -1,17 +1,16 @@
 package io.ino.solrs
 
+import io.ino.solrs.AsyncSolrClientMocks.mockDoRequest
 import io.ino.solrs.CloudSolrServers.WarmupQueries
 import io.ino.solrs.SolrMatchers.hasQuery
 import io.ino.time.Clock
-import org.apache.curator.test.TestingServer
 import org.apache.solr.client.solrj.SolrQuery
+import org.apache.solr.client.solrj.embedded.JettySolrRunner
 import org.apache.solr.client.solrj.impl.CloudSolrClient
 import org.apache.solr.client.solrj.response.QueryResponse
 import org.mockito.Matchers.{eq => mockEq, _}
 import org.mockito.Mockito._
-import org.scalatest._
-import org.scalatest.concurrent.Eventually._
-import org.scalatest.concurrent.Eventually.eventually
+import org.scalatest.concurrent.Eventually.{eventually, _}
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.time.{Millis, Span}
 
@@ -31,105 +30,85 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
 
   private type AsyncSolrClient = io.ino.solrs.AsyncSolrClient[Future]
 
-  private var zk: TestingServer = _
-  private var solrRunners = List.empty[SolrRunner]
-  private var solrs = Map.empty[SolrRunner, AsyncSolrClient]
+  private var solrRunner: SolrCloudRunner = _
 
-  import AsyncSolrClientMocks._
-  private val asyncSolrClient = mockDoRequest(mock[AsyncSolrClient])(Clock.mutable)
+  private def zkConnectString = solrRunner.zkAddress
+  private def solrServerUrls = solrRunner.solrCoreUrls
+
+  private var solrJClient: CloudSolrClient = _
+  private var asyncSolrClients: Map[JettySolrRunner, AsyncSolrClient] = _
 
   private var cut: CloudSolrServers[Future] = _
-  private var cloudSolrServer: CloudSolrClient = _
 
   import io.ino.solrs.SolrUtils._
 
   override def beforeAll() {
-    zk = new TestingServer()
-    zk.start()
-
-    solrRunners = List(
-      SolrRunner.start(18888, Some(ZooKeeperOptions(zk.getConnectString, bootstrapConfig = Some("collection1")))),
-      SolrRunner.start(18889, Some(ZooKeeperOptions(zk.getConnectString)))
-    )
-
-    solrs = solrRunners.foldLeft(Map.empty[SolrRunner, AsyncSolrClient])( (res, solrRunner) =>
-      res + (solrRunner -> AsyncSolrClient(s"http://$hostName:${solrRunner.port}/solr/collection1")))
-
-    cloudSolrServer = new CloudSolrClient.Builder().withZkHost(zk.getConnectString).build()
-    cloudSolrServer.setDefaultCollection("collection1")
-
-    cut = new CloudSolrServers(zk.getConnectString, clusterStateUpdateInterval = 100 millis)
-    cut.setAsyncSolrClient(asyncSolrClient)
+    // create a 2 node cluster with one collection that has 1 shard in 2 replicas
+    solrRunner = SolrCloudRunner.start(2, List(SolrCollection("collection1", 2, 1)), Some("collection1"))
+    solrJClient = solrRunner.solrJClient
+    asyncSolrClients = solrRunner.jettySolrRunners.map(jetty => jetty -> AsyncSolrClient(s"http://$hostName:${jetty.getLocalPort}/solr/collection1")).toMap
 
     eventually(Timeout(10 seconds)) {
-      cloudSolrServer.deleteByQuery("*:*")
+      solrJClient.deleteByQuery("*:*")
     }
     import scala.collection.JavaConverters._
-    cloudSolrServer.add(someDocs.asJava)
-    cloudSolrServer.commit()
+    solrJClient.add(someDocs.asJava)
+    solrJClient.commit()
+  }
+
+  override def afterEach(): Unit = {
+    cut.shutdown()
   }
 
   override def afterAll() {
-    cloudSolrServer.close()
-    cut.shutdown
-    solrs.values.foreach(_.shutdown())
-    solrRunners.foreach(_.stop())
-    zk.close()
-  }
-
-  override def afterEach() {
-    solrRunners.foreach { solrRunner =>
-      // if tomcat got stopped but not shut down, we must (and can) start it again
-      if(solrRunner.isStopped) {
-        solrRunner.tomcat.start()
-      }
-      // if tomcat got destroyed, we must use solrRunner.start to start from scratch
-      else if(solrRunner.isDestroyed) {
-        solrRunner.start
-      }
+    for (asyncSolrClient <- asyncSolrClients.values) {
+      asyncSolrClient.shutdown()
     }
+    solrJClient.close()
+    solrRunner.shutdown()
   }
-
-  private def solrRunnerUrls = solrRunners.map(solrRunner => s"http://$hostName:${solrRunner.port}/solr/collection1/")
 
   describe("CloudSolrServers") {
 
     it("should list available solr instances") {
+      cut = new CloudSolrServers(zkConnectString, clusterStateUpdateInterval = 100 millis)
+      cut.setAsyncSolrClient(mockDoRequest(mock[AsyncSolrClient])(Clock.mutable))
 
       eventually {
-        cut.all should contain theSameElementsAs solrRunnerUrls.map(SolrServer(_, Enabled))
+        cut.all should contain theSameElementsAs solrServerUrls.map(SolrServer(_, Enabled))
       }
 
-      solrRunners.foreach { solrRunner =>
+      asyncSolrClients.foreach { case(_, client) =>
         eventually {
-          val response = solrs(solrRunner).query(new SolrQuery("*:*").setRows(Int.MaxValue)).map(getIds)
+          val response = client.query(new SolrQuery("*:*").setRows(Int.MaxValue)).map(getIds)
           await(response) should contain theSameElementsAs someDocsIds
         }
       }
     }
 
     it("should update available solr instances") {
+      cut = new CloudSolrServers(zkConnectString, clusterStateUpdateInterval = 100 millis)
+      cut.setAsyncSolrClient(mockDoRequest(mock[AsyncSolrClient])(Clock.mutable))
 
       eventually {
-        cut.all should contain theSameElementsAs solrRunnerUrls.map(SolrServer(_, Enabled))
+        cut.all should contain theSameElementsAs solrServerUrls.map(SolrServer(_, Enabled))
       }
 
-      solrRunners.head.stop()
+      SolrRunner.stopJetty(solrRunner.jettySolrRunners.head)
       eventually {
-        cut.all.map(_.status) should contain theSameElementsInOrderAs Seq(Failed, Enabled)
+        cut.all.map(_.status) should contain theSameElementsAs Seq(Failed, Enabled)
       }
 
-      solrRunners.head.start
+      SolrRunner.startJetty(solrRunner.jettySolrRunners.head)
       eventually {
-        cut.all.map(_.status) should contain theSameElementsInOrderAs Seq(Enabled, Enabled)
+        cut.all.map(_.status) should contain theSameElementsAs Seq(Enabled, Enabled)
       }
-
     }
 
     it("should test solr instances according to the WarmupQueries") {
       val queries = Seq(new SolrQuery("foo"))
       val warmupQueries = WarmupQueries(queriesByCollection = _ => queries, count = 2)
-      val cut = new CloudSolrServers(zk.getConnectString, warmupQueries = Some(warmupQueries))
+      cut = new CloudSolrServers(zkConnectString, warmupQueries = Some(warmupQueries))
 
       val standardResponsePromise = futureFactory.newPromise[QueryResponse]
       val standardResponse = standardResponsePromise.future
@@ -143,17 +122,15 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
       // as soon as the response is set the LB should provide the servers...
       standardResponsePromise.success(new QueryResponse())
       eventually {
-        cut.all should contain theSameElementsAs solrRunnerUrls.map(SolrServer(_, Enabled))
+        cut.all should contain theSameElementsAs solrServerUrls.map(SolrServer(_, Enabled))
       }
 
       // and the servers should have been tested with queries
-      solrRunnerUrls.map(SolrServer(_, Enabled)).foreach { solrServer =>
+      solrServerUrls.map(SolrServer(_, Enabled)).foreach { solrServer =>
         warmupQueries.queriesByCollection("col1").foreach { q =>
           verify(asyncSolrClient, times(warmupQueries.count)).doExecute[QueryResponse](mockEq(solrServer), hasQuery(q))(any())
         }
       }
-
-      cut.shutdown
     }
 
     it("should resolve server by collection alias") {

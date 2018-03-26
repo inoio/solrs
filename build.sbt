@@ -31,7 +31,6 @@ resolvers ++= Seq(
 
 val solrVersion = "6.6.2"
 val slf4jVersion = "1.7.25"
-val tomcatVersion = "8.5.27"
 
 libraryDependencies ++= Seq(
   "org.apache.solr"         % "solr-solrj"        % solrVersion,
@@ -46,13 +45,9 @@ libraryDependencies ++= Seq(
   "org.mockito"             % "mockito-core"      % "1.10.19" % "test",
   "org.hamcrest"            % "hamcrest-library"  % "1.3" % "test",
   "org.clapper"            %% "grizzled-scala"    % "4.4.2" % "test",
-  // Cloud testing, solr-core for ZkController (upconfig), curator-test for ZK TestingServer
+  // Cloud testing, solr-core for ZkController (upconfig)
   "org.apache.solr"         % "solr-core"         % solrVersion % "test",
-  "org.apache.curator"      % "curator-test"      % "2.12.0" % "test",
-  // tomcat
-  "org.apache.tomcat"       % "tomcat-catalina"   % tomcatVersion % "test",
-  "org.apache.tomcat"       % "tomcat-jasper"     % tomcatVersion % "test",
-  "org.apache.tomcat.embed" % "tomcat-embed-core" % tomcatVersion % "test",
+  "org.apache.solr"         % "solr-test-framework" % solrVersion % "test",
   "com.twitter"            %% "util-core"         % "18.1.0" % "optional",
   "commons-logging"         % "commons-logging"   % "1.2"
 )

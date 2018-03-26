@@ -7,16 +7,16 @@ trait RunningSolr extends BeforeAndAfterAll {
   this: Suite =>
 
   protected var solrRunner: SolrRunner = _
-  protected var solr: HttpSolrClient = _
+  protected var solrJClient: HttpSolrClient = _
 
   override def beforeAll() {
     solrRunner = SolrRunner.startOnce(8888)
 
-    solr = new HttpSolrClient.Builder("http://localhost:" + solrRunner.port + "/solr/collection1").build()
+    solrJClient = new HttpSolrClient.Builder("http://localhost:" + solrRunner.port + "/solr/collection1").build()
   }
 
   override def afterAll() {
-    solr.close()
+    solrJClient.close()
   }
 
 }

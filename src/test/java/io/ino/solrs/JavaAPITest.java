@@ -31,7 +31,7 @@ public class JavaAPITest extends JUnitSuite {
 
     @BeforeClass
     public static void beforeClass() {
-        solrRunner = SolrRunner.startOnce(8888, Option.empty()).awaitReady(10, SECONDS);
+        solrRunner = SolrRunner.startOnce(8888).awaitReady(10, SECONDS);
     }
 
     @Test

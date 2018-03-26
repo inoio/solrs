@@ -174,9 +174,9 @@ class AsyncSolrClientIntegrationSpec extends StandardFunSpec with RunningSolr {
   private def disable(solrUrl: String) = setStatus(solrUrl, "disable", expectedStatus = 503)
   @tailrec
   private def setStatus(solrUrl: String, action: String, expectedStatus: Int, attempt: Int = 1): Unit = {
-    val response = httpClient.prepareGet(s"$solrUrl/admin/ping?action=$action").execute().get()
+    val response = httpClient.prepareGet(s"$solrUrl/admin/ping?action=$action&wt=xml").execute().get()
     response.getStatusCode shouldBe 200
-    val newStatusCode = httpClient.prepareGet(s"$solrUrl/admin/ping").execute().get().getStatusCode
+    val newStatusCode = httpClient.prepareGet(s"$solrUrl/admin/ping?wt=xml").execute().get().getStatusCode
     if(newStatusCode != expectedStatus && attempt > 3) {
       throw new IllegalStateException(s"Could not reach expected status $expectedStatus via action '$action', reached $newStatusCode instead.")
     } else if (newStatusCode != expectedStatus) {

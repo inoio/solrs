@@ -1,6 +1,6 @@
 package io.ino.solrs
 
-import java.io.IOException
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream, IOException}
 import java.util.Arrays.asList
 import java.util.Locale
 import java.util.concurrent.{ScheduledExecutorService, TimeUnit}
@@ -96,15 +96,15 @@ object AsyncSolrClient {
     )
 
   case class Builder[F[_], ASC <: AsyncSolrClient[F]] protected (loadBalancer: LoadBalancer,
-                                    httpClient: Option[AsyncHttpClient],
-                                    shutdownHttpClient: Boolean,
-                                    requestInterceptor: Option[RequestInterceptor] = None,
-                                    requestWriter: Option[RequestWriter] = None,
-                                    responseParser: Option[ResponseParser] = None,
-                                    metrics: Option[Metrics] = None,
-                                    serverStateObservation: Option[ServerStateObservation[F]] = None,
-                                    retryPolicy: RetryPolicy = RetryPolicy.TryOnce,
-                                    factory: ASCFactory[F, ASC])(implicit futureFactory: FutureFactory[F]) {
+                                                                 httpClient: Option[AsyncHttpClient],
+                                                                 shutdownHttpClient: Boolean,
+                                                                 requestInterceptor: Option[RequestInterceptor] = None,
+                                                                 requestWriter: Option[RequestWriter] = None,
+                                                                 responseParser: Option[ResponseParser] = None,
+                                                                 metrics: Option[Metrics] = None,
+                                                                 serverStateObservation: Option[ServerStateObservation[F]] = None,
+                                                                 retryPolicy: RetryPolicy = RetryPolicy.TryOnce,
+                                                                 factory: ASCFactory[F, ASC])(implicit futureFactory: FutureFactory[F]) {
 
     def this(loadBalancer: LoadBalancer, factory: ASCFactory[F, ASC])(implicit futureFactory: FutureFactory[F]) = this(loadBalancer, None, true, factory = factory)
     def this(baseUrl: String, factory: ASCFactory[F, ASC])(implicit futureFactory: FutureFactory[F]) = this(new SingleServerLB(baseUrl), factory = factory)
@@ -130,17 +130,17 @@ object AsyncSolrClient {
     }
 
     /**
-     * Configures server state observation using the given observer and the provided interval.
-     */
+      * Configures server state observation using the given observer and the provided interval.
+      */
     def withServerStateObservation(serverStateObserver: ServerStateObserver[F],
-                              checkInterval: FiniteDuration,
-                              executorService: ScheduledExecutorService): Builder[F, ASC] = {
+                                   checkInterval: FiniteDuration,
+                                   executorService: ScheduledExecutorService): Builder[F, ASC] = {
       copy(serverStateObservation = Some(ServerStateObservation[F](serverStateObserver, checkInterval, executorService, futureFactory)))
     }
 
     /**
-     * Configure the retry policy to apply for failed requests.
-     */
+      * Configure the retry policy to apply for failed requests.
+      */
     def withRetryPolicy(retryPolicy: RetryPolicy): Builder[F, ASC] = {
       copy(retryPolicy = retryPolicy)
     }
@@ -188,12 +188,12 @@ object AsyncSolrClient {
 }
 
 /**
- * Async, non-blocking Solr Server that allows to make requests to Solr.
- * The usage shall be similar to the <a href="https://wiki.apache.org/solr/Solrj">solrj SolrServer</a>,
- * so request returns a future of a {@link SolrResponse}.
- *
- * @author <a href="martin.grotzke@inoio.de">Martin Grotzke</a>
- */
+  * Async, non-blocking Solr Server that allows to make requests to Solr.
+  * The usage shall be similar to the <a href="https://wiki.apache.org/solr/Solrj">solrj SolrServer</a>,
+  * so request returns a future of a {@link SolrResponse}.
+  *
+  * @author <a href="martin.grotzke@inoio.de">Martin Grotzke</a>
+  */
 class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBalancer,
                                        httpClient: AsyncHttpClient,
                                        shutdownHttpClient: Boolean,
@@ -609,24 +609,37 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
     val promise = futureFactory.newPromise[T]
     val startTime = System.currentTimeMillis()
 
-    val streams = requestWriter.getContentStreams(r)
-    val url = if (r.getMethod == POST && streams == null) {
-      // for POST (non-stream post), wparam should NOT be added to the url - wparam passed as form data in POST.
-      solrServer.baseUrl + getPath(r)
-    } else {
-      solrServer.baseUrl + getPath(r) + wparams.toQueryString
-    }
+    val contentWriter = requestWriter.getContentWriter(r)
+    val streams = if (contentWriter == null) requestWriter.getContentStreams(r) else null
+
+    val url = solrServer.baseUrl + getPath(r)
 
     val requestBuilder = if (r.getMethod == GET) {
-      if (streams != null) {
+      val fullQueryUrl = url + wparams.toQueryString
+      if (streams != null || contentWriter != null) {
         throw new SolrException(BAD_REQUEST, "GET can't send streams!")
       }
-      httpClient.prepareGet(url)
+      httpClient.prepareGet(fullQueryUrl)
     } else {
-      val req = if (r.getMethod == POST) httpClient.preparePost(url) else httpClient.preparePut(url)
-      if (streams == null) {
+      if (contentWriter != null) {
+        // case 1: new Solr7 content writer interface
+        val fullQueryUrl = url + wparams.toQueryString
+        val req = if (r.getMethod == POST) httpClient.preparePost(fullQueryUrl) else httpClient.preparePut(fullQueryUrl)
+
+        // AsyncHttpClient needs InputStream, need to adapt the writer
+        val baos = new ByteArrayOutputStream()
+        contentWriter.write(baos)
+        val is = new ByteArrayInputStream(baos.toByteArray)
+
+        req.setHeader("Content-Type", contentWriter.getContentType)
+          .setBody(is)
+      } else if (streams == null) {
+        // case 2: no streams, FORM post
+        val req = if (r.getMethod == POST) httpClient.preparePost(url) else httpClient.preparePut(url)
         req.setFormParams(wparams.getMap.asScala.mapValues(asList[String](_: _*)).asJava)
       } else {
+        // case 3: old streams, not sure if this is still relevant...
+        val req = if (r.getMethod == POST) httpClient.preparePost(url) else httpClient.preparePut(url)
         val contentStream = streams.iterator.next
         req
           .setBody(contentStream.getStream)
@@ -783,10 +796,10 @@ trait TypedAsyncSolrClient[F[_], ASC <: AsyncSolrClient[F]] {
 trait AsyncSolrClientAware[F[_]] {
 
   /**
-   * On creation of AsyncSolrClient this method is invoked with the created instance if the
-   * concrete component is "supported", right now this are SolrServers and LoadBalancer.
-   * Subclasses can override this method to get access to the solr client.
-   */
+    * On creation of AsyncSolrClient this method is invoked with the created instance if the
+    * concrete component is "supported", right now this are SolrServers and LoadBalancer.
+    * Subclasses can override this method to get access to the solr client.
+    */
   def setAsyncSolrClient(solr: AsyncSolrClient[F]): Unit = {
     // empty default
   }
@@ -794,12 +807,12 @@ trait AsyncSolrClientAware[F[_]] {
 }
 
 /**
- * Subclass of SolrException that allows us to capture an arbitrary HTTP
- * status code that may have been returned by the remote server or a
- * proxy along the way.
- *
- * @param code Arbitrary HTTP status code
- * @param msg Exception Message
- * @param th Throwable to wrap with this Exception
- */
+  * Subclass of SolrException that allows us to capture an arbitrary HTTP
+  * status code that may have been returned by the remote server or a
+  * proxy along the way.
+  *
+  * @param code Arbitrary HTTP status code
+  * @param msg Exception Message
+  * @param th Throwable to wrap with this Exception
+  */
 class RemoteSolrException(code: Int, msg: String, th: Throwable) extends SolrException(code, msg, th)

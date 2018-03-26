@@ -49,7 +49,7 @@ class PingStatusObserver[F[_]](solrServers: SolrServers, httpClient: AsyncHttpCl
 
   override def checkServerStatus(): Future[Unit] = {
     val futures = solrServers.all.map { server =>
-      val url = server.baseUrl + "/admin/ping?action=status"
+      val url = server.baseUrl + "/admin/ping?action=status&wt=xml"
       val promise = futureFactory.newPromise[Unit]
       httpClient.prepareGet(url).execute(new AsyncCompletionHandler[Response]() {
         override def onCompleted(response: Response): Response = {

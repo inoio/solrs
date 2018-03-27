@@ -25,7 +25,7 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
   private implicit val timeout = 5.second
 
   private var solrRunner: SolrCloudRunner = _
-  private def solrServerUrls = solrRunner.getCoreUrls
+  private def solrServerUrls = solrRunner.solrCoreUrls
 
   private var solrServers: CloudSolrServers[Future] = _
   private var cut: AsyncSolrClient[Future] = _
@@ -39,10 +39,10 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
 
   override def beforeAll() {
     solrRunner = SolrCloudRunner.start(2, List(SolrCollection("collection1", 2, 1)), Some("collection1"))
-    solrJClient = solrRunner.getClient
+    solrJClient = solrRunner.solrJClient
 
     solrServers = new CloudSolrServers(
-      solrRunner.getZkAddress,
+      solrRunner.zkAddress,
       clusterStateUpdateInterval = 100 millis,
       defaultCollection = Some("collection1"))
     // We need to configure a retry policy as otherwise requests fail because server status is not
@@ -89,13 +89,13 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
       }
 
       // Stop solr
-      SolrRunner.stopJetty(solrRunner.getJettySolrRunners.last)
+      SolrRunner.stopJetty(solrRunner.jettySolrRunners.last)
 
       // Wait some time after Jetty was stopped
       Thread.sleep(100)
 
       // Restart solr
-      SolrRunner.startJetty(solrRunner.getJettySolrRunners.last)
+      SolrRunner.startJetty(solrRunner.jettySolrRunners.last)
 
       // Wait some time after Jetty was restarted
       Thread.sleep(200)

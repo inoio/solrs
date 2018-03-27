@@ -19,7 +19,7 @@ class CloudSolrServersUninitializedIntegrationSpec extends StandardFunSpec {
   private implicit val patienceConfig = PatienceConfig(timeout = scaled(Span(1000, Millis)))
 
   private var solrRunner: SolrCloudRunner = _
-  private def solrServerUrls = solrRunner.getCoreUrls
+  private def solrServerUrls = solrRunner.solrCoreUrls
 
   private var cut: Option[CloudSolrServers[Future]] = None
 

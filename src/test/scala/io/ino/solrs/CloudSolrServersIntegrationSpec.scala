@@ -32,19 +32,21 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
 
   private var solrRunner: SolrCloudRunner = _
 
-  private def zkConnectString = solrRunner.getZkAddress
-  private def solrServerUrls = solrRunner.getCoreUrls
+  private def zkConnectString = solrRunner.zkAddress
+  private def solrServerUrls = solrRunner.solrCoreUrls
 
   private var solrJClient: CloudSolrClient = _
   private var asyncSolrClients: Map[JettySolrRunner, AsyncSolrClient] = _
+
+  private var cut: CloudSolrServers[Future] = _
 
   import io.ino.solrs.SolrUtils._
 
   override def beforeAll() {
     // create a 2 node cluster with one collection that has 1 shard in 2 replicas
     solrRunner = SolrCloudRunner.start(2, List(SolrCollection("collection1", 2, 1)), Some("collection1"))
-    solrJClient = solrRunner.getClient
-    asyncSolrClients = solrRunner.getJettySolrRunners.map(jetty => jetty -> AsyncSolrClient(s"http://$hostName:${jetty.getLocalPort}/solr/collection1")).toMap
+    solrJClient = solrRunner.solrJClient
+    asyncSolrClients = solrRunner.jettySolrRunners.map(jetty => jetty -> AsyncSolrClient(s"http://$hostName:${jetty.getLocalPort}/solr/collection1")).toMap
 
     eventually(Timeout(10 seconds)) {
       solrJClient.deleteByQuery("*:*")
@@ -52,6 +54,10 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
     import scala.collection.JavaConverters._
     solrJClient.add(someDocs.asJava)
     solrJClient.commit()
+  }
+
+  override def afterEach(): Unit = {
+    cut.shutdown()
   }
 
   override def afterAll() {
@@ -65,7 +71,7 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
   describe("CloudSolrServers") {
 
     it("should list available solr instances") {
-      val cut = new CloudSolrServers(zkConnectString, clusterStateUpdateInterval = 100 millis)
+      cut = new CloudSolrServers(zkConnectString, clusterStateUpdateInterval = 100 millis)
       cut.setAsyncSolrClient(mockDoRequest(mock[AsyncSolrClient])(Clock.mutable))
 
       eventually {
@@ -78,35 +84,31 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
           await(response) should contain theSameElementsAs someDocsIds
         }
       }
-
-      cut.shutdown()
     }
 
     it("should update available solr instances") {
-      val cut = new CloudSolrServers(zkConnectString, clusterStateUpdateInterval = 100 millis)
+      cut = new CloudSolrServers(zkConnectString, clusterStateUpdateInterval = 100 millis)
       cut.setAsyncSolrClient(mockDoRequest(mock[AsyncSolrClient])(Clock.mutable))
 
       eventually {
         cut.all should contain theSameElementsAs solrServerUrls.map(SolrServer(_, Enabled))
       }
 
-      SolrRunner.stopJetty(solrRunner.getJettySolrRunners.head)
+      SolrRunner.stopJetty(solrRunner.jettySolrRunners.head)
       eventually {
         cut.all.map(_.status) should contain theSameElementsAs Seq(Failed, Enabled)
       }
 
-      SolrRunner.startJetty(solrRunner.getJettySolrRunners.head)
+      SolrRunner.startJetty(solrRunner.jettySolrRunners.head)
       eventually {
         cut.all.map(_.status) should contain theSameElementsAs Seq(Enabled, Enabled)
       }
-
-      cut.shutdown()
     }
 
     it("should test solr instances according to the WarmupQueries") {
       val queries = Seq(new SolrQuery("foo"))
       val warmupQueries = WarmupQueries(queriesByCollection = _ => queries, count = 2)
-      val cut = new CloudSolrServers(zkConnectString, warmupQueries = Some(warmupQueries))
+      cut = new CloudSolrServers(zkConnectString, warmupQueries = Some(warmupQueries))
 
       val standardResponsePromise = futureFactory.newPromise[QueryResponse]
       val standardResponse = standardResponsePromise.future
@@ -129,8 +131,6 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
           verify(asyncSolrClient, times(warmupQueries.count)).doExecute[QueryResponse](mockEq(solrServer), hasQuery(q))(any())
         }
       }
-
-      cut.shutdown()
     }
 
     it("should resolve server by collection alias") {

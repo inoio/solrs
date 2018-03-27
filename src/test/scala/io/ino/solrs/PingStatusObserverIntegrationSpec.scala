@@ -1,7 +1,7 @@
 package io.ino.solrs
 
 import java.net.ConnectException
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
 import java.util.concurrent.{ExecutionException, TimeUnit, TimeoutException}
 
 import javax.servlet._
@@ -41,7 +41,7 @@ class PingStatusObserverIntegrationSpec extends FunSpec with BeforeAndAfterAll w
   }
 
   override def beforeEach() {
-    doDelayResponse.set(false)
+    responseDelayMillis.set(0)
     doReturn404.set(false)
     eventually {
       enable(solrUrl).getStatusCode shouldBe 200
@@ -93,8 +93,8 @@ class PingStatusObserverIntegrationSpec extends FunSpec with BeforeAndAfterAll w
       await(pingStatusObserver.checkServerStatus())
       solrServers(0).status should be (Enabled)
 
-      doDelayResponse.set(true)
-      val httpClientConfig = new DefaultAsyncHttpClientConfig.Builder().setReadTimeout(1).build()
+      responseDelayMillis.set(5000)
+      val httpClientConfig = new DefaultAsyncHttpClientConfig.Builder().setReadTimeout(100).build()
       val asyncHttpClient = new DefaultAsyncHttpClient(httpClientConfig)
       try {
 
@@ -109,7 +109,6 @@ class PingStatusObserverIntegrationSpec extends FunSpec with BeforeAndAfterAll w
         solrServers(0).status should be(Failed)
       } finally {
         asyncHttpClient.close()
-        solrServers(0).status should be(Failed)
       }
     }
 
@@ -143,8 +142,11 @@ class PingStatusObserverIntegrationSpec extends FunSpec with BeforeAndAfterAll w
 
 object PingStatusObserverIntegrationSpec {
 
-  private val doDelayResponse: AtomicBoolean = new AtomicBoolean(false)
-  private val doReturn404: AtomicBoolean = new AtomicBoolean(false)
+  // the global delay for all requests passing the DebuggingFilter
+  private val responseDelayMillis = new AtomicLong(0)
+
+  // whether DebuggingFilter should always return 404
+  private val doReturn404 = new AtomicBoolean(false)
 
   class DebuggingFilter extends Filter {
 
@@ -159,9 +161,7 @@ object PingStatusObserverIntegrationSpec {
         if (doReturn404.get()) {
           response.asInstanceOf[HttpServletResponse].sendError(404)
         } else {
-          if (doDelayResponse.get()) {
-            Thread.sleep(1000)
-          }
+          Thread.sleep(responseDelayMillis.get())
           chain.doFilter(request, response)
         }
       }

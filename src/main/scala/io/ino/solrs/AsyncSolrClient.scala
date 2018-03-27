@@ -609,41 +609,34 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
     val promise = futureFactory.newPromise[T]
     val startTime = System.currentTimeMillis()
 
-    val contentWriter = requestWriter.getContentWriter(r)
-    val streams = if (contentWriter == null) requestWriter.getContentStreams(r) else null
-
     val url = solrServer.baseUrl + getPath(r)
+
+    // the new Solr7 ContentWriter interface
+    val maybeContentWriter = Option(requestWriter.getContentWriter(r))
 
     val requestBuilder = if (r.getMethod == GET) {
       val fullQueryUrl = url + wparams.toQueryString
-      if (streams != null || contentWriter != null) {
-        throw new SolrException(BAD_REQUEST, "GET can't send streams!")
+      if (maybeContentWriter.isDefined) {
+        throw new SolrException(BAD_REQUEST, "GET can't use ContentWriter")
       }
       httpClient.prepareGet(fullQueryUrl)
     } else {
-      if (contentWriter != null) {
-        // case 1: new Solr7 content writer interface
+      maybeContentWriter.map { contentWriter =>
+        // POST/PUT with contentWriter
         val fullQueryUrl = url + wparams.toQueryString
         val req = if (r.getMethod == POST) httpClient.preparePost(fullQueryUrl) else httpClient.preparePut(fullQueryUrl)
 
         // AsyncHttpClient needs InputStream, need to adapt the writer
-        val baos = new ByteArrayOutputStream()
+        val baos = new BinaryRequestWriter.BAOS()
         contentWriter.write(baos)
-        val is = new ByteArrayInputStream(baos.toByteArray)
+        val is = new ByteArrayInputStream(baos.getbuf(), 0, baos.size())
 
         req.setHeader("Content-Type", contentWriter.getContentType)
           .setBody(is)
-      } else if (streams == null) {
-        // case 2: no streams, FORM post
+      }.getOrElse {
+        // POST/PUT with FORM data
         val req = if (r.getMethod == POST) httpClient.preparePost(url) else httpClient.preparePut(url)
         req.setFormParams(wparams.getMap.asScala.mapValues(asList[String](_: _*)).asJava)
-      } else {
-        // case 3: old streams, not sure if this is still relevant...
-        val req = if (r.getMethod == POST) httpClient.preparePost(url) else httpClient.preparePut(url)
-        val contentStream = streams.iterator.next
-        req
-          .setBody(contentStream.getStream)
-          .setHeader("Content-Type", contentStream.getContentType)
       }
     }
     val request = requestBuilder.addHeader("User-Agent", AGENT).build()

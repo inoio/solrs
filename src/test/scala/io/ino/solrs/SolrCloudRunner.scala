@@ -19,12 +19,12 @@ case class SolrCollection(name: String, replicas: Int = 1, shards: Int = 1)
 /**
   * A runner for a s Solr Cloud cluster using [[MiniSolrCloudCluster]]. Will start up embedded Zookeeper.
   *
-  * @param numServers the number of Solr Cloud instances in this cluster
-  * @param collections (optional) a list of collections (name, # replica / shard) to be used in this cluster,
-  *                    their config must exist below SolrHome (see below). Will be uploaded to ZK and core(s) will be created.
-  * @param defaultCollection (optional) the default collection the [[getClient]] should query
-  * @param maybeZkPort (optional) the port to start Zookeeper on, a random port is chosen if empty
-  * @param maybeSolrHome (optional) a Solr home dir to use, tries to locate resource /solr-home in classpath if not specified
+  * @param numServers        the number of Solr Cloud instances in this cluster
+  * @param collections       (optional) a list of collections (name, # replica / shard) to be used in this cluster,
+  *                          their config must exist below SolrHome (see below). Will be uploaded to ZK and core(s) will be created.
+  * @param defaultCollection (optional) the default collection the [[solrJClient]] should query
+  * @param maybeZkPort       (optional) the port to start Zookeeper on, a random port is chosen if empty
+  * @param maybeSolrHome     (optional) a Solr home dir to use, tries to locate resource /solr-home in classpath if not specified
   *
   */
 class SolrCloudRunner(numServers: Int, collections: List[SolrCollection] = List.empty,
@@ -95,7 +95,7 @@ class SolrCloudRunner(numServers: Int, collections: List[SolrCollection] = List.
       logger.info(s"Success: ${result.isSuccess}, Status: ${result.getCollectionStatus}")
     }
 
-    for ((url, idx) <- getCoreUrls.zipWithIndex) {
+    for ((url, idx) <- solrCoreUrls.zipWithIndex) {
       logger.info(s"Jetty core #$idx running at $url")
     }
 
@@ -125,20 +125,14 @@ class SolrCloudRunner(numServers: Int, collections: List[SolrCollection] = List.
     }
   }
 
-  def getClient: CloudSolrClient = {
-    miniSolrCloudCluster.getSolrClient
-  }
+  def solrJClient: CloudSolrClient = miniSolrCloudCluster.getSolrClient
 
-  def getJettySolrRunners: List[JettySolrRunner] = {
+  def jettySolrRunners: List[JettySolrRunner] = {
     import scala.collection.JavaConverters._
     miniSolrCloudCluster.getJettySolrRunners.asScala.toList
   }
 
-  def getZk: ZkTestServer = zookeeper
-
-  def getZkAddress: String = zookeeper.getZkAddress
-
-  def getZkPort: Int = zookeeper.getPort
+  def zkAddress: String = zookeeper.getZkAddress
 
   def restartZookeeper(): Unit = {
     logger.info("Restarting Zookeeper...")
@@ -154,8 +148,8 @@ class SolrCloudRunner(numServers: Int, collections: List[SolrCollection] = List.
     zk.run()
   }
 
-  def getCoreUrls: List[String] = {
-    getJettySolrRunners.flatMap { jetty =>
+  def solrCoreUrls: List[String] = {
+    jettySolrRunners.flatMap { jetty =>
       jetty.getCoreContainer.getAllCoreNames.asScala.map { coreName =>
         s"http://127.0.0.1:${jetty.getLocalPort}/solr/$coreName"
       }

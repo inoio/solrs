@@ -1,49 +1,58 @@
 package io.ino.solrs
 
 import java.net.ConnectException
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
 import java.util.concurrent.{ExecutionException, TimeUnit, TimeoutException}
 
+import javax.servlet._
+import javax.servlet.http.HttpServletResponse
+import org.apache.solr.client.solrj.impl.HttpSolrClient
 import org.asynchttpclient.{DefaultAsyncHttpClient, DefaultAsyncHttpClientConfig}
-import org.apache.catalina.LifecycleState
-import org.scalatest.concurrent.Eventually
+import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.mockito.MockitoSugar
-import org.scalatest.{BeforeAndAfterEach, FunSpec, Matchers}
-import org.scalatest.concurrent.IntegrationPatience
+import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, FunSpec, Matchers}
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
-import scala.concurrent.ExecutionContext.Implicits.global
 
-class PingStatusObserverIntegrationSpec extends FunSpec with RunningSolr with Eventually with IntegrationPatience with BeforeAndAfterEach with Matchers with FutureAwaits with MockitoSugar {
+class PingStatusObserverIntegrationSpec extends FunSpec with BeforeAndAfterAll with Eventually with IntegrationPatience with BeforeAndAfterEach with Matchers with FutureAwaits with MockitoSugar {
+
+  import PingStatusObserverIntegrationSpec._
 
   private implicit val awaitTimeout = 2000 millis
   private val httpClientTimeout = 100
   private val httpClient = new DefaultAsyncHttpClient(new DefaultAsyncHttpClientConfig.Builder().setRequestTimeout(httpClientTimeout).build)
 
+  protected var solrRunner: SolrRunner = _
+  protected var solrJClient: HttpSolrClient = _
+
   private lazy val solrUrl = s"http://localhost:${solrRunner.port}/solr/collection1"
 
+  override def beforeAll(): Unit = {
+    solrRunner = SolrRunner.startOnce(8889, extraFilters = Map(classOf[DebuggingFilter] -> "*"))
+    solrJClient = new HttpSolrClient.Builder(solrUrl).build()
+  }
+
+  override def afterAll(): Unit = {
+    httpClient.close()
+    solrJClient.close()
+    solrRunner.stop()
+  }
+
   override def beforeEach() {
+    responseDelayMillis.set(0)
+    doReturn404.set(false)
     eventually {
       enable(solrUrl).getStatusCode shouldBe 200
     }
   }
 
   override def afterEach() {
-    // if tomcat got stopped but not shut down, we must (and can) start it again
-    if(solrRunner.isStopped) {
-      solrRunner.tomcat.start()
-    }
-    // if tomcat got destroyed, we must use solrRunner.start to start from scratch
-    else if(solrRunner.isDestroyed) {
-      solrRunner.start
-    }
-    else if(solrRunner.context.getState == LifecycleState.STOPPED) {
-      solrRunner.context.start()
+    if (solrRunner.jetty.isStopped) {
+      solrRunner.jetty.start()
     }
   }
-
-  override def afterAll(): Unit = httpClient.close()
 
   describe("PingStatusObserver") {
 
@@ -63,7 +72,7 @@ class PingStatusObserverIntegrationSpec extends FunSpec with RunningSolr with Ev
       await(pingStatusObserver.checkServerStatus())
       solrServers(0).status should be (Enabled)
 
-      solrRunner.context.stop()
+      doReturn404.set(true)
 
       eventually(Timeout(awaitTimeout)) {
         try {
@@ -84,8 +93,8 @@ class PingStatusObserverIntegrationSpec extends FunSpec with RunningSolr with Ev
       await(pingStatusObserver.checkServerStatus())
       solrServers(0).status should be (Enabled)
 
-      solrRunner.tomcat.getConnector.pause()
-      val httpClientConfig = new DefaultAsyncHttpClientConfig.Builder().setReadTimeout(1).build()
+      responseDelayMillis.set(5000)
+      val httpClientConfig = new DefaultAsyncHttpClientConfig.Builder().setReadTimeout(100).build()
       val asyncHttpClient = new DefaultAsyncHttpClient(httpClientConfig)
       try {
 
@@ -100,7 +109,6 @@ class PingStatusObserverIntegrationSpec extends FunSpec with RunningSolr with Ev
         solrServers(0).status should be(Failed)
       } finally {
         asyncHttpClient.close()
-        solrRunner.tomcat.getConnector.resume()
       }
     }
 
@@ -108,7 +116,7 @@ class PingStatusObserverIntegrationSpec extends FunSpec with RunningSolr with Ev
       await(pingStatusObserver.checkServerStatus())
       solrServers(0).status should be (Enabled)
 
-      solrRunner.stop()
+      SolrRunner.stopJetty(solrRunner.jetty)
 
       eventually {
         val thrown = the [ExecutionException] thrownBy pingAction(solrUrl, "status")
@@ -129,5 +137,35 @@ class PingStatusObserverIntegrationSpec extends FunSpec with RunningSolr with Ev
   private def disable(solrUrl: String) = pingAction(solrUrl, "disable")
   private def pingAction(solrUrl: String, action: String, timeoutInMillis: Long = httpClientTimeout * 2) =
     httpClient.prepareGet(s"$solrUrl/admin/ping?action=$action").execute().get(timeoutInMillis, TimeUnit.MILLISECONDS)
+
+}
+
+object PingStatusObserverIntegrationSpec {
+
+  // the global delay for all requests passing the DebuggingFilter
+  private val responseDelayMillis = new AtomicLong(0)
+
+  // whether DebuggingFilter should always return 404
+  private val doReturn404 = new AtomicBoolean(false)
+
+  class DebuggingFilter extends Filter {
+
+    private val isOn: AtomicBoolean = new AtomicBoolean(false)
+
+    override def init(filterConfig: FilterConfig): Unit = isOn.set(true)
+
+    override def destroy(): Unit = isOn.set(false)
+
+    override def doFilter(request: ServletRequest, response: ServletResponse, chain: FilterChain): Unit = {
+      if (isOn.get()) {
+        if (doReturn404.get()) {
+          response.asInstanceOf[HttpServletResponse].sendError(404)
+        } else {
+          Thread.sleep(responseDelayMillis.get())
+          chain.doFilter(request, response)
+        }
+      }
+    }
+  }
 
 }

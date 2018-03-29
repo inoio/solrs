@@ -23,7 +23,7 @@ class AsyncSolrClientFunSpec extends StandardFunSpec with RunningSolr {
 
   override def beforeEach() {
     eventually(Timeout(10 seconds)) {
-      solr.deleteByQuery("*:*")
+      solrJClient.deleteByQuery("*:*")
     }
   }
 
@@ -38,8 +38,8 @@ class AsyncSolrClientFunSpec extends StandardFunSpec with RunningSolr {
       val doc1 = newInputDoc("id1", "doc1", "cat1", 10)
       val doc2 = newInputDoc("id2", "doc2", "cat1", 20)
       await(solrs.addDocs(docs = Iterable(doc1, doc2)))
-      solr.commit()
-      val docs = solr.query(new SolrQuery("*:*")).getResults
+      solrJClient.commit()
+      val docs = solrJClient.query(new SolrQuery("*:*")).getResults
       docs.getNumFound should be (2)
       docs.asScala.map(_.getFieldValue("price")) should contain theSameElementsAs List(10, 20)
     }
@@ -48,16 +48,16 @@ class AsyncSolrClientFunSpec extends StandardFunSpec with RunningSolr {
       val doc1 = newInputDoc("id1", "doc1", "cat1", 10)
       val doc2 = newInputDoc("id2", "doc2", "cat1", 20)
       await(solrs.addDocs(Iterator(doc1, doc2)))
-      solr.commit()
-      val docs = solr.query(new SolrQuery("*:*")).getResults
+      solrJClient.commit()
+      val docs = solrJClient.query(new SolrQuery("*:*")).getResults
       docs.getNumFound should be (2)
       docs.asScala.map(_.getFieldValue("price")) should contain theSameElementsAs List(10, 20)
     }
 
     it("should add doc") {
       await(solrs.addDoc(doc = newInputDoc("id1", "doc1", "cat1", 10)))
-      solr.commit()
-      val docs = solr.query(new SolrQuery("*:*")).getResults
+      solrJClient.commit()
+      val docs = solrJClient.query(new SolrQuery("*:*")).getResults
       docs.getNumFound should be (1)
       docs.asScala.map(_.getFieldValue("price")) should contain theSameElementsAs List(10)
     }
@@ -65,8 +65,8 @@ class AsyncSolrClientFunSpec extends StandardFunSpec with RunningSolr {
     it("should add bean") {
       val bean = TestBean("id1", "doc1", "cat1", 10)
       await(solrs.addBean(obj = bean))
-      solr.commit()
-      val response = solr.query(new SolrQuery("*:*"))
+      solrJClient.commit()
+      val response = solrJClient.query(new SolrQuery("*:*"))
       response.getResults.getNumFound should be (1)
       response.getBeans(classOf[TestBean]) should contain theSameElementsAs List(bean)
     }
@@ -75,8 +75,8 @@ class AsyncSolrClientFunSpec extends StandardFunSpec with RunningSolr {
       val bean1 = TestBean("id1", "doc1", "cat1", 10)
       val bean2 = TestBean("id2", "doc2", "cat1", 20)
       await(solrs.addBeans(beans = Iterable(bean1, bean2)))
-      solr.commit()
-      val response = solr.query(new SolrQuery("*:*"))
+      solrJClient.commit()
+      val response = solrJClient.query(new SolrQuery("*:*"))
       response.getResults.getNumFound should be (2)
       response.getBeans(classOf[TestBean]).asScala should contain theSameElementsAs List(bean1, bean2)
     }
@@ -85,16 +85,16 @@ class AsyncSolrClientFunSpec extends StandardFunSpec with RunningSolr {
       val bean1 = TestBean("id1", "doc1", "cat1", 10)
       val bean2 = TestBean("id2", "doc2", "cat1", 20)
       await(solrs.addBeans(beanIterator = Iterator(bean1, bean2)))
-      solr.commit()
-      val response = solr.query(new SolrQuery("*:*"))
+      solrJClient.commit()
+      val response = solrJClient.query(new SolrQuery("*:*"))
       response.getResults.getNumFound should be (2)
       response.getBeans(classOf[TestBean]).asScala should contain theSameElementsAs List(bean1, bean2)
     }
 
     it("should commit") {
-      solr.add(newInputDoc("id1", "doc1", "cat1", 10))
+      solrJClient.add(newInputDoc("id1", "doc1", "cat1", 10))
       await(solrs.commit())
-      val docs = solr.query(new SolrQuery("*:*")).getResults
+      val docs = solrJClient.query(new SolrQuery("*:*")).getResults
       docs.getNumFound should be (1)
       docs.asScala.map(_.getFieldValue("price")) should contain theSameElementsAs List(10)
     }
@@ -102,11 +102,11 @@ class AsyncSolrClientFunSpec extends StandardFunSpec with RunningSolr {
     it("should delete by id") {
       val doc1 = newInputDoc("id1", "doc1", "cat1", 10)
       val doc2 = newInputDoc("id2", "doc2", "cat1", 20)
-      solr.add(asList(doc1, doc2))
-      solr.commit()
+      solrJClient.add(asList(doc1, doc2))
+      solrJClient.commit()
       await(solrs.deleteById(id = "id1"))
-      solr.commit()
-      val docs = solr.query(new SolrQuery("*:*")).getResults
+      solrJClient.commit()
+      val docs = solrJClient.query(new SolrQuery("*:*")).getResults
       docs.getNumFound should be (1)
       docs.asScala.map(_.getFieldValue("price")) should contain theSameElementsAs List(20)
     }
@@ -115,11 +115,11 @@ class AsyncSolrClientFunSpec extends StandardFunSpec with RunningSolr {
       val doc1 = newInputDoc("id1", "doc1", "cat1", 10)
       val doc2 = newInputDoc("id2", "doc2", "cat1", 20)
       val doc3 = newInputDoc("id3", "doc3", "cat2", 30)
-      solr.add(asList(doc1, doc2, doc3))
-      solr.commit()
+      solrJClient.add(asList(doc1, doc2, doc3))
+      solrJClient.commit()
       await(solrs.deleteByIds(ids = Seq("id1", "id2")))
-      solr.commit()
-      val docs = solr.query(new SolrQuery("*:*")).getResults
+      solrJClient.commit()
+      val docs = solrJClient.query(new SolrQuery("*:*")).getResults
       docs.getNumFound should be (1)
       docs.asScala.map(_.getFieldValue("price")) should contain theSameElementsAs List(30)
     }
@@ -128,11 +128,11 @@ class AsyncSolrClientFunSpec extends StandardFunSpec with RunningSolr {
       val doc1 = newInputDoc("id1", "doc1", "cat1", 10)
       val doc2 = newInputDoc("id2", "doc2", "cat1", 20)
       val doc3 = newInputDoc("id3", "doc3", "cat2", 30)
-      solr.add(asList(doc1, doc2, doc3))
-      solr.commit()
+      solrJClient.add(asList(doc1, doc2, doc3))
+      solrJClient.commit()
       await(solrs.deleteByQuery(query = "cat:cat1"))
-      solr.commit()
-      val docs = solr.query(new SolrQuery("*:*")).getResults
+      solrJClient.commit()
+      val docs = solrJClient.query(new SolrQuery("*:*")).getResults
       docs.getNumFound should be (1)
       docs.asScala.map(_.getFieldValue("price")) should contain theSameElementsAs List(30)
     }
@@ -141,8 +141,8 @@ class AsyncSolrClientFunSpec extends StandardFunSpec with RunningSolr {
       val doc1 = newInputDoc("id1", "doc1", "cat1", 10)
       val doc2 = newInputDoc("id2", "doc2", "cat1", 20)
       val doc3 = newInputDoc("id3", "doc3", "cat2", 30)
-      solr.add(asList(doc1, doc2, doc3))
-      solr.commit()
+      solrJClient.add(asList(doc1, doc2, doc3))
+      solrJClient.commit()
       val docs = await(solrs.query(new SolrQuery("cat:cat1"))).getResults
       docs.getNumFound should be (2)
       docs.asScala.map(_.getFieldValue("price")) should contain theSameElementsAs List(10, 20)
@@ -151,14 +151,14 @@ class AsyncSolrClientFunSpec extends StandardFunSpec with RunningSolr {
     it("should get by id") {
       val doc1 = newInputDoc("id1", "doc1", "cat1", 10)
       val doc2 = newInputDoc("id2", "doc2", "cat1", 20)
-      solr.add(asList(doc1, doc2))
-      solr.commit()
+      solrJClient.add(asList(doc1, doc2))
+      solrJClient.commit()
       await(solrs.getById(id = "id1")).map(_.getFieldValue("price")) should be (Some(10))
     }
 
     it("should get by id absent") {
-      solr.add(newInputDoc("id1", "doc1", "cat1", 10))
-      solr.commit()
+      solrJClient.add(newInputDoc("id1", "doc1", "cat1", 10))
+      solrJClient.commit()
       await(solrs.getById(id = "id2")) should be (empty)
     }
 
@@ -166,16 +166,16 @@ class AsyncSolrClientFunSpec extends StandardFunSpec with RunningSolr {
       val doc1 = newInputDoc("id1", "doc1", "cat1", 10)
       val doc2 = newInputDoc("id2", "doc2", "cat1", 20)
       val doc3 = newInputDoc("id3", "doc3", "cat2", 30)
-      solr.add(asList(doc1, doc2, doc3))
-      solr.commit()
+      solrJClient.add(asList(doc1, doc2, doc3))
+      solrJClient.commit()
       val docs = await(solrs.getByIds(ids = Iterable("id1", "id2")))
       docs.getNumFound should be (2)
       docs.asScala.map(_.getFieldValue("price")) should contain theSameElementsAs List(10, 20)
     }
 
     it("should get by ids absent") {
-      solr.add(newInputDoc("id1", "doc1", "cat1", 10))
-      solr.commit()
+      solrJClient.add(newInputDoc("id1", "doc1", "cat1", 10))
+      solrJClient.commit()
       val docs = await(solrs.getByIds(ids = Iterable("id2", "id3")))
       docs.getNumFound should be (0)
       docs.asScala should be (empty)
@@ -186,7 +186,7 @@ class AsyncSolrClientFunSpec extends StandardFunSpec with RunningSolr {
       // check this via response header's parameter echo (params field)
       val query = new SolrQuery("cat:cat1")
       val paramEchoExpected = {
-        solr.query(query, POST).getHeader.get("params")
+        solrJClient.query(query, POST).getHeader.get("params")
       }
       val paramEcho = await(solrs.query(query, POST)).getHeader.get("params")
       paramEcho should be (paramEchoExpected)

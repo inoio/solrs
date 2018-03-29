@@ -229,9 +229,10 @@ class CloudSolrServers[F[_]](zkHost: String,
     }
   }
 
-  def shutdown = {
+  def shutdown(): Unit = {
     maybeZk.foreach(_.close())
     scheduledExecutor.shutdownNow()
+    scheduledExecutor.awaitTermination(10, TimeUnit.SECONDS)
   }
 
   /**

@@ -2,11 +2,8 @@ package io.ino.solrs
 
 import io.ino.solrs.AsyncSolrClientMocks._
 import io.ino.time.Clock
-import org.apache.curator.test.TestingServer
-import org.scalatest._
 import org.scalatest.concurrent.Eventually._
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
-import org.scalatest.mock.MockitoSugar
 import org.scalatest.time.{Millis, Span}
 
 import scala.concurrent.Future
@@ -21,27 +18,22 @@ class CloudSolrServersUninitializedIntegrationSpec extends StandardFunSpec {
   private implicit val awaitTimeout = 2 seconds
   private implicit val patienceConfig = PatienceConfig(timeout = scaled(Span(1000, Millis)))
 
-  private var zk: Option[TestingServer] = None
-  private var solrRunners = List.empty[SolrRunner]
+  private var solrRunner: SolrCloudRunner = _
+  private def solrServerUrls = solrRunner.solrCoreUrls
 
   private var cut: Option[CloudSolrServers[Future]] = None
 
   private type AsyncSolrClient = io.ino.solrs.AsyncSolrClient[Future]
 
-  import SolrUtils._
-
   override def afterEach() {
-    cut.foreach(_.shutdown)
+    cut.foreach(_.shutdown())
     cut = None
 
-    solrRunners.foreach(_.stop())
-    solrRunners = List.empty
-
-    zk.foreach(_.close())
-    zk = None
+    if (solrRunner != null) {
+      solrRunner.shutdown()
+      solrRunner = null
+    }
   }
-
-  private def solrRunnerUrls = solrRunners.map(solrRunner => s"http://$hostName:${solrRunner.port}/solr/collection1/")
 
   describe("CloudSolrServers") {
 
@@ -57,7 +49,7 @@ class CloudSolrServersUninitializedIntegrationSpec extends StandardFunSpec {
       cut.foreach(_.setAsyncSolrClient(asyncSolrClient))
 
       // Just see that shutdown doesn't block
-      cut.get.shutdown
+      cut.get.shutdown()
 
     }
 
@@ -66,7 +58,7 @@ class CloudSolrServersUninitializedIntegrationSpec extends StandardFunSpec {
      */
     it("should be able to start with unavailable ZK and should be connected as soon as ZK is available") {
       val zkPort = 2181
-      val zkConnectString = s"localhost:$zkPort"
+      val zkConnectString = s"localhost:$zkPort/solr"
 
       // Create CUT when there's no ZK available. There are also no solr servers started, so that initially the
       // zkStateReader.createClusterStateWatchersAndUpdate will fail as well...
@@ -74,16 +66,11 @@ class CloudSolrServersUninitializedIntegrationSpec extends StandardFunSpec {
       val asyncSolrClient = mockDoRequest(mock[AsyncSolrClient])(Clock.mutable)
       cut.foreach(_.setAsyncSolrClient(asyncSolrClient))
 
-      // Now start ZK
-      zk = Some(new TestingServer(zkPort, true))
-      // And our solr runners
-      solrRunners = List(
-        SolrRunner.start(18888, Some(ZooKeeperOptions(zkConnectString, bootstrapConfig = Some("collection1")))),
-        SolrRunner.start(18889, Some(ZooKeeperOptions(zkConnectString)))
-      )
+      // Now start Solr Runner
+      solrRunner = SolrCloudRunner.start(2, List(SolrCollection("collection1", 2, 1)), Some("collection1"), Some(zkPort))
 
       eventually(Timeout(20 seconds)) {
-        cut.get.all should contain theSameElementsAs solrRunnerUrls.map(SolrServer(_, Enabled))
+        cut.get.all should contain theSameElementsAs solrServerUrls.map(SolrServer(_, Enabled))
       }
 
     }

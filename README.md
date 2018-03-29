@@ -1,7 +1,7 @@
 # solrs - async solr client for java/scala
 
 [![Build Status](https://travis-ci.org/inoio/solrs.png?branch=master)](https://travis-ci.org/inoio/solrs)
-[![Maven Central](https://maven-badges.herokuapp.com/maven-central/io.ino/solrs_2.11/badge.svg)](http://search.maven.org/#search%7Cga%7C1%7Cg%3A%22io.ino%22%20AND%20a%3Asolrs*_2.11)
+[![Maven Central](https://img.shields.io/maven-central/v/io.ino/solrs_2.11.svg)](http://search.maven.org/#search%7Cga%7C1%7Cg%3A%22io.ino%22%20AND%20a%3Asolrs*_2.11)
 [![Join the chat at https://gitter.im/inoio/solrs](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/inoio/solrs)
 
 This is a java/scala solr client providing an interface like SolrJ, just asynchronously / non-blocking
@@ -22,16 +22,18 @@ For java it supports `CompletableFuture`, for scala you can choose between twitt
 
 ## Installation
 
+Each solrs version is compatible with a certain Solr version. For Solr 7.2.x use solrs 2.1.0, for Solr 6.x use solrs 2.0.0.
+
 You must add the library to the dependencies of the build file, e.g. add to `build.sbt`:
 
-    libraryDependencies += "io.ino" %% "solrs" % "2.0.0"
+    libraryDependencies += "io.ino" %% "solrs" % "2.1.0"
 
 or for java projects to pom.xml:
 
     <dependency>
       <groupId>io.ino</groupId>
       <artifactId>solrs_2.12</artifactId>
-      <version>2.0.0</version>
+      <version>2.1.0</version>
     </dependency>
 
 solrs is published to maven central for both scala 2.11 and 2.12.

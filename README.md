@@ -22,16 +22,18 @@ For java it supports `CompletableFuture`, for scala you can choose between twitt
 
 ## Installation
 
+Each solrs version is compatible with a certain Solr version. For Solr 7.2.x use solrs 2.1.0, for Solr 6.x use solrs 2.0.0.
+
 You must add the library to the dependencies of the build file, e.g. add to `build.sbt`:
 
-    libraryDependencies += "io.ino" %% "solrs" % "2.0.0"
+    libraryDependencies += "io.ino" %% "solrs" % "2.1.0"
 
 or for java projects to pom.xml:
 
     <dependency>
       <groupId>io.ino</groupId>
       <artifactId>solrs_2.12</artifactId>
-      <version>2.0.0</version>
+      <version>2.1.0</version>
     </dependency>
 
 solrs is published to maven central for both scala 2.11 and 2.12.

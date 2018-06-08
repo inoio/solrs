@@ -119,6 +119,8 @@ class CloudSolrServers[F[_]](zkHost: String,
 
   @volatile
   private var collectionToServers = Map.empty[String, IndexedSeq[SolrServer]].withDefaultValue(IndexedSeq.empty)
+  @volatile
+  private var aliasToCollections = Map.empty[String, IndexedSeq[String]].withDefaultValue(IndexedSeq.empty)
 
   private var scheduledExecutor: ScheduledExecutorService = Executors.newScheduledThreadPool(1, new ZkClusterStateUpdateTF)
 
@@ -183,6 +185,14 @@ class CloudSolrServers[F[_]](zkHost: String,
       else logger.info (s"Updated server map: $collectionToServers")
     }
 
+    def setAliases(newAliasToCollections: Map[String, IndexedSeq[String]]): Unit = {
+      //notifyObservers(aliasToCollections, newAliasToCollections)
+
+      aliasToCollections = newAliasToCollections
+      if (logger.isDebugEnabled) logger.debug (s"Updated alias map: $aliasToCollections from ClusterState $clusterState")
+      else logger.info (s"Updated alias server map: $aliasToCollections")
+    }
+
     try {
       val newCollectionToServers = getCollectionToServers(clusterState)
 
@@ -191,7 +201,16 @@ class CloudSolrServers[F[_]](zkHost: String,
           .onComplete(_ => set(newCollectionToServers))
         case None => set(newCollectionToServers)
       }
+      try {
+        val newAliasToCollections = getAliasToServers(zkStateReader)
 
+        if (newAliasToCollections != aliasToCollections) {
+          setAliases(newAliasToCollections)
+        }
+      } catch {
+        case NonFatal(e) =>
+          logger.error(s"Could not process alias cluster state, alias list might get outdated. Cluster state: $clusterState", e)
+      }
     } catch {
       case NonFatal(e) =>
         logger.error(s"Could not process cluster state, server list might get outdated. Cluster state: $clusterState", e)
@@ -250,7 +269,16 @@ class CloudSolrServers[F[_]](zkHost: String,
     val collection = Option(r.getParams.get("collection")).orElse(defaultCollection).getOrElse(
       throw new SolrServerException("No collection param specified on request and no default collection has been set.")
     )
-    collectionToServers.getOrElse(collection, Vector.empty)
+
+    collectionToServers.get(collection) match
+    {
+      case Some(servers) => servers
+      case None if aliasToCollections.nonEmpty => aliasToCollections.get(collection) match {
+        case Some(collections) if collections.headOption.nonEmpty => collectionToServers.getOrElse(collections.head, Vector.empty)
+        case _ => Vector.empty
+      }
+      case None => Vector.empty
+    }
   }
 
   // server state change
@@ -315,6 +343,17 @@ object CloudSolrServers {
         SolrServer(ZkCoreNodeProps.getCoreUrl(repl), serverStatus(repl))
       )).toIndexedSeq
       res.updated(name, res(name) ++ servers)
+    }
+  }
+
+  private[solrs] def getAliasToServers(zkStateReader: ZkStateReader): Map[String, IndexedSeq[String]] = {
+    import scala.collection.JavaConverters._
+
+    zkStateReader.getAliases.getCollectionAliasMap.asScala.foldLeft(
+      Map.empty[String, IndexedSeq[String]].withDefaultValue(IndexedSeq.empty)
+    ) { case (res, (alias, collections)) =>
+      val aliasedCollections = Option(collections.split(",").toIndexedSeq)
+      res.updated(alias, res(alias) ++ aliasedCollections.get)
     }
   }
 

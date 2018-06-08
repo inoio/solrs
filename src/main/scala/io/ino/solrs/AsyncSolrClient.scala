@@ -208,8 +208,8 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
   private val DEFAULT_PATH = "/select"
 
   /**
-   * User-Agent String.
-   */
+    * User-Agent String.
+    */
   val AGENT = "Solr[" + classOf[AsyncSolrClient[F]].getName() + "] 1.0"
 
   private val logger = LoggerFactory.getLogger(getClass())
@@ -250,8 +250,8 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
   }
 
   /**
-   * Closes the http client (asynchronously) if it was not provided but created by this class.
-   */
+    * Closes the http client (asynchronously) if it was not provided but created by this class.
+    */
   def shutdown(): Unit = {
     cancellableObservation.foreach(_.cancel(true))
     if(shutdownHttpClient) {
@@ -538,12 +538,12 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
     futureFactory.toBase[SolrDocumentList](doGetByIds(collection, ids, params))
 
   /**
-   * Performs a query to a solr server taking the preferred server into account if provided.
-   * @param q the query to send to the solr server.
-   * @param preferred the server that should be preferred to process the query. Specific [[io.ino.solrs.LoadBalancer LoadBalancer]]
-   *                  implementations have to support this and might add their own semantics.
-   * @return the response and the server that handled the query.
-   */
+    * Performs a query to a solr server taking the preferred server into account if provided.
+    * @param q the query to send to the solr server.
+    * @param preferred the server that should be preferred to process the query. Specific [[io.ino.solrs.LoadBalancer LoadBalancer]]
+    *                  implementations have to support this and might add their own semantics.
+    * @return the response and the server that handled the query.
+    */
   def queryPreferred(q: SolrQuery, preferred: Option[SolrServer]): F[(QueryResponse, SolrServer)] =
     executePreferred(new QueryRequest(q), preferred)
 

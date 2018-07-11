@@ -341,8 +341,8 @@ be passed to `RoundRobinLB`/`FastestServerLB`).
 
 Solr Cloud is supported with the following properties / restrictions:
 
-* No Shard Support (yet, please raise an issue or submit a pull request)
 * No Collection Aliases supported (a PR's welcome)
+* No optimized [document/request routing](https://lucene.apache.org/solr/guide/7_4/shards-and-indexing-data-in-solrcloud.html#document-routing) for shards via the `_route_` parameter, to direct queries to specific shards (please raise an issue or submit a pull request)
 * Can use a default collection, if this is not provided, per request the `SolrQuery` must specify
   the collection via the "collection" parameter.
 * New solr servers or solr servers that changed their state from inactive (e.g. down) to active can be tested

@@ -25,7 +25,6 @@ initialize := {
 }
 
 resolvers ++= Seq(
-  "JCenter" at "http://jcenter.bintray.com/",
   "Restlet Repositories" at "http://maven.restlet.org"
 )
 

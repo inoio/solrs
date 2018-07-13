@@ -22,9 +22,8 @@ import org.slf4j.LoggerFactory
 
 import scala.annotation.tailrec
 import scala.collection.concurrent.TrieMap
+import scala.collection.mutable
 import scala.concurrent.duration._
-import scala.language.higherKinds
-import scala.language.postfixOps
 
 trait LoadBalancer extends RequestInterceptor {
 
@@ -53,7 +52,7 @@ trait LoadBalancer extends RequestInterceptor {
 class SingleServerLB(val server: SolrServer) extends LoadBalancer {
   def this(baseUrl: String) = this(SolrServer(baseUrl))
   private val someServer = Some(server)
-  override def solrServer(r: SolrRequest[_], preferred: Option[SolrServer] = None) = someServer
+  override def solrServer(r: SolrRequest[_], preferred: Option[SolrServer] = None): Some[SolrServer] = someServer
   override val solrServers: SolrServers = new StaticSolrServers(IndexedSeq(server))
 }
 
@@ -155,6 +154,7 @@ object RoundRobinLB {
  * @param clock the clock to get the current time from. The tests using the maxDelay are
  *              run using a scheduled executor, therefore this interval uses the system clock
  */
+//noinspection ScalaUnnecessaryParentheses
 class FastestServerLB[F[_]](override val solrServers: SolrServers,
                             val collectionAndTestQuery: SolrServer => (String, SolrQuery),
                             minDelay: Duration = 100 millis,
@@ -174,11 +174,11 @@ class FastestServerLB[F[_]](override val solrServers: SolrServers,
 
   private val scheduler = Executors.newSingleThreadScheduledExecutor()
 
-  protected[solrs] val statsByServer = TrieMap.empty[SolrServer, PerformanceStats]
-  protected[solrs] val serverTestTimestamp = TrieMap.empty[SolrServer, Millisecond].withDefaultValue(Millisecond(0))
+  protected[solrs] val statsByServer: TrieMap[SolrServer, PerformanceStats] = TrieMap.empty[SolrServer, PerformanceStats]
+  protected[solrs] val serverTestTimestamp: mutable.Map[SolrServer, Millisecond] = TrieMap.empty[SolrServer, Millisecond].withDefaultValue(Millisecond(0))
   // "fast" servers are faster than the average of all servers, they're tested more frequently than slow servers.
   // slow servers e.g. are running in a separate dc and are not expected to suddenly perform significantly better
-  protected var fastServersByCollection = Map.empty[String, Set[SolrServer]].withDefaultValue(Set.empty)
+  protected var fastServersByCollection: Map[String, Set[SolrServer]] = Map.empty[String, Set[SolrServer]].withDefaultValue(Set.empty)
   private val lastServerIdx = new AtomicInteger(-1)
 
   private def collection(server: SolrServer): String = collectionAndTestQuery(server)._1
@@ -204,11 +204,11 @@ class FastestServerLB[F[_]](override val solrServers: SolrServers,
     solrServers match {
       case observable: ServerStateChangeObservable => observable.register(new StateChangeObserver {
         override def onStateChange(event: StateChange): Unit = event match {
-          case Removed(server, collection) if server.isEnabled =>
+          case Removed(server, _) if server.isEnabled =>
             // clean up
             statsByServer.remove(server)
             serverTestTimestamp.remove(server)
-          case StateChanged(from, to, collection) if from.isEnabled && !to.isEnabled =>
+          case StateChanged(from, to, _) if from.isEnabled && !to.isEnabled =>
             statsByServer.remove(from)
             serverTestTimestamp.remove(from)
           case _ => // ignore
@@ -350,8 +350,7 @@ class FastestServerLB[F[_]](override val solrServers: SolrServers,
    * Determines the servers that are tested more frequently.
    */
   protected def updateFastServers(): Unit = {
-    if(statsByServer.isEmpty) Map.empty
-    else {
+    if(statsByServer.nonEmpty) {
       val serversByCollection = statsByServer.keys.toSet.groupBy(collection)
       serversByCollection.foreach { case (collection, servers) =>
         val durationByServer = statsByServer.filterKeys(servers.contains).mapValues(_.predictDuration(TestQueryClass))
@@ -396,6 +395,7 @@ object FastestServerLB {
   import java.util.function.BiFunction
   import java.util.function.LongFunction
   import java.util.function.{Function => JFunction}
+  //noinspection ScalaUnnecessaryParentheses
   case class Builder(solrServers: SolrServers,
                      collectionAndTestQuery: SolrServer => (String, SolrQuery),
                      minDelay: Duration = 100 millis,

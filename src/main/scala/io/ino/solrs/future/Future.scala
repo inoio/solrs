@@ -1,7 +1,6 @@
 package io.ino.solrs.future
 
 import scala.collection.generic.CanBuildFrom
-import scala.language.higherKinds
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
@@ -102,7 +101,7 @@ trait FutureFactory[RFT[_]] {
 
   def newPromise[T]: Promise[T]
 
-  def toBase[T]: (Future[T] => RFT[T])
+  def toBase[T]: Future[T] => RFT[T]
 
 }
 

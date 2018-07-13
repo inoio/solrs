@@ -10,14 +10,14 @@ import scala.util.Try
 class JavaFutureFactory extends FutureFactory[CompletionStage] {
   import scala.util.{Failure, Success}
 
-  def toBase[T]: (Future[T]) => CompletionStage[T] = {
+  def toBase[T]: Future[T] => CompletionStage[T] = {
     case sf: JavaFuture[T] => sf.inner
     case _ => throw new Exception("Wrong future type")
   }
 
   class JavaFuture[T](private[JavaFutureFactory] val inner: CompletionStage[T]) extends FutureBase[T] {
 
-    override def onComplete[U](func: (Try[T]) => U): Unit = {
+    override def onComplete[U](func: Try[T] => U): Unit = {
       inner.whenComplete(new BiConsumer[T, Throwable] {
         override def accept(value: T, ex: Throwable): Unit = {
           val trie = if(value != null) Success(value) else Failure(ex)

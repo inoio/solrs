@@ -23,9 +23,6 @@ import org.asynchttpclient.Response
 import org.slf4j.LoggerFactory
 
 import scala.collection.mutable
-import scala.language.postfixOps
-import scala.language.higherKinds
-import scala.language.postfixOps
 import scala.util.control.NonFatal
 import scala.util.Failure
 import scala.util.Success
@@ -60,7 +57,6 @@ object StaticSolrServers {
 import java.util.concurrent.TimeUnit
 
 import scala.concurrent.duration._
-import scala.languageFeature.postfixOps
 
 private object ZkClusterStateUpdateTF {
   private val tg = new ThreadGroup("solrs-CloudSolrServersUpdate")
@@ -261,7 +257,7 @@ class CloudSolrServers[F[_]](zkHost: String,
     serverChangeStateObservers += listener
   }
 
-  private def notifyObservers(oldState: Map[String, Seq[SolrServer]], newState: Map[String, Seq[SolrServer]]) = {
+  private def notifyObservers(oldState: Map[String, Seq[SolrServer]], newState: Map[String, Seq[SolrServer]]): Unit = {
     CloudSolrServers.diff(oldState, newState).foreach { event =>
       serverChangeStateObservers.foreach(_.onStateChange(event))
     }
@@ -352,10 +348,10 @@ object CloudSolrServers {
       val newServers = newState.getOrElse(collection, Nil)
       val changesFromOldState = changes(oldServers, newServers,
         stateChanged = (oldServer, newServer) => StateChanged(oldServer, newServer, collection),
-        onlyInServers2 = (server2) => Added(server2, collection))
+        onlyInServers2 = server2 => Added(server2, collection))
       val changesFromNewState = changes(newServers, oldServers,
         stateChanged = (newServer, oldServer) => StateChanged(oldServer, newServer, collection),
-        onlyInServers2 = (server2) => Removed(server2, collection))
+        onlyInServers2 = server2 => Removed(server2, collection))
       changesFromOldState ++ changesFromNewState
     }
 
@@ -371,7 +367,8 @@ object CloudSolrServers {
 
 }
 
-class ReloadingSolrServers[F[_]](url: String, extractor: Array[Byte] => IndexedSeq[SolrServer], httpClient: AsyncHttpClient)(implicit futureFactory: FutureFactory[F] = ScalaFutureFactory) extends SolrServers {
+class ReloadingSolrServers[F[_]](url: String, extractor: Array[Byte] => IndexedSeq[SolrServer], httpClient: AsyncHttpClient)
+                                (implicit futureFactory: FutureFactory[F] = ScalaFutureFactory) extends SolrServers {
 
   private val logger = LoggerFactory.getLogger(getClass)
 

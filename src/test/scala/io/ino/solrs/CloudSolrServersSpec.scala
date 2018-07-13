@@ -5,7 +5,6 @@ import java.nio.file.{Files, Paths}
 import org.apache.solr.common.cloud.ClusterState
 import org.scalatest._
 
-import scala.language.postfixOps
 
 /**
  * Test that starts ZK, solrRunners and our Class Under Test before all tests.

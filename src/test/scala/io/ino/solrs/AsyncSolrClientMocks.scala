@@ -9,7 +9,6 @@ import org.mockito.Mockito._
 
 import scala.concurrent._
 import scala.concurrent.duration._
-import scala.language.{higherKinds, postfixOps}
 import scala.util.{Success, Try}
 
 object AsyncSolrClientMocks {

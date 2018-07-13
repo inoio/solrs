@@ -6,7 +6,6 @@ import org.scalatest.{FunSpec, Matchers}
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
 class SolrServersSpec extends FunSpec with Matchers with FutureAwaits {
 

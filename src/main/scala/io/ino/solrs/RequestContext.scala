@@ -3,7 +3,6 @@ package io.ino.solrs
 import org.apache.solr.client.solrj.SolrRequest
 import org.apache.solr.client.solrj.SolrResponse
 
-import scala.language.existentials
 import scala.concurrent.duration.Duration
 
 /**
@@ -17,7 +16,7 @@ case class RequestContext[T <: SolrResponse](r: SolrRequest[_ <: T], preferred: 
   def failedRequest(server: SolrServer, duration: Duration, e: Throwable): RequestContext[T] =
     copy(failedRequests = failedRequests :+ RequestInfo(server, duration, e))
 
-  def triedServers = failedRequests.map(_.server)
+  def triedServers: Seq[SolrServer] = failedRequests.map(_.server)
 
   def hasTriedServer(server: SolrServer): Boolean = failedRequests.exists(_.server == server)
 

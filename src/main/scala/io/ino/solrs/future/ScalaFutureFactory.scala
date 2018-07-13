@@ -10,19 +10,19 @@ object ScalaFutureFactory extends FutureFactory[SFuture] {
   import scala.util.{Failure, Success}
 
   // Implicit val to provide s.th. to import.
-  implicit val Implicit = ScalaFutureFactory
+  implicit val Implicit: ScalaFutureFactory.type = ScalaFutureFactory
 
-  def toBase[T]: (Future[T]) => SFuture[T] = {
+  def toBase[T]: Future[T] => SFuture[T] = {
     case sf: ScalaFuture[T] => sf.inner
     case _ => throw new Exception("Wrong future type")
   }
 
   class ScalaFuture[+T](f: SFuture[T]) extends FutureBase[T] {
-    val inner = f
+    val inner: SFuture[T] = f
 
     import Execution.Implicits.sameThreadContext
 
-    override def onComplete[U](func: (Try[T]) => U): Unit = inner.onComplete(func)
+    override def onComplete[U](func: Try[T] => U): Unit = inner.onComplete(func)
 
     def map[S](f: T => S): Future[S] = {
       val p = new ScalaPromise[S]
@@ -78,7 +78,7 @@ object ScalaFutureFactory extends FutureFactory[SFuture] {
   }
 
   class ScalaPromise[T] extends Promise[T] {
-    val inner = SPromise[T]()
+    val inner: SPromise[T] = SPromise[T]()
     def future: Future[T] = new ScalaFuture(inner.future)
     def success(value: T): Unit = inner.success(value)
     def failure(exception: Throwable): Unit = inner.failure(exception)

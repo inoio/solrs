@@ -51,7 +51,7 @@ class PerformanceStats(solrServer: SolrServer, initialPredictedResponseTime: Lon
 
   def requestStarted(queryClass: QueryClass): RequestHandle = {
     new RequestHandle {
-      override val startedAtMillis = clock.millis()
+      override val startedAtMillis: Duration = clock.millis()
       // store this request, so that it can be used for prediction
       currentRequestsFor(queryClass).add(this)
       override def finished(): Unit = {
@@ -229,7 +229,7 @@ object PerformanceStats {
     }
     
     def averageCountsAndDurations: Map[QueryClass, CountAndDuration] = {
-      requestCounts.map { case ((queryClass, count)) =>
+      requestCounts.map { case (queryClass, count) =>
         (queryClass, count -> requestDurationsInMillis(queryClass) / count)
       }.toMap
     }
@@ -252,11 +252,11 @@ object PerformanceStats {
 
     private val serverStats = new CountsAndDurations
 
-    val register = serverStats.record _
+    val register: (QueryClass, Duration) => Unit = serverStats.record
     
-    def averageDurations = serverStats.averageCountsAndDurations
+    def averageDurations: Map[QueryClass, (Count, Duration)] = serverStats.averageCountsAndDurations
 
-    def averageDuration = serverStats.averageDuration _
+    def averageDuration: QueryClass => Option[Duration] = serverStats.averageDuration
 
   }
 
@@ -275,7 +275,7 @@ object PerformanceStats {
    */
   class EvictingArray[T: ClassTag] private(_values: Array[T]) {
 
-    private val size = _values.size
+    private val size = _values.length
     private var length = 0
     private var pos = 0
 

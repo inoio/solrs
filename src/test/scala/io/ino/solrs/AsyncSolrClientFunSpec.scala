@@ -11,7 +11,6 @@ import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import scala.annotation.meta.field
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
 class AsyncSolrClientFunSpec extends StandardFunSpec with RunningSolr {
 

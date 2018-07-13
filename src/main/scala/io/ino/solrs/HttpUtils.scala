@@ -1,7 +1,5 @@
 package io.ino.solrs
 
-import org.apache.http.HeaderElement
-
 /**
  * Created by magro on 4/29/14.
  */

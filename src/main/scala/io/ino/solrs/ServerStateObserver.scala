@@ -7,7 +7,6 @@ import io.ino.solrs.future.{Future, FutureFactory, ScalaFutureFactory}
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration._
-import scala.language.{higherKinds, postfixOps}
 import scala.util.Success
 import scala.xml.XML
 
@@ -45,7 +44,7 @@ class PingStatusObserver[F[_]](solrServers: SolrServers, httpClient: AsyncHttpCl
   def this(solrServers: Seq[SolrServer], httpClient: AsyncHttpClient)
           (implicit futureFactory: FutureFactory[F] = ScalaFutureFactory) = this(new StaticSolrServers(solrServers.toIndexedSeq), httpClient)
 
-  private val logger = LoggerFactory.getLogger(getClass())
+  private val logger = LoggerFactory.getLogger(getClass)
 
   override def checkServerStatus(): Future[Unit] = {
     val futures = solrServers.all.map { server =>

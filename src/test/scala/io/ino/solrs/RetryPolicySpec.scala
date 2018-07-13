@@ -8,7 +8,6 @@ import org.apache.solr.client.solrj.request.QueryRequest
 import org.scalatest.{FunSpec, Inside, Matchers}
 
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
 class RetryPolicySpec extends FunSpec with Matchers with Inside {
 

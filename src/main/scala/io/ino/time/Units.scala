@@ -1,6 +1,5 @@
 package io.ino.time
 
-import scala.language.implicitConversions
 import scala.math.Ordering
 
 object Units {

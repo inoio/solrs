@@ -93,7 +93,7 @@ object RetryPolicy {
   /**
    * Retries the given number of times.
    */
-  def AtMost(times: Int) = new RetryPolicy {
+  def AtMost(times: Int): RetryPolicy = new RetryPolicy {
     override def shouldRetry(e: Throwable, server: SolrServer, requestContext: RequestContext[_], lb: LoadBalancer): RetryDecision = {
       if(requestContext.triedServers.length < times) RetryDecision.Retry
       else RetryDecision.Fail

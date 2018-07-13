@@ -1,23 +1,24 @@
 package io.ino.solrs.future
 
-import com.twitter.util.{Future => TFuture, Return, Throw}
+import com.twitter.util
+import com.twitter.util.{Return, Throw, Future => TFuture}
 
 import scala.util.{Failure, Success, Try => STry}
 
 object TwitterFutureFactory extends FutureFactory[TFuture] {
 
   // Implicit val to provide s.th. to import.
-  implicit val Implicit = TwitterFutureFactory
+  implicit val Implicit: TwitterFutureFactory.type = TwitterFutureFactory
 
-  def toBase[T]: (Future[T]) => TFuture[T] = {
+  def toBase[T]: Future[T] => TFuture[T] = {
     case sf: TwitterFuture[T] => sf.inner
     case _ => throw new Exception("Wrong future type")
   }
 
   class TwitterFuture[+T](f: TFuture[T]) extends FutureBase[T] {
-    val inner = f
+    val inner: TFuture[T] = f
 
-    override def onComplete[U](func: (STry[T]) => U): Unit = {
+    override def onComplete[U](func: STry[T] => U): Unit = {
       inner.respond {
         case Return(value)  => func(Success(value))
         case Throw(t)       => func(Failure(t))
@@ -80,7 +81,7 @@ object TwitterFutureFactory extends FutureFactory[TFuture] {
   }
 
   class TwitterPromise[T] extends Promise[T] {
-    val inner = com.twitter.util.Promise.apply[T]()
+    val inner: util.Promise[T] = com.twitter.util.Promise.apply[T]()
     def future: Future[T] = new TwitterFuture(inner.map(x => x))
     def success(value: T): Unit = inner.setValue(value)
     def failure(exception: Throwable): Unit = inner.setException(exception)

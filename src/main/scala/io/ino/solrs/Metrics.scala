@@ -1,5 +1,6 @@
 package io.ino.solrs
 
+//noinspection UnitMethodIsParameterless
 trait Metrics {
 
   def requestTime(timeInMillis: Long): Unit
@@ -17,9 +18,9 @@ trait Metrics {
 }
 
 object NoopMetrics extends Metrics {
-  override def requestTime(timeInMillis: Long) = {}
-  override def countException = {}
-  override def countRemoteException = {}
+  override def requestTime(timeInMillis: Long): Unit = {}
+  override def countException: Unit = {}
+  override def countRemoteException: Unit = {}
 }
 
 import com.codahale.metrics.MetricRegistry
@@ -34,10 +35,10 @@ class CodaHaleMetrics[F[_]](val registry: MetricRegistry = new MetricRegistry())
   private val transformResponseExceptionCounter = registry.meter(name(classOf[AsyncSolrClient[F]], "transform-response-exceptions"))
   private val exceptionCounter = registry.meter(name(classOf[AsyncSolrClient[F]], "other-exceptions"))
 
-  override def requestTime(timeInMillis: Long) = requestTimer.update(timeInMillis, MILLISECONDS)
+  override def requestTime(timeInMillis: Long): Unit = requestTimer.update(timeInMillis, MILLISECONDS)
 
-  override def countRemoteException = remoteSolrExceptionCounter.mark()
+  override def countRemoteException: Unit = remoteSolrExceptionCounter.mark()
 
-  override def countException = exceptionCounter.mark()
+  override def countException: Unit = exceptionCounter.mark()
 
 }

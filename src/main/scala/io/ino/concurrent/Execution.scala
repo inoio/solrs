@@ -4,7 +4,7 @@ import scala.concurrent.ExecutionContext
 
 object Execution {
 
-  val sameThreadContext = new ExecutionContext {
+  val sameThreadContext: ExecutionContext = new ExecutionContext {
     def reportFailure(t: Throwable) { t.printStackTrace() }
     def execute(runnable: Runnable) {runnable.run()}
   }
@@ -13,7 +13,7 @@ object Execution {
     /**
      * Runs in the caller's thread.
      */
-    implicit val sameThreadContext = Execution.sameThreadContext
+    implicit val sameThreadContext: ExecutionContext = Execution.sameThreadContext
   }
 
 }

@@ -101,7 +101,7 @@ trait FutureFactory[RFT[_]] {
 
   def newPromise[T]: Promise[T]
 
-  def toBase[T]: (Future[T] => RFT[T])
+  def toBase[T]: Future[T] => RFT[T]
 
 }
 

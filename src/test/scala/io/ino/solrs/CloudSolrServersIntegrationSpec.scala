@@ -17,7 +17,6 @@ import org.scalatest.time.{Millis, Span}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
 /**
  * Test that starts ZK, solrRunners and our Class Under Test before all tests.

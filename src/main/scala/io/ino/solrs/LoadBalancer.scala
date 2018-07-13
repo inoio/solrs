@@ -23,8 +23,6 @@ import org.slf4j.LoggerFactory
 import scala.annotation.tailrec
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration._
-import scala.language.higherKinds
-import scala.language.postfixOps
 
 trait LoadBalancer extends RequestInterceptor {
 

@@ -24,7 +24,6 @@ import org.asynchttpclient.AsyncHttpClient
 import scala.collection.JavaConverters._
 import scala.compat.java8.FunctionConverters._
 import scala.compat.java8.OptionConverters._
-import scala.language.higherKinds
 
 /**
  * Java API: Async, non-blocking Solr Server that allows to make requests to Solr.

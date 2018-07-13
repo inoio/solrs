@@ -9,7 +9,6 @@ import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{FunSpec, Matchers}
 
 import scala.concurrent.{Future => SFuture}
-import scala.language.{higherKinds, postfixOps}
 
 class ScalaFutureFactorySpec extends FutureFactorySpec[SFuture] with FutureAwaits {
   import scala.concurrent.duration._

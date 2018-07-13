@@ -14,7 +14,6 @@ import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, FunSpec, Matchers}
 
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
 class PingStatusObserverIntegrationSpec extends FunSpec with BeforeAndAfterAll with Eventually with IntegrationPatience with BeforeAndAfterEach with Matchers with FutureAwaits with MockitoSugar {
 

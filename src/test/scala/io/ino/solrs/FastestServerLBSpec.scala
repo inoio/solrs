@@ -15,7 +15,6 @@ import org.scalatest.concurrent.Eventually._
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
 class FastestServerLBSpec extends StandardFunSpec {
 

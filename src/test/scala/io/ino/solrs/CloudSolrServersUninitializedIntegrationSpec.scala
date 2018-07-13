@@ -8,7 +8,6 @@ import org.scalatest.time.{Millis, Span}
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
 /**
  * Test that starts uninitialized, there is no ZK and no solr servers started before tests. 

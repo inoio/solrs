@@ -3,7 +3,6 @@ package io.ino.solrs
 import org.apache.solr.client.solrj.SolrRequest
 import org.apache.solr.client.solrj.SolrResponse
 
-import scala.language.existentials
 import scala.concurrent.duration.Duration
 
 /**

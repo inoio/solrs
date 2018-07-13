@@ -1,7 +1,6 @@
 package io.ino.solrs.future
 
 import scala.collection.generic.CanBuildFrom
-import scala.language.higherKinds
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 

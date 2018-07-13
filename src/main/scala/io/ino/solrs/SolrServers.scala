@@ -23,9 +23,6 @@ import org.asynchttpclient.Response
 import org.slf4j.LoggerFactory
 
 import scala.collection.mutable
-import scala.language.postfixOps
-import scala.language.higherKinds
-import scala.language.postfixOps
 import scala.util.control.NonFatal
 import scala.util.Failure
 import scala.util.Success
@@ -60,7 +57,6 @@ object StaticSolrServers {
 import java.util.concurrent.TimeUnit
 
 import scala.concurrent.duration._
-import scala.languageFeature.postfixOps
 
 private object ZkClusterStateUpdateTF {
   private val tg = new ThreadGroup("solrs-CloudSolrServersUpdate")

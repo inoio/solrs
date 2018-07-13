@@ -52,8 +52,6 @@ import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration._
 import scala.collection.JavaConverters._
-import scala.language.higherKinds
-import scala.language.postfixOps
 import scala.util.control.NonFatal
 
 object AsyncSolrClient {

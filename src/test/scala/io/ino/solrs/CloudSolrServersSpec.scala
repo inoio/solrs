@@ -28,7 +28,7 @@ class CloudSolrServersSpec extends FunSpec with Matchers {
         )
       )
 
-      implicit val solrServerOrd = Ordering[String].on[SolrServer](s => s.baseUrl)
+      implicit val solrServerOrd: Ordering[SolrServer] = Ordering[String].on[SolrServer](s => s.baseUrl)
 
       events should contain theSameElementsAs Seq(
         Removed(SolrServer("h10", Enabled), "col1"),

@@ -23,8 +23,8 @@ import scala.concurrent.duration._
  */
 class CloudSolrServersIntegrationSpec extends StandardFunSpec {
 
-  private implicit val awaitTimeout = 2 seconds
-  private implicit val patienceConfig = PatienceConfig(timeout = scaled(Span(20000, Millis)),
+  private implicit val awaitTimeout: FiniteDuration = 2 seconds
+  private implicit val patienceConfig: PatienceConfig = PatienceConfig(timeout = scaled(Span(20000, Millis)),
                                                        interval = scaled(Span(1000, Millis)))
 
   private type AsyncSolrClient = io.ino.solrs.AsyncSolrClient[Future]
@@ -42,8 +42,12 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
   import io.ino.solrs.SolrUtils._
 
   override def beforeAll() {
-    // create a 2 node cluster with one collection that has 1 shard in 2 replicas
-    solrRunner = SolrCloudRunner.start(2, List(SolrCollection("collection1", 2, 1)), Some("collection1"))
+    // create a 2 node cluster with one collection that has 2 shards with 2 replicas
+    solrRunner = SolrCloudRunner.start(
+      numServers = 4,
+      cores = List(SolrCollection("collection1", replicas = 2, shards = 2)),
+      defaultCollection = Some("collection1")
+    )
     solrJClient = solrRunner.solrJClient
     asyncSolrClients = solrRunner.jettySolrRunners.map(jetty => jetty -> AsyncSolrClient(s"http://$hostName:${jetty.getLocalPort}/solr/collection1")).toMap
 
@@ -79,7 +83,9 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
 
       asyncSolrClients.foreach { case(_, client) =>
         eventually {
-          val response = client.query(new SolrQuery("*:*").setRows(Int.MaxValue)).map(getIds)
+          // don't use Int.MaxValue to get all docs with distributed queries,
+          // see also https://stackoverflow.com/questions/32046716/solr-to-get-all-records
+          val response = client.query(new SolrQuery("*:*").setRows(1000)).map(getIds)
           await(response) should contain theSameElementsAs someDocsIds
         }
       }
@@ -89,18 +95,21 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
       cut = new CloudSolrServers(zkConnectString, clusterStateUpdateInterval = 100 millis)
       cut.setAsyncSolrClient(mockDoRequest(mock[AsyncSolrClient])(Clock.mutable))
 
+      val expectedSolrServers = solrServerUrls.map(SolrServer(_, Enabled))
       eventually {
-        cut.all should contain theSameElementsAs solrServerUrls.map(SolrServer(_, Enabled))
+        cut.all should contain theSameElementsAs expectedSolrServers
       }
 
       SolrRunner.stopJetty(solrRunner.jettySolrRunners.head)
+      expectedSolrServers.head.status = Failed
       eventually {
-        cut.all.map(_.status) should contain theSameElementsAs Seq(Failed, Enabled)
+        cut.all should contain theSameElementsAs expectedSolrServers
       }
 
       SolrRunner.startJetty(solrRunner.jettySolrRunners.head)
+      expectedSolrServers.head.status = Enabled
       eventually {
-        cut.all.map(_.status) should contain theSameElementsAs Seq(Enabled, Enabled)
+        cut.all should contain theSameElementsAs expectedSolrServers
       }
     }
 

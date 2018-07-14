@@ -1,5 +1,6 @@
 package io.ino.solrs
 
+import java.util
 import java.util.concurrent.CompletionStage
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
@@ -7,9 +8,9 @@ import java.util.concurrent.ThreadFactory
 
 import io.ino.solrs.CloudSolrServers.WarmupQueries
 import io.ino.solrs.ServerStateChangeObservable.StateChange
-import io.ino.solrs.future.JavaFutureFactory
 import io.ino.solrs.future.Future
 import io.ino.solrs.future.FutureFactory
+import io.ino.solrs.future.JavaFutureFactory
 import io.ino.solrs.future.ScalaFutureFactory
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.SolrRequest
@@ -17,16 +18,19 @@ import org.apache.solr.client.solrj.SolrServerException
 import org.apache.solr.client.solrj.request.QueryRequest
 import org.apache.solr.client.solrj.response.QueryResponse
 import org.apache.solr.common.cloud._
+import org.apache.solr.common.params.ShardParams
 import org.asynchttpclient.AsyncCompletionHandler
 import org.asynchttpclient.AsyncHttpClient
 import org.asynchttpclient.Response
 import org.slf4j.LoggerFactory
 
+import scala.collection.breakOut
+import scala.collection.generic.CanBuildFrom
 import scala.collection.mutable
-import scala.util.control.NonFatal
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
+import scala.util.control.NonFatal
 
 /**
  * Provides the list of solr servers.
@@ -114,9 +118,10 @@ class CloudSolrServers[F[_]](zkHost: String,
   private var maybeZk: Option[ZkStateReader] = None
 
   @volatile
-  private var collectionToServers = Map.empty[String, IndexedSeq[SolrServer]].withDefaultValue(IndexedSeq.empty)
+  private var collections = Map.empty[String, CollectionInfo]
+  private def collectionToServers: Map[String, IndexedSeq[SolrServer]] = collections.mapValues(_.servers)
 
-  private var scheduledExecutor: ScheduledExecutorService = Executors.newScheduledThreadPool(1, new ZkClusterStateUpdateTF)
+  private val scheduledExecutor: ScheduledExecutorService = Executors.newScheduledThreadPool(1, new ZkClusterStateUpdateTF)
 
   private var asyncSolrClient: AsyncSolrClient[F] = _
 
@@ -151,9 +156,7 @@ class CloudSolrServers[F[_]](zkHost: String,
       // Directly update, because scheduler thread creation might take too long (issue #7)
       updateFromClusterState(zkStateReader)
       // Now regularly update the server list from ZkStateReader clusterState
-      scheduledExecutor.scheduleAtFixedRate(new Runnable {
-        override def run(): Unit = updateFromClusterState(zkStateReader)
-      }, clusterStateUpdateInterval.toMillis, clusterStateUpdateInterval.toMillis, TimeUnit.MILLISECONDS)
+      scheduleUpdateFromClusterState(zkStateReader)
     } catch {
       case NonFatal(e) =>
         logger.warn("Could not initialize ZkStateReader, this can happen when there are no solr servers connected." +
@@ -164,33 +167,45 @@ class CloudSolrServers[F[_]](zkHost: String,
     }
   }
 
+  private def scheduleUpdateFromClusterState(zkStateReader: ZkStateReader): Unit = {
+    // reschedule after completion of the previous run, to prevent overlapping updates
+    scheduledExecutor.schedule(new Runnable {
+      override def run(): Unit = updateFromClusterState(zkStateReader).onComplete(_ =>
+        scheduleUpdateFromClusterState(zkStateReader)
+      )
+    }, clusterStateUpdateInterval.toMillis, TimeUnit.MILLISECONDS)
+  }
+
   /**
    * Updates the server list when the ZkStateReader clusterState changed
    */
-  private def updateFromClusterState(zkStateReader: ZkStateReader): Unit = {
+  private def updateFromClusterState(zkStateReader: ZkStateReader): Future[Unit] = {
     // could perhaps be replaced with zkStateReader.registerCollectionStateWatcher(collection, watcher);
 
     val clusterState = zkStateReader.getClusterState
 
-    def set(newCollectionToServers: Map[String, IndexedSeq[SolrServer]]): Unit = {
-      notifyObservers(collectionToServers, newCollectionToServers)
-      collectionToServers = newCollectionToServers
+    def set(newCollections: Map[String, CollectionInfo]): Unit = {
+      notifyObservers(collectionToServers, newCollections.mapValues(_.servers))
+      collections = newCollections
       if (logger.isDebugEnabled) logger.debug (s"Updated server map: $collectionToServers from ClusterState $clusterState")
       else logger.info (s"Updated server map: $collectionToServers")
     }
 
     try {
-      val newCollectionToServers = getCollectionToServers(clusterState)
+      val newCollections = getCollections(clusterState)
 
-      if (newCollectionToServers != collectionToServers) warmupQueries match {
-        case Some(warmup) => warmupNewServers(newCollectionToServers, warmup)
-          .onComplete(_ => set(newCollectionToServers))
-        case None => set(newCollectionToServers)
-      }
+      if (newCollections != collections) warmupQueries match {
+        case Some(warmup) =>
+          warmupNewServers(newCollections.mapValues(_.servers), warmup)
+          .map(_ => set(newCollections))
+        case None =>
+          futureFactory.successful(set(newCollections))
+      } else futureFactory.successful(())
 
     } catch {
       case NonFatal(e) =>
         logger.error(s"Could not process cluster state, server list might get outdated. Cluster state: $clusterState", e)
+        futureFactory.failed(e)
     }
   }
 
@@ -198,7 +213,7 @@ class CloudSolrServers[F[_]](zkHost: String,
                                warmup: WarmupQueries): Future[Iterable[Try[QueryResponse]]] = {
 
     val perCollectionResponses = newCollectionToServers.flatMap { case (collection, solrServers) =>
-      val existingServers = collectionToServers(collection)
+      val existingServers = collectionToServers.getOrElse(collection, IndexedSeq.empty)
       // SolrServer.equals checks both baseUrl and status, therefore we can just use contains
       val newActiveServers = solrServers.filter(s => s.isEnabled && !existingServers.contains(s))
       newActiveServers.map(warmupNewServer(collection, _, warmup.queriesByCollection(collection), warmup.count))
@@ -235,7 +250,7 @@ class CloudSolrServers[F[_]](zkHost: String,
    * The currently known solr servers.
    */
   @volatile
-  override def all: IndexedSeq[SolrServer] = collectionToServers.values.flatten.toSet.toIndexedSeq
+  override def all: IndexedSeq[SolrServer] = collections.values.flatMap(_.servers)(breakOut)
 
   /**
    * An infinite iterator over known solr servers. When the last item is reached,
@@ -243,10 +258,21 @@ class CloudSolrServers[F[_]](zkHost: String,
    * the iterator must reflect this.
    */
   override def matching(r: SolrRequest[_]): IndexedSeq[SolrServer] = {
-    val collection = Option(r.getParams.get("collection")).orElse(defaultCollection).getOrElse(
+    val params = r.getParams
+    val collection = Option(params.get("collection")).orElse(defaultCollection).getOrElse(
       throw new SolrServerException("No collection param specified on request and no default collection has been set.")
     )
-    collectionToServers.getOrElse(collection, Vector.empty)
+    collections.get(collection) match {
+      case Some(CollectionInfo(docCollection, servers)) =>
+        val shardKeys = params.get(ShardParams._ROUTE_)
+        val slices = docCollection.getRouter.getSearchSlices(shardKeys, params, docCollection)
+        val serverUrls: Set[String] = mapSliceReplicas(slices)(repl =>
+          SolrServer.fixUrl(repl.getCoreUrl)
+        )(breakOut)
+        servers.filter(server => serverUrls.contains(server.baseUrl))
+      case None =>
+        Vector.empty
+    }
   }
 
   // server state change
@@ -300,18 +326,28 @@ object CloudSolrServers {
   /* Java API */
   def builder(zkHost: String): Builder = Builder(zkHost)
 
-  private[solrs] def getCollectionToServers(clusterState: ClusterState): Map[String, IndexedSeq[SolrServer]] = {
+  private[CloudSolrServers] final case class CollectionInfo(collection: DocCollection, servers: IndexedSeq[SolrServer])
+
+  private[solrs] def getCollections(clusterState: ClusterState): Map[String, CollectionInfo] = {
     import scala.collection.JavaConverters._
 
     clusterState.getCollectionsMap.asScala.foldLeft(
-      Map.empty[String, IndexedSeq[SolrServer]].withDefaultValue(IndexedSeq.empty)
+      Map.empty[String, CollectionInfo]
     ) { case (res, (name, collection)) =>
-      val slices = collection.getSlices
-      val servers = slices.asScala.flatMap(_.getReplicas.asScala.map(repl =>
-        SolrServer(ZkCoreNodeProps.getCoreUrl(repl), serverStatus(repl))
-      )).toIndexedSeq
-      res.updated(name, res(name) ++ servers)
+      val servers = mapSliceReplicas(collection.getSlices)(repl =>
+        SolrServer(repl.getCoreUrl, serverStatus(repl))
+      ).toIndexedSeq
+      res.updated(name, CollectionInfo(collection, servers))
     }
+  }
+
+  private def mapSliceReplicas[A, T <: Iterable[A]](slices: util.Collection[Slice])
+                                                   (fun: Replica => A)
+                                                   (implicit cbf: CanBuildFrom[Iterable[Slice], A, T]): T = {
+    import scala.collection.JavaConverters.collectionAsScalaIterableConverter
+    slices.asScala.flatMap(_.getReplicas.asScala.map(repl =>
+      fun(repl)
+    ))(breakOut)
   }
 
   private def serverStatus(replica: Replica): ServerStatus = replica.getState match {

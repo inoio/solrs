@@ -27,10 +27,11 @@ class SolrServer(val baseUrl: String) {
 }
 
 object SolrServer {
-  def apply(baseUrl: String): SolrServer = {
-    val fixedUrl = if(baseUrl.endsWith("/")) baseUrl.dropRight(1) else baseUrl
-    new SolrServer(fixedUrl)
-  }
+
+  def apply(baseUrl: String): SolrServer = new SolrServer(fixUrl(baseUrl))
+
+  private[solrs] def fixUrl(baseUrl: String): String = if (baseUrl.endsWith("/")) baseUrl.dropRight(1) else baseUrl
+
   def apply(baseUrl: String, status: ServerStatus): SolrServer = {
     val res = SolrServer(baseUrl)
     res.status = status

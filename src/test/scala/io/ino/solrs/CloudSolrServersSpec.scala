@@ -28,7 +28,7 @@ class CloudSolrServersSpec extends FunSpec with Matchers {
         )
       )
 
-      implicit val solrServerOrd = Ordering[String].on[SolrServer](s => s.baseUrl)
+      implicit val solrServerOrd: Ordering[SolrServer] = Ordering[String].on[SolrServer](s => s.baseUrl)
 
       events should contain theSameElementsAs Seq(
         Removed(SolrServer("h10", Enabled), "col1"),
@@ -46,8 +46,8 @@ class CloudSolrServersSpec extends FunSpec with Matchers {
       val bytes = Files.readAllBytes(Paths.get(this.getClass.getResource("/cluster_status.json").toURI))
       val cs = ClusterState.load(1, bytes, Set("server1:8983_solr").asJava)
 
-      val collectionToServers = CloudSolrServers.getCollectionToServers(cs)
-      collectionToServers("my-collection").map(_.baseUrl) should contain allOf(
+      val collectionToServers = CloudSolrServers.getCollections(cs)
+      collectionToServers("my-collection").servers.map(_.baseUrl) should contain allOf(
         "http://server1:8983/solr/my-collection_shard1_replica1",
         "http://server2:8983/solr/my-collection_shard1_replica2",
         "http://server3:8983/solr/my-collection_shard2_replica1",

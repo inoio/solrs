@@ -116,6 +116,9 @@ class CloudSolrServers[F[_]](zkHost: String,
   @volatile
   private var collectionToServers = Map.empty[String, IndexedSeq[SolrServer]].withDefaultValue(IndexedSeq.empty)
 
+  @volatile
+  private var aliases: Option[Aliases] = None
+
   private var scheduledExecutor: ScheduledExecutorService = Executors.newScheduledThreadPool(1, new ZkClusterStateUpdateTF)
 
   private var asyncSolrClient: AsyncSolrClient[F] = _
@@ -170,6 +173,7 @@ class CloudSolrServers[F[_]](zkHost: String,
   private def updateFromClusterState(zkStateReader: ZkStateReader): Unit = {
     // could perhaps be replaced with zkStateReader.registerCollectionStateWatcher(collection, watcher);
 
+    aliases = Some(zkStateReader.getAliases)
     val clusterState = zkStateReader.getClusterState
 
     def set(newCollectionToServers: Map[String, IndexedSeq[SolrServer]]): Unit = {
@@ -246,7 +250,8 @@ class CloudSolrServers[F[_]](zkHost: String,
     val collection = Option(r.getParams.get("collection")).orElse(defaultCollection).getOrElse(
       throw new SolrServerException("No collection param specified on request and no default collection has been set.")
     )
-    collectionToServers.getOrElse(collection, Vector.empty)
+    val revisedCollection = aliases.flatMap(x => Option(x.getCollectionAlias(collection))).getOrElse(collection)
+    collectionToServers.getOrElse(revisedCollection, Vector.empty)
   }
 
   // server state change

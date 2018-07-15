@@ -55,7 +55,7 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
     // create a 2 node cluster with one collection that has 2 shards with 2 replicas
     solrRunner = SolrCloudRunner.start(
       numServers = 4,
-      cores = List(SolrCollection("collection1", replicas = 2, shards = 2)),
+      collections = List(SolrCollection("collection1", replicas = 2, shards = 2)),
       defaultCollection = Some("collection1")
     )
     solrJClient = solrRunner.solrJClient

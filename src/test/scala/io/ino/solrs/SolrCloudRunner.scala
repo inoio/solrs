@@ -1,15 +1,20 @@
 package io.ino.solrs
 
-import java.io.{File, IOException}
-import java.nio.file.{Files, Path, Paths}
+import java.io.IOException
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
 
 import org.apache.commons.io.FileUtils
-import org.apache.solr.client.solrj.embedded.{JettyConfig, JettySolrRunner}
+import org.apache.solr.client.solrj.embedded.JettyConfig
+import org.apache.solr.client.solrj.embedded.JettySolrRunner
 import org.apache.solr.client.solrj.impl.CloudSolrClient
 import org.apache.solr.client.solrj.request.CollectionAdminRequest
-import org.apache.solr.cloud.{MiniSolrCloudCluster, ZkTestServer}
-import org.slf4j.{Logger, LoggerFactory}
+import org.apache.solr.cloud.MiniSolrCloudCluster
+import org.apache.solr.cloud.ZkTestServer
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
 
@@ -85,10 +90,10 @@ class SolrCloudRunner(numServers: Int, collections: List[SolrCollection] = List.
       // just use collection name = config name
       val configName = collectionName
       val confDir = solrHome.resolve(collectionName).resolve("conf")
-      timed(s"Uploading config for $collectionName from $confDir") {
-        miniSolrCloudCluster.uploadConfigSet(confDir, collectionName)
+      timed(s"Uploading config '$configName' for collection '$collectionName' from $confDir") {
+        miniSolrCloudCluster.uploadConfigSet(confDir, configName)
       }
-      val result = timed(s"Creating core for collection $collectionName with replicas=${coll.replicas} and shards=${coll.shards}") {
+      val result = timed(s"Creating collection '$collectionName' with replicas=${coll.replicas} and shards=${coll.shards}") {
         CollectionAdminRequest.createCollection(collectionName, configName, coll.shards, coll.replicas)
           .process(miniSolrCloudCluster.getSolrClient)
       }
@@ -157,9 +162,12 @@ class SolrCloudRunner(numServers: Int, collections: List[SolrCollection] = List.
   }
 
   private def makeSolrHomeDirIn(baseDir: Path): Path = {
-    val solrHomeSourceDir = maybeSolrHome.map(_.toFile).getOrElse(new File(classOf[SolrCloudRunner].getResource("/solr-home").toURI))
+    val solrHomeSourceDir = maybeSolrHome.map(_.toFile).getOrElse {
+      // read from src/test/resources, because sbt does not copy the symlink solr-home/collection2/conf when copying to target...
+      Paths.get("./src/test/resources/solr-home").toAbsolutePath.normalize().toFile
+    }
     val solrHome = Files.createDirectories(baseDir.resolve("solrhome"))
-    FileUtils.copyDirectory(solrHomeSourceDir, solrHome.toFile)
+    BetterFiles.copyDirectory(solrHomeSourceDir.toPath, solrHome)
     solrHome
   }
 
@@ -182,9 +190,57 @@ object SolrCloudRunner {
 
   private val logger: Logger = LoggerFactory.getLogger(classOf[SolrCloudRunner])
 
-  def start(numServers: Int, cores: List[SolrCollection] = List.empty, defaultCollection: Option[String] = None,
+  def start(numServers: Int, collections: List[SolrCollection] = List.empty, defaultCollection: Option[String] = None,
             maybeZkPort: Option[Int] = None, maybeSolrHome: Option[Path] = None): SolrCloudRunner = {
-    new SolrCloudRunner(numServers, cores, defaultCollection, maybeZkPort, maybeSolrHome).start()
+    new SolrCloudRunner(numServers, collections, defaultCollection, maybeZkPort, maybeSolrHome).start()
+  }
+
+}
+
+object BetterFiles {
+
+  /**
+    * Recursively copies the given source directory to the destination directory.
+    * In contrast to commons-io or better-files, it supports directories being symbolic links
+    * (as used by solr-home/collection2/conf -> ../collection1/conf/).
+    * Such symbolic links / directories are completely resolved, i.e. the original link target
+    * is copied to the new destination (because SolrZkClient.uploadToZK seems not be able to upload
+    * from a symbolic link (conf dir)).
+    */
+  def copyDirectory(from: Path, to: Path): Path = Files.walkFileTree(from, new CopyFileVisitor(to))
+
+  import java.nio.file.FileVisitResult
+  import java.nio.file.SimpleFileVisitor
+  import java.nio.file.attribute.BasicFileAttributes
+
+  private class CopyFileVisitor(val targetPath: Path) extends SimpleFileVisitor[Path] {
+
+    private var sourcePath: Path = _
+
+    override def preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult = {
+      if (sourcePath == null) {
+        sourcePath = dir
+        Files.createDirectories(targetPath)
+      } else {
+        Files.createDirectories(targetPath.resolve(sourcePath.relativize(dir)))
+      }
+      FileVisitResult.CONTINUE
+    }
+
+    override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
+      val targetFile = targetPath.resolve(sourcePath.relativize(file))
+      if (attrs.isSymbolicLink) {
+        // since SolrZkClient.uploadToZK seems not be able to upload from a symbolic link (conf dir), we're copying
+        // the link target directory instead of copying/creating the (relative) symlink.
+        // (file.toRealPath resolves the symbolic link)
+        BetterFiles.copyDirectory(file.toRealPath(), targetFile)
+        // if we'd like to create the symlink, this would look like this: Files.createSymbolicLink(targetFile, Files.readSymbolicLink(file))
+      } else {
+        Files.copy(file, targetFile)
+      }
+      FileVisitResult.CONTINUE
+    }
+
   }
 
 }

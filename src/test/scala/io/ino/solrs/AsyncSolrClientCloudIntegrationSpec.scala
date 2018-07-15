@@ -20,6 +20,7 @@ import scala.util.control.NonFatal
  * RetryPolicy.TryAvailableServers is needed because for a restarted server the status is not updated
  * fast enough.
  */
+//noinspection RedundantDefaultArgument
 class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventually with IntegrationPatience {
 
   private implicit val timeout: FiniteDuration = 5.second
@@ -38,7 +39,14 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
   import io.ino.solrs.SolrUtils._
 
   override def beforeAll() {
-    solrRunner = SolrCloudRunner.start(2, List(SolrCollection("collection1", 2, 1)), Some("collection1"))
+    solrRunner = SolrCloudRunner.start(
+      numServers = 2,
+      collections = List(
+        SolrCollection("collection1", replicas = 2, shards = 1),
+        SolrCollection("collection2", replicas = 2, shards = 1)
+      ),
+      defaultCollection = Some("collection1")
+    )
     solrJClient = solrRunner.solrJClient
 
     solrServers = new CloudSolrServers(

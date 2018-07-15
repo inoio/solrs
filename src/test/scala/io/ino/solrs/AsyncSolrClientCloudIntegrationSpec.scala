@@ -4,6 +4,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.impl.CloudSolrClient
+import org.scalatest.Assertion
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.slf4j.LoggerFactory
@@ -21,7 +22,7 @@ import scala.util.control.NonFatal
  */
 class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventually with IntegrationPatience {
 
-  private implicit val timeout = 5.second
+  private implicit val timeout: FiniteDuration = 5.second
 
   private var solrRunner: SolrCloudRunner = _
   private def solrServerUrls = solrRunner.solrCoreUrls
@@ -77,9 +78,7 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
 
     it("should serve queries while solr server is restarted") {
 
-      eventually {
-        cut.loadBalancer.solrServers.all should contain theSameElementsAs solrServerUrls.map(SolrServer(_, Enabled))
-      }
+      awaitAllServersBeingEnabled()
 
       // Run queries in the background
       val run = new AtomicBoolean(true)
@@ -111,16 +110,12 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
         await(response) should contain theSameElementsAs someDocsIds
       }
 
-      eventually {
-        cut.loadBalancer.solrServers.all should contain theSameElementsAs solrServerUrls.map(SolrServer(_, Enabled))
-      }
+      awaitAllServersBeingEnabled()
     }
 
     it("should serve queries when ZK is not available") {
 
-      eventually {
-        cut.loadBalancer.solrServers.all should contain theSameElementsAs solrServerUrls.map(SolrServer(_, Enabled))
-      }
+      awaitAllServersBeingEnabled()
 
       // Run queries in the background
       val run = new AtomicBoolean(true)
@@ -146,11 +141,15 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
         await(response) should contain theSameElementsAs someDocsIds
       }
 
-      eventually(Timeout(10 seconds)) {
-        cut.loadBalancer.solrServers.all should contain theSameElementsAs solrServerUrls.map(SolrServer(_, Enabled))
-      }
+      awaitAllServersBeingEnabled()
     }
 
+  }
+
+  private def awaitAllServersBeingEnabled(): Assertion = {
+    eventually {
+      cut.loadBalancer.solrServers.all.map(_.status) should contain theSameElementsAs solrServerUrls.map(_ => Enabled)
+    }
   }
 
   @tailrec

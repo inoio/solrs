@@ -69,7 +69,7 @@ class CloudSolrServersUninitializedIntegrationSpec extends StandardFunSpec {
       solrRunner = SolrCloudRunner.start(2, List(SolrCollection("collection1", 2, 1)), Some("collection1"), Some(zkPort))
 
       eventually(Timeout(20 seconds)) {
-        cut.get.all should contain theSameElementsAs solrServerUrls.map(SolrServer(_, Enabled))
+        cut.get.all.map(_.withLeader(false)) should contain theSameElementsAs solrServerUrls.map(SolrServer(_, Enabled, isLeader = false))
       }
 
     }

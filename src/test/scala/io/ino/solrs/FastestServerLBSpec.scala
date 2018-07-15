@@ -4,10 +4,12 @@ import java.util.concurrent.TimeUnit
 
 import io.ino.solrs.SolrMatchers.hasQuery
 import io.ino.time.Clock
+import io.ino.time.Clock.MutableClock
 import org.apache.solr.client.solrj.request.QueryRequest
 import org.apache.solr.client.solrj.response.QueryResponse
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.SolrRequest
+import org.apache.solr.client.solrj.request.UpdateRequest
 import org.mockito.Matchers.{eq => mockEq, _}
 import org.mockito.Mockito._
 import org.scalactic.source.Position
@@ -16,6 +18,7 @@ import org.scalatest.concurrent.Eventually._
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
+//noinspection RedundantDefaultArgument
 class FastestServerLBSpec extends StandardFunSpec {
 
   type FastestServerLB = io.ino.solrs.FastestServerLB[Future]
@@ -31,9 +34,9 @@ class FastestServerLBSpec extends StandardFunSpec {
 
   private val q = new SolrQuery("foo")
   private val r = new QueryRequest(q)
-  private val classifyQuery: (SolrQuery) => String = solrQuery => "foo"
+  private val classifyQuery: SolrQuery => String = solrQuery => "foo"
 
-  private implicit val clock = Clock.mutable
+  private implicit val clock: MutableClock = Clock.mutable
 
   private val solrs = mock[AsyncSolrClient]
 
@@ -76,6 +79,33 @@ class FastestServerLBSpec extends StandardFunSpec {
       servers(1).status = Failed
       cut.solrServer(r) should be (Some(SolrServer("host1")))
       cut.solrServer(r) should be (Some(SolrServer("host1")))
+
+      servers.head.status = Disabled
+      cut.solrServer(r) should be (None)
+    }
+
+    it("should return the active leader for update requests") {
+      val server1 = SolrServer("host1", isLeader = true)
+      val server2 = SolrServer("host2", isLeader = false)
+      val servers = IndexedSeq(server1, server2)
+      val cut = newDynamicLB(new StaticSolrServers(servers))
+
+      val r = new UpdateRequest()
+
+      cut.solrServer(r) should be (Some(server1))
+      // we must create some performance stats for host1, so that host2 would usually be selected (for non-update requests)
+      runTests(cut, server1, fromSecond = 1, toSecond = 2, startResponseTime = 1000, endResponseTime = 1000)
+      cut.solrServer(r) should be (Some(server1))
+      cut.solrServer(r) should be (Some(server1))
+
+      servers.head.status = Disabled
+      cut.solrServer(r) should be (Some(server2))
+      cut.solrServer(r) should be (Some(server2))
+
+      servers.head.status = Enabled
+      servers(1).status = Failed
+      cut.solrServer(r) should be (Some(server1))
+      cut.solrServer(r) should be (Some(server1))
 
       servers.head.status = Disabled
       cut.solrServer(r) should be (None)
@@ -308,7 +338,7 @@ class FastestServerLBSpec extends StandardFunSpec {
 
   private def runTests(cut: FastestServerLB, server: SolrServer,
                                   fromSecond: Long, toSecond: Long,
-                                  startResponseTime: Long, endResponseTime: Long) = {
+                                  startResponseTime: Long, endResponseTime: Long): Unit = {
     val deltaPerStep = (endResponseTime - startResponseTime) / (toSecond - fromSecond)
     for(second <- fromSecond to toSecond) {
       atSecond(second) {

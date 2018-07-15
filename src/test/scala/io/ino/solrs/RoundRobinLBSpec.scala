@@ -3,8 +3,10 @@ package io.ino.solrs
 import org.apache.solr.client.solrj.request.QueryRequest
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.SolrRequest
-import org.scalatest.{Matchers, FunSpec}
+import org.apache.solr.client.solrj.request.UpdateRequest
+import org.scalatest.{FunSpec, Matchers}
 
+//noinspection RedundantDefaultArgument
 class RoundRobinLBSpec extends FunSpec with Matchers {
 
   private val q = new QueryRequest(new SolrQuery("foo"))
@@ -49,18 +51,36 @@ class RoundRobinLBSpec extends FunSpec with Matchers {
       servers(0).status = Disabled
       cut.solrServer(q) should be (None)
     }
+
+    it("should return the active leader for update requests") {
+      val server1 = SolrServer("host1", isLeader = true)
+      val server2 = SolrServer("host2", isLeader = false)
+      val servers = IndexedSeq(server1, server2)
+      val cut = new RoundRobinLB(new StaticSolrServers(servers))
+
+      val q = new UpdateRequest()
+
+      cut.solrServer(q) should be (Some(server1))
+      cut.solrServer(q) should be (Some(server1))
+      cut.solrServer(q) should be (Some(server1))
+
+      servers(0).status = Disabled
+      cut.solrServer(q) should be (Some(server2))
+      cut.solrServer(q) should be (Some(server2))
+    }
+
+    it("should consider the preferred server if active") {
+      val servers = IndexedSeq(SolrServer("host1"), SolrServer("host2"))
+      val cut = new RoundRobinLB(new StaticSolrServers(servers))
+
+      val preferred = Some(SolrServer("host2"))
+
+      cut.solrServer(q, preferred) should be (preferred)
+      cut.solrServer(q, preferred) should be (preferred)
+
+      servers(1).status = Failed
+      cut.solrServer(q, preferred) should be (Some(SolrServer("host1")))
+    }
   }
 
-  it("should consider the preferred server if active") {
-    val servers = IndexedSeq(SolrServer("host1"), SolrServer("host2"))
-    val cut = new RoundRobinLB(new StaticSolrServers(servers))
-
-    val preferred = Some(SolrServer("host2"))
-
-    cut.solrServer(q, preferred) should be (preferred)
-    cut.solrServer(q, preferred) should be (preferred)
-
-    servers(1).status = Failed
-    cut.solrServer(q, preferred) should be (Some(SolrServer("host1")))
-  }
 }

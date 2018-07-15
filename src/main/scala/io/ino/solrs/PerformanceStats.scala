@@ -13,7 +13,7 @@ import scala.reflect.ClassTag
 /**
  * Statistics for a solr server.
  */
-class PerformanceStats(solrServer: SolrServer, initialPredictedResponseTime: Long, clock: Clock) {
+class PerformanceStats(val solrServer: SolrServer, initialPredictedResponseTime: Long, clock: Clock) {
 
   private val logger = LoggerFactory.getLogger(getClass)
 

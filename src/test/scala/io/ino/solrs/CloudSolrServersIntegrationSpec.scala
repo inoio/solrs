@@ -3,6 +3,7 @@ package io.ino.solrs
 import io.ino.solrs.AsyncSolrClientMocks.mockDoRequest
 import io.ino.solrs.CloudSolrServers.WarmupQueries
 import io.ino.solrs.SolrMatchers.hasQuery
+import io.ino.solrs.SolrMatchers.hasBaseUrlOf
 import io.ino.time.Clock
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.embedded.JettySolrRunner
@@ -13,7 +14,6 @@ import org.apache.solr.client.solrj.response.QueryResponse
 import org.apache.solr.common.SolrInputDocument
 import org.apache.solr.common.params.ShardParams.SHARDS
 import org.apache.solr.common.params.ShardParams._ROUTE_
-import org.mockito.Matchers.{eq => mockEq}
 import org.mockito.Matchers._
 import org.mockito.Mockito._
 import org.scalatest.concurrent.Eventually.eventually
@@ -42,6 +42,7 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
 
   private def zkConnectString = solrRunner.zkAddress
   private def solrServerUrls = solrRunner.solrCoreUrls
+  private def solrServerUrlsEnabled = solrServerUrls.map(SolrServer(_, Enabled, isLeader = false))
 
   private var solrJClient: CloudSolrClient = _
   private var asyncSolrClients: Map[JettySolrRunner, AsyncSolrClient] = _
@@ -96,7 +97,7 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
       cut.setAsyncSolrClient(mockDoRequest(mock[AsyncSolrClient])(Clock.mutable))
 
       eventually {
-        cut.all should contain theSameElementsAs solrServerUrls.map(SolrServer(_, Enabled))
+        cut.all.map(_.withLeader(false)) should contain theSameElementsAs solrServerUrlsEnabled
       }
 
       asyncSolrClients.foreach { case(_, client) =>
@@ -113,21 +114,21 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
       cut = new CloudSolrServers(zkConnectString, clusterStateUpdateInterval = 100 millis)
       cut.setAsyncSolrClient(mockDoRequest(mock[AsyncSolrClient])(Clock.mutable))
 
-      val expectedSolrServers = solrServerUrls.map(SolrServer(_, Enabled))
+      val expectedSolrServers = solrServerUrlsEnabled
       eventually {
-        cut.all should contain theSameElementsAs expectedSolrServers
+        cut.all.map(_.withLeader(false)) should contain theSameElementsAs expectedSolrServers
       }
 
       SolrRunner.stopJetty(solrRunner.jettySolrRunners.head)
       expectedSolrServers.head.status = Failed
       eventually {
-        cut.all should contain theSameElementsAs expectedSolrServers
+        cut.all.map(_.withLeader(false)) should contain theSameElementsAs expectedSolrServers
       }
 
       SolrRunner.startJetty(solrRunner.jettySolrRunners.head)
       expectedSolrServers.head.status = Enabled
       eventually {
-        cut.all should contain theSameElementsAs expectedSolrServers
+        cut.all.map(_.withLeader(false)) should contain theSameElementsAs expectedSolrServers
       }
     }
 
@@ -157,15 +158,15 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
         val id = doc.getFieldValue("id").toString
         val route = id.substring(0, id.indexOf('!') + 1)
         val request = new QueryRequest(new SolrQuery("*:*").setParam(_ROUTE_, route))
-        cut.matching(request) should contain theSameElementsAs expectedServers.map(SolrServer(_, Enabled))
+        cut.matching(request).map(_.withLeader(false)) should contain theSameElementsAs expectedServers.map(SolrServer(_, Enabled, isLeader = false))
       }
 
       // now stop a server
-      val solrServers = solrServerUrls.map(SolrServer(_, Enabled))
+      val solrServers = solrServerUrlsEnabled
       SolrRunner.stopJetty(solrRunner.jettySolrRunners.head)
         solrServers.head.status = Failed
         eventually {
-          cut.all should contain theSameElementsAs solrServers
+          cut.all.map(_.withLeader(false)) should contain theSameElementsAs solrServers
         }
 
         // ensure that the returned servers per route also contain the expected status
@@ -174,10 +175,10 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
           val route = id.substring(0, id.indexOf('!') + 1)
           val request = new QueryRequest(new SolrQuery("*:*").setParam(_ROUTE_, route))
           val expectedServersWithStatus = expectedServers.map {
-            case serverUrl if serverUrl == solrServers.head.baseUrl => SolrServer(serverUrl, Failed)
-            case serverUrl => SolrServer(serverUrl, Enabled)
+            case serverUrl if serverUrl == solrServers.head.baseUrl => SolrServer(serverUrl, Failed, isLeader = false)
+            case serverUrl => SolrServer(serverUrl, Enabled, isLeader = false)
           }
-          cut.matching(request) should contain theSameElementsAs expectedServersWithStatus
+          cut.matching(request).map(_.withLeader(false)) should contain theSameElementsAs expectedServersWithStatus
         }
 
     }
@@ -199,13 +200,13 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
       // as soon as the response is set the LB should provide the servers...
       standardResponsePromise.success(new QueryResponse())
       eventually {
-        cut.all should contain theSameElementsAs solrServerUrls.map(SolrServer(_, Enabled))
+        cut.all.map(_.withLeader(false)) should contain theSameElementsAs solrServerUrlsEnabled
       }
 
       // and the servers should have been tested with queries
-      solrServerUrls.map(SolrServer(_, Enabled)).foreach { solrServer =>
+      solrServerUrlsEnabled.foreach { solrServer =>
         warmupQueries.queriesByCollection("col1").foreach { q =>
-          verify(asyncSolrClient, times(warmupQueries.count)).doExecute[QueryResponse](mockEq(solrServer), hasQuery(q))(any())
+          verify(asyncSolrClient, times(warmupQueries.count)).doExecute[QueryResponse](hasBaseUrlOf(solrServer), hasQuery(q))(any())
         }
       }
     }

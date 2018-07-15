@@ -19,23 +19,24 @@ class CloudSolrServersSpec extends FunSpec with Matchers {
 
       val events = CloudSolrServers.diff(
         oldState = Map(
-          "col1" -> Seq(SolrServer("h10", Enabled)),
-          "col2" -> Seq(SolrServer("h20", Enabled), SolrServer("h21", Enabled), SolrServer("h22", Disabled))
+          "col1" -> Seq(SolrServer("h10", Enabled, isLeader = true)),
+          "col2" -> Seq(SolrServer("h20", Enabled, isLeader = true), SolrServer("h21", Enabled, isLeader = false), SolrServer("h22", Disabled, isLeader = false))
         ),
         newState = Map(
-          "col2" -> Seq(SolrServer("h21", Enabled), SolrServer("h22", Enabled), SolrServer("h23", Enabled)),
-          "col3" -> Seq(SolrServer("h30", Enabled))
+          "col2" -> Seq(SolrServer("h21", Enabled, isLeader = true), SolrServer("h22", Enabled, isLeader = false), SolrServer("h23", Enabled, isLeader = false)),
+          "col3" -> Seq(SolrServer("h30", Enabled, isLeader = false))
         )
       )
 
       implicit val solrServerOrd: Ordering[SolrServer] = Ordering[String].on[SolrServer](s => s.baseUrl)
 
       events should contain theSameElementsAs Seq(
-        Removed(SolrServer("h10", Enabled), "col1"),
-        Removed(SolrServer("h20", Enabled), "col2"),
-        StateChanged(SolrServer("h22", Disabled), SolrServer("h22", Enabled), "col2"),
-        Added(SolrServer("h23", Enabled), "col2"),
-        Added(SolrServer("h30", Enabled), "col3")
+        Removed(SolrServer("h10", Enabled, isLeader = true), "col1"),
+        Removed(SolrServer("h20", Enabled, isLeader = true), "col2"),
+        StateChanged(SolrServer("h21", Enabled, isLeader = false), SolrServer("h21", Enabled, isLeader = true), "col2"),
+        StateChanged(SolrServer("h22", Disabled, isLeader = false), SolrServer("h22", Enabled, isLeader = false), "col2"),
+        Added(SolrServer("h23", Enabled, isLeader = false), "col2"),
+        Added(SolrServer("h30", Enabled, isLeader = false), "col3")
       )
 
     }
@@ -47,13 +48,13 @@ class CloudSolrServersSpec extends FunSpec with Matchers {
       val cs = ClusterState.load(1, bytes, Set("server1:8983_solr").asJava)
 
       val collectionToServers = CloudSolrServers.getCollections(cs)
-      collectionToServers("my-collection").servers.map(_.baseUrl) should contain allOf(
-        "http://server1:8983/solr/my-collection_shard1_replica1",
-        "http://server2:8983/solr/my-collection_shard1_replica2",
-        "http://server3:8983/solr/my-collection_shard2_replica1",
-        "http://server4:8983/solr/my-collection_shard2_replica2",
-        "http://server5:8983/solr/my-collection_shard3_replica1",
-        "http://server6:8983/solr/my-collection_shard3_replica2")
+      collectionToServers("my-collection").servers should contain allOf(
+        SolrServer("http://server1:8983/solr/my-collection_shard1_replica1", Enabled, isLeader = true),
+        SolrServer("http://server2:8983/solr/my-collection_shard1_replica2", Enabled, isLeader = false),
+        SolrServer("http://server3:8983/solr/my-collection_shard2_replica1", Enabled, isLeader = true),
+        SolrServer("http://server4:8983/solr/my-collection_shard2_replica2", Enabled, isLeader = false),
+        SolrServer("http://server5:8983/solr/my-collection_shard3_replica1", Enabled, isLeader = true),
+        SolrServer("http://server6:8983/solr/my-collection_shard3_replica2", Enabled, isLeader = false))
     }
 
   }

@@ -1,26 +1,27 @@
 package io.ino.solrs
 
 import java.util.concurrent.CompletionStage
-import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 import io.ino.solrs.ServerStateChangeObservable.Removed
 import io.ino.solrs.ServerStateChangeObservable.StateChange
 import io.ino.solrs.ServerStateChangeObservable.StateChanged
-import io.ino.solrs.future.JavaFutureFactory
 import io.ino.solrs.future.Future
 import io.ino.solrs.future.FutureFactory
+import io.ino.solrs.future.JavaFutureFactory
 import io.ino.time.Clock
 import io.ino.time.Units.Millisecond
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.SolrRequest
 import org.apache.solr.client.solrj.SolrResponse
+import org.apache.solr.client.solrj.request.IsUpdateRequest
 import org.apache.solr.client.solrj.request.QueryRequest
 import org.apache.solr.client.solrj.response.QueryResponse
 import org.slf4j.LoggerFactory
 
-import scala.annotation.tailrec
+import scala.collection.breakOut
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
 import scala.concurrent.duration._
@@ -60,37 +61,20 @@ class RoundRobinLB(override val solrServers: SolrServers) extends LoadBalancer {
 
   private var idx = 0
 
-  /**
-   * Start from the given idx and try servers.length servers to get the next available.
-   */
-  @tailrec
-  private def findAvailable(servers: IndexedSeq[SolrServer], startIndex: Int, round: Int = 0): (Int, Option[SolrServer]) = {
-    if (round == servers.length) {
-      (startIndex, None)
-    } else {
-      val server = servers(startIndex)
-      if (server.status == Enabled) {
-        (startIndex, Some(server))
-      } else {
-        val nextIndex = (startIndex + 1) % servers.length
-        findAvailable(servers, nextIndex, round + 1)
-      }
-    }
-  }
-
   override def solrServer(r: SolrRequest[_], preferred: Option[SolrServer] = None): Option[SolrServer] = {
-    val servers = solrServers.matching(r)
+    val servers = solrServers.matching(r).filter(_.isEnabled)
     if(servers.isEmpty) {
       None
     } else {
-      if(preferred.isDefined && servers.exists(s => s.baseUrl == preferred.get.baseUrl && s.status == Enabled)) {
+      if(preferred.isDefined && servers.exists(_.baseUrl == preferred.get.baseUrl)) {
         preferred
+      } else if (r.isInstanceOf[IsUpdateRequest] && servers.exists(_.isLeader)) {
+        servers.find(_.isLeader)
       } else {
         // idx + 1 might be > servers.length, so let's use % to get a valid start position
-        val startIndex = (idx + 1) % servers.length
-        val (newIndex, result) = findAvailable(servers, startIndex)
+        val newIndex = (idx + 1) % servers.length
         idx = newIndex
-        result
+        Some(servers(newIndex))
       }
     }
   }
@@ -174,11 +158,11 @@ class FastestServerLB[F[_]](override val solrServers: SolrServers,
 
   private val scheduler = Executors.newSingleThreadScheduledExecutor()
 
-  protected[solrs] val statsByServer: TrieMap[SolrServer, PerformanceStats] = TrieMap.empty[SolrServer, PerformanceStats]
-  protected[solrs] val serverTestTimestamp: mutable.Map[SolrServer, Millisecond] = TrieMap.empty[SolrServer, Millisecond].withDefaultValue(Millisecond(0))
+  protected[solrs] val statsByServer: TrieMap[SolrServerId, PerformanceStats] = TrieMap.empty[SolrServerId, PerformanceStats]
+  protected[solrs] val serverTestTimestamp: mutable.Map[SolrServerId, Millisecond] = TrieMap.empty[SolrServerId, Millisecond].withDefaultValue(Millisecond(0))
   // "fast" servers are faster than the average of all servers, they're tested more frequently than slow servers.
   // slow servers e.g. are running in a separate dc and are not expected to suddenly perform significantly better
-  protected var fastServersByCollection: Map[String, Set[SolrServer]] = Map.empty[String, Set[SolrServer]].withDefaultValue(Set.empty)
+  protected var fastServersByCollection: Map[String, Set[SolrServerId]] = Map.empty[String, Set[SolrServerId]].withDefaultValue(Set.empty)
   private val lastServerIdx = new AtomicInteger(-1)
 
   private def collection(server: SolrServer): String = collectionAndTestQuery(server)._1
@@ -206,11 +190,11 @@ class FastestServerLB[F[_]](override val solrServers: SolrServers,
         override def onStateChange(event: StateChange): Unit = event match {
           case Removed(server, _) if server.isEnabled =>
             // clean up
-            statsByServer.remove(server)
-            serverTestTimestamp.remove(server)
+            statsByServer.remove(server.id)
+            serverTestTimestamp.remove(server.id)
           case StateChanged(from, to, _) if from.isEnabled && !to.isEnabled =>
-            statsByServer.remove(from)
-            serverTestTimestamp.remove(from)
+            statsByServer.remove(from.id)
+            serverTestTimestamp.remove(from.id)
           case _ => // ignore
         }
       })
@@ -252,8 +236,8 @@ class FastestServerLB[F[_]](override val solrServers: SolrServers,
     this.client = client
 
     // gather initial stats
-    val futures = solrServers.all.filter(_.status == Enabled).map { server =>
-      (1 to initialTestRuns).foldLeft(futureFactory.successful(Unit))((res, i) =>
+    val futures = solrServers.all.filter(_.isEnabled).map { server =>
+      (1 to initialTestRuns).foldLeft(futureFactory.successful(Unit))((res, _) =>
         res.flatMap(_ => test(server).map(_ => Unit))
       )
     }
@@ -266,9 +250,11 @@ class FastestServerLB[F[_]](override val solrServers: SolrServers,
    * Determines the solr server to use for a new request.
    */
   override def solrServer(r: SolrRequest[_], preferred: Option[SolrServer] = None): Option[SolrServer] = {
-    val servers = solrServers.matching(r).filter(_.status == Enabled)
+    val servers = solrServers.matching(r).filter(_.isEnabled)
     if(servers.isEmpty) {
       None
+    } else if (r.isInstanceOf[IsUpdateRequest] && servers.exists(_.isLeader)) {
+      servers.find(_.isLeader)
     } else {
       val (serverIdx, result) = findBestServer(servers, lastServerIdx.get(), preferred)
       lastServerIdx.lazySet(serverIdx)
@@ -287,7 +273,7 @@ class FastestServerLB[F[_]](override val solrServers: SolrServers,
       .matching(r)
       .filter { server =>
         val fastServers = fastServersByCollection(collection(server))
-        server.status == Enabled &&  fastServers.contains(server)
+        server.isEnabled && fastServers.contains(server.id)
       }
       .foreach(testWithMinDelay)
     res
@@ -316,7 +302,7 @@ class FastestServerLB[F[_]](override val solrServers: SolrServers,
 
   private def testWithMinDelay(server: SolrServer): Option[Future[QueryResponse]] = {
     // println(s"${clock.millis()} - ${serverTestTimestamp(server).value} - ${minDelay.toMillis} ")
-    if(clock.millis() > serverTestTimestamp(server).value + minDelay.toMillis)
+    if(clock.millis() > serverTestTimestamp(server.id).value + minDelay.toMillis)
       Some(test(server))
     else
       None
@@ -325,7 +311,7 @@ class FastestServerLB[F[_]](override val solrServers: SolrServers,
   private[solrs] def test(server: SolrServer): Future[QueryResponse] = {
 
     // store the timestamp before the test starts, so that a new test is not triggered when there's already one running
-    serverTestTimestamp.update(server, Millisecond(clock.millis()))
+    serverTestTimestamp.update(server.id, Millisecond(clock.millis()))
 
     val request = stats(server).requestStarted(TestQueryClass)
     val res = client.doExecute[QueryResponse](server, new QueryRequest(testQuery(server)))
@@ -335,7 +321,7 @@ class FastestServerLB[F[_]](override val solrServers: SolrServers,
       // we want to limit the delay between requests, i.e. the time between the end of a test and the
       // start of the new test. Otherwise, when test queries are running for a long time, we would send more
       // and more test queries to the server
-      serverTestTimestamp.update(server, Millisecond(clock.millis()))
+      serverTestTimestamp.update(server.id, Millisecond(clock.millis()))
     }
 
     res
@@ -351,12 +337,14 @@ class FastestServerLB[F[_]](override val solrServers: SolrServers,
    */
   protected def updateFastServers(): Unit = {
     if(statsByServer.nonEmpty) {
-      val serversByCollection = statsByServer.keys.toSet.groupBy(collection)
-      serversByCollection.foreach { case (collection, servers) =>
-        val durationByServer = statsByServer.filterKeys(servers.contains).mapValues(_.predictDuration(TestQueryClass))
+      val statsByCollection = statsByServer.values.groupBy(stats => collection(stats.solrServer))
+      statsByCollection.foreach { case (collection, stats) =>
+        val durationByServer: Map[SolrServer, Long] = stats.map(s => s.solrServer -> s.predictDuration(TestQueryClass))(breakOut)
         val average = durationByServer.values.sum / durationByServer.size
         val serverFilter = filterFastServers(average)
-        val fastServers = durationByServer.filter(serverFilter).keys.toSet
+        val fastServers: Set[SolrServerId] = durationByServer.collect {
+          case (server, duration) if serverFilter(server, duration) => server.id
+        }(breakOut)
         if(fastServers != fastServersByCollection(collection)) {
           onBeforeFastServersChanged(collection, fastServers, durationByServer, average)
           fastServersByCollection += (collection -> fastServers)
@@ -366,16 +354,16 @@ class FastestServerLB[F[_]](override val solrServers: SolrServers,
   }
 
   protected def onBeforeFastServersChanged(collection: String,
-                                          fastServers: Set[SolrServer],
-                                          durationByServer: scala.collection.Map[SolrServer, Long],
+                                          fastServers: Set[SolrServerId],
+                                          durationByServer: Map[SolrServer, Long],
                                           average: Long): Unit = {
-    if (logger.isInfoEnabled) {
-      logger.info(s"Updating fast servers ($collection): $fastServers (average: $average, durationByServer: ${durationByServer.mkString(", ")})")
+    if (logger.isDebugEnabled) {
+      logger.debug(s"Updating fast servers ($collection): $fastServers (average: $average, durationByServer: ${durationByServer.mkString(", ")})")
     }
   }
 
   protected def stats(server: SolrServer): PerformanceStats = {
-    statsByServer.getOrElseUpdate(server, new PerformanceStats(server, initialPredictedResponseTime, clock))
+    statsByServer.getOrElseUpdate(server.id, new PerformanceStats(server, initialPredictedResponseTime, clock))
   }
 
   protected def initialPredictedResponseTime: Long = {
@@ -487,6 +475,7 @@ trait FastestServerLBMBean /*extends DynamicMBean*/ {
 }
 
 import java.lang.management.ManagementFactory
+
 import javax.management.ObjectName
 import javax.management.openmbean._
 
@@ -554,8 +543,8 @@ trait FastestServerLBJmxSupport[F[_]] extends FastestServerLBMBean { self: Faste
   override def fastServers(collection: String): CompositeData = {
     val servers = fastServersByCollection(collection).toArray
     new CompositeDataSupport(
-      compositeType(servers.map(_.baseUrl)),
-      servers.map(s => s.baseUrl -> stats(s).totalAverageDuration(TestQueryClass, -1).toString).toMap[String, String].asJava)
+      compositeType(servers.map(_.url)),
+      servers.map(s => s.url -> statsByServer(s).totalAverageDuration(TestQueryClass, -1).toString).toMap[String, String].asJava)
   }
 
   private def serversAndNames(collection: String): (Array[SolrServer], Array[String]) = {
@@ -564,7 +553,9 @@ trait FastestServerLBJmxSupport[F[_]] extends FastestServerLBMBean { self: Faste
   }
 
   private def serversByCollection(collection: String): Array[SolrServer] = {
-    statsByServer.keys.filter(collectionAndTestQuery(_)._1 == collection).toArray
+    statsByServer.values.collect {
+      case stats if collectionAndTestQuery(stats.solrServer)._1 == collection => stats.solrServer
+    }(breakOut)
   }
 
   private def compositeType(itemNames: Array[String]): CompositeType = {

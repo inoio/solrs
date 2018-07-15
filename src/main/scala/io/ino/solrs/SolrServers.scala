@@ -334,9 +334,11 @@ object CloudSolrServers {
     clusterState.getCollectionsMap.asScala.foldLeft(
       Map.empty[String, CollectionInfo]
     ) { case (res, (name, collection)) =>
-      val servers = mapSliceReplicas(collection.getSlices)(repl =>
-        SolrServer(repl.getCoreUrl, serverStatus(repl))
-      ).toIndexedSeq
+      val servers = mapSliceReplicas(collection.getSlices) { repl =>
+        // according to org.apache.solr.common.cloud.ZkCoreNodeProps.isLeader
+        val isLeader = repl.containsKey(ZkStateReader.LEADER_PROP)
+        SolrServer(repl.getCoreUrl, serverStatus(repl), isLeader)
+      }.toIndexedSeq
       res.updated(name, CollectionInfo(collection, servers))
     }
   }
@@ -373,7 +375,7 @@ object CloudSolrServers {
                 onlyInServers2: SolrServer => StateChange): Set[StateChange] = {
       servers2.foldLeft(Set.empty[StateChange]) { (res, server2) =>
         servers1.find(_.baseUrl == server2.baseUrl) match {
-          case Some(server1) if server1.status == server2.status => res
+          case Some(server1) if server1 == server2 => res
           case Some(server1) => res + stateChanged(server1, server2)
           case None => res + onlyInServers2(server2)
         }

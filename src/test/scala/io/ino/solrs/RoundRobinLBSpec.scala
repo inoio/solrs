@@ -1,5 +1,6 @@
 package io.ino.solrs
 
+import io.ino.solrs.Fixtures.shardReplica
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.SolrRequest
 import org.apache.solr.client.solrj.request.QueryRequest
@@ -58,10 +59,12 @@ class RoundRobinLBSpec extends FunSpec with Matchers {
     }
 
     it("should return the active leader for update requests") {
-      val server1 = SolrServer("host1", isLeader = true)
-      val server2 = SolrServer("host2", isLeader = false)
+      val server1 = shardReplica("host1", isLeader = true)
+      val server2 = shardReplica("host2", isLeader = false)
       val servers = IndexedSeq(server1, server2)
-      val cut = new RoundRobinLB(new StaticSolrServers(servers))
+      val cut = new RoundRobinLB(new StaticSolrServers(servers) {
+        override def findLeader(servers: Iterable[SolrServer]): Option[ShardReplica] = ShardReplica.findLeader(servers)
+      })
 
       val q = new UpdateRequest()
 

@@ -23,6 +23,7 @@ import org.apache.solr.client.solrj.request.QueryRequest
 import org.apache.solr.client.solrj.response.QueryResponse
 import org.slf4j.LoggerFactory
 
+import scala.annotation.tailrec
 import scala.collection.breakOut
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
@@ -78,17 +79,15 @@ class RoundRobinLB(override val solrServers: SolrServers) extends LoadBalancer {
     val servers = matching.filter(_.isEnabled)
     if(servers.isEmpty) {
       Failure(NoSolrServersAvailableException(matching))
+    } else if(preferred.isDefined && servers.exists(_.baseUrl == preferred.get.baseUrl)) {
+      Success(preferred.get)
+    } else if (r.isInstanceOf[IsUpdateRequest] && solrServers.findLeader(servers).isDefined) {
+      solrServers.findLeader(servers).toTry("no leader found")
     } else {
-      if(preferred.isDefined && servers.exists(_.baseUrl == preferred.get.baseUrl)) {
-        Success(preferred.get)
-      } else if (r.isInstanceOf[IsUpdateRequest] && servers.exists(_.isLeader)) {
-        servers.find(_.isLeader).toTry("no leader found")
-      } else {
-        // idx + 1 might be > servers.length, so let's use % to get a valid start position
-        val newIndex = (idx + 1) % servers.length
-        idx = newIndex
-        Success(servers(newIndex))
-      }
+      // idx + 1 might be > servers.length, so let's use % to get a valid start position
+      val newIndex = (idx + 1) % servers.length
+      idx = newIndex
+      Success(servers(newIndex))
     }
   }
 
@@ -266,8 +265,8 @@ class FastestServerLB[F[_]](override val solrServers: SolrServers,
     val servers = matching.filter(_.isEnabled)
     if(servers.isEmpty) {
       Failure(NoSolrServersAvailableException(matching))
-    } else if (r.isInstanceOf[IsUpdateRequest] && servers.exists(_.isLeader)) {
-      servers.find(_.isLeader).toTry("no leader found")
+    } else if (r.isInstanceOf[IsUpdateRequest] && solrServers.findLeader(servers).isDefined) {
+      solrServers.findLeader(servers).toTry("no leader found")
     } else {
       val (serverIdx, result) = findBestServer(servers, lastServerIdx.get(), preferred)
       lastServerIdx.lazySet(serverIdx)

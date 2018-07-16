@@ -2,6 +2,7 @@ package io.ino.solrs
 
 import java.nio.file.{Files, Paths}
 
+import io.ino.solrs.Fixtures.shardReplica
 import org.apache.solr.common.cloud.ClusterState
 import org.scalatest._
 
@@ -19,24 +20,24 @@ class CloudSolrServersSpec extends FunSpec with Matchers {
 
       val events = CloudSolrServers.diff(
         oldState = Map(
-          "col1" -> Seq(SolrServer("h10", Enabled, isLeader = true)),
-          "col2" -> Seq(SolrServer("h20", Enabled, isLeader = true), SolrServer("h21", Enabled, isLeader = false), SolrServer("h22", Disabled, isLeader = false))
+          "col1" -> Seq(shardReplica("h10", Enabled, isLeader = true)),
+          "col2" -> Seq(shardReplica("h20", Enabled, isLeader = true), shardReplica("h21", Enabled, isLeader = false), shardReplica("h22", Disabled, isLeader = false))
         ),
         newState = Map(
-          "col2" -> Seq(SolrServer("h21", Enabled, isLeader = true), SolrServer("h22", Enabled, isLeader = false), SolrServer("h23", Enabled, isLeader = false)),
-          "col3" -> Seq(SolrServer("h30", Enabled, isLeader = false))
+          "col2" -> Seq(shardReplica("h21", Enabled, isLeader = true), shardReplica("h22", Enabled, isLeader = false), shardReplica("h23", Enabled, isLeader = false)),
+          "col3" -> Seq(shardReplica("h30", Enabled, isLeader = false))
         )
       )
 
       implicit val solrServerOrd: Ordering[SolrServer] = Ordering[String].on[SolrServer](s => s.baseUrl)
 
       events should contain theSameElementsAs Seq(
-        Removed(SolrServer("h10", Enabled, isLeader = true), "col1"),
-        Removed(SolrServer("h20", Enabled, isLeader = true), "col2"),
-        StateChanged(SolrServer("h21", Enabled, isLeader = false), SolrServer("h21", Enabled, isLeader = true), "col2"),
-        StateChanged(SolrServer("h22", Disabled, isLeader = false), SolrServer("h22", Enabled, isLeader = false), "col2"),
-        Added(SolrServer("h23", Enabled, isLeader = false), "col2"),
-        Added(SolrServer("h30", Enabled, isLeader = false), "col3")
+        Removed(shardReplica("h10", Enabled, isLeader = true), "col1"),
+        Removed(shardReplica("h20", Enabled, isLeader = true), "col2"),
+        StateChanged(shardReplica("h21", Enabled, isLeader = false), shardReplica("h21", Enabled, isLeader = true), "col2"),
+        StateChanged(shardReplica("h22", Disabled, isLeader = false), shardReplica("h22", Enabled, isLeader = false), "col2"),
+        Added(shardReplica("h23", Enabled, isLeader = false), "col2"),
+        Added(shardReplica("h30", Enabled, isLeader = false), "col3")
       )
 
     }
@@ -49,12 +50,12 @@ class CloudSolrServersSpec extends FunSpec with Matchers {
 
       val collectionToServers = CloudSolrServers.getCollections(cs)
       collectionToServers("my-collection").servers should contain allOf(
-        SolrServer("http://server1:8983/solr/my-collection_shard1_replica1", Enabled, isLeader = true),
-        SolrServer("http://server2:8983/solr/my-collection_shard1_replica2", Enabled, isLeader = false),
-        SolrServer("http://server3:8983/solr/my-collection_shard2_replica1", Enabled, isLeader = true),
-        SolrServer("http://server4:8983/solr/my-collection_shard2_replica2", Enabled, isLeader = false),
-        SolrServer("http://server5:8983/solr/my-collection_shard3_replica1", Enabled, isLeader = true),
-        SolrServer("http://server6:8983/solr/my-collection_shard3_replica2", Enabled, isLeader = false))
+        shardReplica("http://server1:8983/solr/my-collection_shard1_replica1", Enabled, isLeader = true),
+        shardReplica("http://server2:8983/solr/my-collection_shard1_replica2", Enabled, isLeader = false),
+        shardReplica("http://server3:8983/solr/my-collection_shard2_replica1", Enabled, isLeader = true),
+        shardReplica("http://server4:8983/solr/my-collection_shard2_replica2", Enabled, isLeader = false),
+        shardReplica("http://server5:8983/solr/my-collection_shard3_replica1", Enabled, isLeader = true),
+        shardReplica("http://server6:8983/solr/my-collection_shard3_replica2", Enabled, isLeader = false))
     }
 
   }

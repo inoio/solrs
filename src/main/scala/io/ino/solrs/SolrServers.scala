@@ -45,6 +45,12 @@ trait SolrServers {
    * Determines Solr servers matching the given solr request (e.g. based on the "collection" param).
    */
   def matching(r: SolrRequest[_]): Try[IndexedSeq[SolrServer]]
+
+  /**
+    * Determines the shard replica which is the shard leader.
+    */
+  protected[solrs] def findLeader(servers: Iterable[SolrServer]): Option[ShardReplica] = None
+
 }
 
 class StaticSolrServers(override val all: IndexedSeq[SolrServer]) extends SolrServers {
@@ -119,7 +125,7 @@ class CloudSolrServers[F[_]](zkHost: String,
 
   @volatile
   private var collections = Map.empty[String, CollectionInfo]
-  private def collectionToServers: Map[String, IndexedSeq[SolrServer]] = collections.mapValues(_.servers)
+  private def collectionToServers: Map[String, IndexedSeq[ShardReplica]] = collections.mapValues(_.servers)
   @volatile
   private var aliases: Option[Aliases] = None
 
@@ -131,6 +137,8 @@ class CloudSolrServers[F[_]](zkHost: String,
     asyncSolrClient = client
     createZkStateReader()
   }
+
+  override protected[solrs] def findLeader(servers: Iterable[SolrServer]): Option[ShardReplica] = ShardReplica.findLeader(servers)
 
   private def createZkStateReader(): Unit = {
     // Setup ZkStateReader, schedule retry if ZK is unavailable
@@ -339,7 +347,7 @@ object CloudSolrServers {
   /* Java API */
   def builder(zkHost: String): Builder = Builder(zkHost)
 
-  private[CloudSolrServers] final case class CollectionInfo(collection: DocCollection, servers: IndexedSeq[SolrServer])
+  private[CloudSolrServers] final case class CollectionInfo(collection: DocCollection, servers: IndexedSeq[ShardReplica])
 
   private[solrs] def getCollections(clusterState: ClusterState): Map[String, CollectionInfo] = {
     import scala.collection.JavaConverters._
@@ -347,11 +355,7 @@ object CloudSolrServers {
     clusterState.getCollectionsMap.asScala.foldLeft(
       Map.empty[String, CollectionInfo]
     ) { case (res, (name, collection)) =>
-      val servers = mapSliceReplicas(collection.getSlices) { repl =>
-        // according to org.apache.solr.common.cloud.ZkCoreNodeProps.isLeader
-        val isLeader = repl.containsKey(ZkStateReader.LEADER_PROP)
-        SolrServer(repl.getCoreUrl, serverStatus(repl), isLeader)
-      }.toIndexedSeq
+      val servers = mapSliceReplicas(collection.getSlices)(repl => ShardReplica(repl.getCoreUrl, repl))(breakOut)
       res.updated(name, CollectionInfo(collection, servers))
     }
   }
@@ -363,13 +367,6 @@ object CloudSolrServers {
     slices.asScala.flatMap(_.getReplicas.asScala.map(repl =>
       fun(repl)
     ))(breakOut)
-  }
-
-  private def serverStatus(replica: Replica): ServerStatus = replica.getState match {
-    case Replica.State.ACTIVE => Enabled
-    case Replica.State.RECOVERING => Disabled
-    case Replica.State.RECOVERY_FAILED => Failed
-    case Replica.State.DOWN => Failed
   }
 
   /**

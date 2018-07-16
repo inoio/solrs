@@ -2,6 +2,7 @@ package io.ino.solrs
 
 import java.util.concurrent.TimeUnit
 
+import io.ino.solrs.Fixtures.shardReplica
 import io.ino.solrs.SolrMatchers.hasQuery
 import io.ino.time.Clock
 import io.ino.time.Clock.MutableClock
@@ -88,10 +89,12 @@ class FastestServerLBSpec extends StandardFunSpec {
     }
 
     it("should return the active leader for update requests") {
-      val server1 = SolrServer("host1", isLeader = true)
-      val server2 = SolrServer("host2", isLeader = false)
+      val server1 = shardReplica("host1", isLeader = true)
+      val server2 = shardReplica("host2", isLeader = false)
       val servers = IndexedSeq(server1, server2)
-      val cut = newDynamicLB(new StaticSolrServers(servers))
+      val cut = newDynamicLB(new StaticSolrServers(servers) {
+        override def findLeader(servers: Iterable[SolrServer]): Option[ShardReplica] = ShardReplica.findLeader(servers)
+      })
 
       val r = new UpdateRequest()
 

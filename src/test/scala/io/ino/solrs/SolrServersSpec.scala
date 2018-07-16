@@ -17,7 +17,7 @@ class SolrServersSpec extends FunSpec with Matchers with FutureAwaits {
       val solrServers = IndexedSeq(SolrServer("host1"), SolrServer("host2"))
       val cut = new StaticSolrServers(solrServers)
 
-      val found = cut.matching(q)
+      val found = cut.matching(q).get
 
       found should contain theSameElementsAs solrServers
     }
@@ -40,13 +40,13 @@ class SolrServersSpec extends FunSpec with Matchers with FutureAwaits {
         }
       }
       cut.all should have size (0)
-      val iterator = cut.matching(q)
+      val iterator = cut.matching(q).get
       iterator should have size 0
 
       await(cut.reload())
 
       cut.all should have size (2)
-      cut.matching(q) should contain theSameElementsAs Seq(SolrServer("host1"), SolrServer("host2"))
+      cut.matching(q).get should contain theSameElementsAs Seq(SolrServer("host1"), SolrServer("host2"))
 
     }
   }

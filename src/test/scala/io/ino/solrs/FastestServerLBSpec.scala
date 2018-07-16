@@ -17,6 +17,9 @@ import org.scalatest.concurrent.Eventually._
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.util.Failure
+import scala.util.Success
+import scala.util.Try
 
 //noinspection RedundantDefaultArgument
 class FastestServerLBSpec extends StandardFunSpec {
@@ -54,34 +57,34 @@ class FastestServerLBSpec extends StandardFunSpec {
 
   describe("FastestServerLB") {
 
-    it("should return None if no solr server matches") {
+    it("should return a Failure if no solr server matches") {
       val nonMatchingServers = new SolrServers {
         override def all: Seq[SolrServer] = Nil
-        override def matching(r: SolrRequest[_]): IndexedSeq[SolrServer] = Vector.empty
+        override def matching(r: SolrRequest[_]): Try[IndexedSeq[SolrServer]] = Success(Vector.empty)
       }
       val cut = newDynamicLB(nonMatchingServers)
-      cut.solrServer(r) should be (None)
+      cut.solrServer(r) shouldBe a[Failure[_]]
     }
 
     it("should only return active solr servers") {
       val servers = IndexedSeq(SolrServer("host1"), SolrServer("host2"))
       val cut = newDynamicLB(new StaticSolrServers(servers))
 
-      cut.solrServer(r) should be (Some(SolrServer("host1")))
+      cut.solrServer(r) should be (Success(SolrServer("host1")))
       // we must create some performance stats for host1, so that host2 will be selected
       runTests(cut, server1, fromSecond = 1, toSecond = 2, startResponseTime = 1000, endResponseTime = 1000)
-      cut.solrServer(r) should be (Some(SolrServer("host2")))
+      cut.solrServer(r) should be (Success(SolrServer("host2")))
 
       servers.head.status = Disabled
-      cut.solrServer(r) should be (Some(SolrServer("host2")))
+      cut.solrServer(r) should be (Success(SolrServer("host2")))
 
       servers.head.status = Enabled
       servers(1).status = Failed
-      cut.solrServer(r) should be (Some(SolrServer("host1")))
-      cut.solrServer(r) should be (Some(SolrServer("host1")))
+      cut.solrServer(r) should be (Success(SolrServer("host1")))
+      cut.solrServer(r) should be (Success(SolrServer("host1")))
 
       servers.head.status = Disabled
-      cut.solrServer(r) should be (None)
+      cut.solrServer(r) shouldBe a[Failure[_]]
     }
 
     it("should return the active leader for update requests") {
@@ -92,23 +95,23 @@ class FastestServerLBSpec extends StandardFunSpec {
 
       val r = new UpdateRequest()
 
-      cut.solrServer(r) should be (Some(server1))
+      cut.solrServer(r) should be (Success(server1))
       // we must create some performance stats for host1, so that host2 would usually be selected (for non-update requests)
       runTests(cut, server1, fromSecond = 1, toSecond = 2, startResponseTime = 1000, endResponseTime = 1000)
-      cut.solrServer(r) should be (Some(server1))
-      cut.solrServer(r) should be (Some(server1))
+      cut.solrServer(r) should be (Success(server1))
+      cut.solrServer(r) should be (Success(server1))
 
       servers.head.status = Disabled
-      cut.solrServer(r) should be (Some(server2))
-      cut.solrServer(r) should be (Some(server2))
+      cut.solrServer(r) should be (Success(server2))
+      cut.solrServer(r) should be (Success(server2))
 
       servers.head.status = Enabled
       servers(1).status = Failed
-      cut.solrServer(r) should be (Some(server1))
-      cut.solrServer(r) should be (Some(server1))
+      cut.solrServer(r) should be (Success(server1))
+      cut.solrServer(r) should be (Success(server1))
 
       servers.head.status = Disabled
-      cut.solrServer(r) should be (None)
+      cut.solrServer(r) shouldBe a[Failure[_]]
     }
 
     it("should return the fastest server by default") {
@@ -121,9 +124,9 @@ class FastestServerLBSpec extends StandardFunSpec {
       when(solrs.doExecute[QueryResponse](any(), any())(any())).thenReturn(delayedResponse(20))
       cut.test(server3)
 
-      cut.solrServer(r) should be (Some(server1))
-      cut.solrServer(r) should be (Some(server1))
-      cut.solrServer(r) should be (Some(server1))
+      cut.solrServer(r) should be (Success(server1))
+      cut.solrServer(r) should be (Success(server1))
+      cut.solrServer(r) should be (Success(server1))
     }
 
     /**
@@ -137,27 +140,27 @@ class FastestServerLBSpec extends StandardFunSpec {
       runTests(cut, server3, fromSecond = 1, toSecond = 5, startResponseTime = 1, endResponseTime = 1)
       cut.updateStats()
 
-      cut.solrServer(r) should be (Some(server1))
-      cut.solrServer(r) should be (Some(server2))
-      cut.solrServer(r) should be (Some(server3))
-      cut.solrServer(r) should be (Some(server1))
+      cut.solrServer(r) should be (Success(server1))
+      cut.solrServer(r) should be (Success(server2))
+      cut.solrServer(r) should be (Success(server3))
+      cut.solrServer(r) should be (Success(server1))
     }
 
     it("should consider the preferred server if it's one of the fastest servers") {
       val cut = newDynamicLB(solrServers)
-      val preferred = Some(server2)
+      val preferred = Success(server2)
 
       runTests(cut, server1, fromSecond = 1, toSecond = 5, startResponseTime = 1, endResponseTime = 1)
       runTests(cut, server2, fromSecond = 1, toSecond = 5, startResponseTime = 1, endResponseTime = 1)
       runTests(cut, server3, fromSecond = 1, toSecond = 5, startResponseTime = 10, endResponseTime = 10)
       cut.updateStats()
 
-      cut.solrServer(r, preferred = Some(server2)) should be (Some(server2))
-      cut.solrServer(r, preferred = Some(server2)) should be (Some(server2))
+      cut.solrServer(r, preferred = Some(server2)) should be (Success(server2))
+      cut.solrServer(r, preferred = Some(server2)) should be (Success(server2))
 
       // if the preferred server is too slow then the fastest ones should be round robin'ed
-      cut.solrServer(r, preferred = Some(server3)) should be (Some(server1))
-      cut.solrServer(r, preferred = Some(server3)) should be (Some(server2))
+      cut.solrServer(r, preferred = Some(server3)) should be (Success(server1))
+      cut.solrServer(r, preferred = Some(server3)) should be (Success(server2))
     }
 
     it("should return the server with a better predicted response time") {
@@ -172,7 +175,7 @@ class FastestServerLBSpec extends StandardFunSpec {
       runTests(cut, server2, fromSecond = 6, toSecond = 10, startResponseTime = 20, endResponseTime = 10)
       cut.updateStats()
 
-      cut.solrServer(r) should be (Some(server2))
+      cut.solrServer(r) should be (Success(server2))
     }
 
     /**
@@ -188,17 +191,17 @@ class FastestServerLBSpec extends StandardFunSpec {
       runTests(cut, server3, fromSecond = 1, toSecond = 5, startResponseTime = 3, endResponseTime = 3)
       cut.updateStats()
 
-      cut.solrServer(r) should be (Some(server1))
-      cut.solrServer(r) should be (Some(server2))
-      cut.solrServer(r) should be (Some(server3))
-      cut.solrServer(r) should be (Some(server1))
+      cut.solrServer(r) should be (Success(server1))
+      cut.solrServer(r) should be (Success(server2))
+      cut.solrServer(r) should be (Success(server3))
+      cut.solrServer(r) should be (Success(server1))
 
       runTests(cut, server2, fromSecond = 6, toSecond = 10, startResponseTime = 10, endResponseTime = 10)
       runTests(cut, server3, fromSecond = 6, toSecond = 10, startResponseTime = 10, endResponseTime = 10)
       cut.updateStats()
 
-      cut.solrServer(r) should be (Some(server1))
-      cut.solrServer(r) should be (Some(server1))
+      cut.solrServer(r) should be (Success(server1))
+      cut.solrServer(r) should be (Success(server1))
     }
 
     it("should initially test servers to gather performance stats") {

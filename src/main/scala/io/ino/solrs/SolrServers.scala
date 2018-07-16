@@ -44,11 +44,11 @@ trait SolrServers {
   /**
    * Determines Solr servers matching the given solr request (e.g. based on the "collection" param).
    */
-  def matching(r: SolrRequest[_]): IndexedSeq[SolrServer]
+  def matching(r: SolrRequest[_]): Try[IndexedSeq[SolrServer]]
 }
 
 class StaticSolrServers(override val all: IndexedSeq[SolrServer]) extends SolrServers {
-  override def matching(r: SolrRequest[_]): IndexedSeq[SolrServer] = all
+  override def matching(r: SolrRequest[_]): Try[IndexedSeq[SolrServer]] = Success(all)
 }
 object StaticSolrServers {
   def apply(baseUrls: IndexedSeq[String]): StaticSolrServers = new StaticSolrServers(baseUrls.map(SolrServer(_)))
@@ -120,6 +120,8 @@ class CloudSolrServers[F[_]](zkHost: String,
   @volatile
   private var collections = Map.empty[String, CollectionInfo]
   private def collectionToServers: Map[String, IndexedSeq[SolrServer]] = collections.mapValues(_.servers)
+  @volatile
+  private var aliases: Option[Aliases] = None
 
   private val scheduledExecutor: ScheduledExecutorService = Executors.newScheduledThreadPool(1, new ZkClusterStateUpdateTF)
 
@@ -181,6 +183,8 @@ class CloudSolrServers[F[_]](zkHost: String,
    */
   private def updateFromClusterState(zkStateReader: ZkStateReader): Future[Unit] = {
     // could perhaps be replaced with zkStateReader.registerCollectionStateWatcher(collection, watcher);
+
+    aliases = Some(zkStateReader.getAliases)
 
     val clusterState = zkStateReader.getClusterState
 
@@ -257,21 +261,26 @@ class CloudSolrServers[F[_]](zkHost: String,
    * it should start from the first one again. When the known solr servers change,
    * the iterator must reflect this.
    */
-  override def matching(r: SolrRequest[_]): IndexedSeq[SolrServer] = {
+  override def matching(r: SolrRequest[_]): Try[IndexedSeq[SolrServer]] = {
     val params = r.getParams
     val collection = Option(params.get("collection")).orElse(defaultCollection).getOrElse(
       throw new SolrServerException("No collection param specified on request and no default collection has been set.")
     )
-    collections.get(collection) match {
+    // - resolveAliases returns the input if no alias exists
+    // - update requests shall only be directed to a single collection (the first of multiple alias target collections, as done by CloudSolrClient)
+    // - for read requests we also only consider the first alias target, to keep things simple, and solr server
+    //   will still return combined responses from all alias target collections
+    val resolvedCollection = aliases.map(_.resolveAliases(collection).get(0)).getOrElse(collection)
+    collections.get(resolvedCollection) match {
       case Some(CollectionInfo(docCollection, servers)) =>
         val shardKeys = params.get(ShardParams._ROUTE_)
         val slices = docCollection.getRouter.getSearchSlices(shardKeys, params, docCollection)
         val serverUrls: Set[String] = mapSliceReplicas(slices)(repl =>
           SolrServer.fixUrl(repl.getCoreUrl)
         )(breakOut)
-        servers.filter(server => serverUrls.contains(server.baseUrl))
+        Success(servers.filter(server => serverUrls.contains(server.baseUrl)))
       case None =>
-        Vector.empty
+        Failure(UnknownCollectionException(collection))
     }
   }
 
@@ -294,6 +303,10 @@ class CloudSolrServers[F[_]](zkHost: String,
 object CloudSolrServers {
 
   private val logger = LoggerFactory.getLogger(getClass)
+
+  final case class UnknownCollectionException(collection: String) extends IllegalArgumentException(
+    s"The collection '$collection' is not known"
+  )
 
   /* Java API */
   case class Builder(zkHost: String,
@@ -422,7 +435,7 @@ class ReloadingSolrServers[F[_]](url: String, extractor: Array[Byte] => IndexedS
    * it should start from the first one again. When the known solr servers change,
    * the iterator must reflect this.
    */
-  override def matching(r: SolrRequest[_]): IndexedSeq[SolrServer] = solrServers
+  override def matching(r: SolrRequest[_]): Try[IndexedSeq[SolrServer]] = Success(solrServers)
 
   def reload(): F[IndexedSeq[SolrServer]] = {
     val f = loadUrl().map { data =>

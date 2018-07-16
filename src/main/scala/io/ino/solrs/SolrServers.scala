@@ -120,6 +120,8 @@ class CloudSolrServers[F[_]](zkHost: String,
   @volatile
   private var collections = Map.empty[String, CollectionInfo]
   private def collectionToServers: Map[String, IndexedSeq[SolrServer]] = collections.mapValues(_.servers)
+  @volatile
+  private var aliases: Option[Aliases] = None
 
   private val scheduledExecutor: ScheduledExecutorService = Executors.newScheduledThreadPool(1, new ZkClusterStateUpdateTF)
 
@@ -181,6 +183,8 @@ class CloudSolrServers[F[_]](zkHost: String,
    */
   private def updateFromClusterState(zkStateReader: ZkStateReader): Future[Unit] = {
     // could perhaps be replaced with zkStateReader.registerCollectionStateWatcher(collection, watcher);
+
+    aliases = Some(zkStateReader.getAliases)
 
     val clusterState = zkStateReader.getClusterState
 
@@ -262,7 +266,12 @@ class CloudSolrServers[F[_]](zkHost: String,
     val collection = Option(params.get("collection")).orElse(defaultCollection).getOrElse(
       throw new SolrServerException("No collection param specified on request and no default collection has been set.")
     )
-    collections.get(collection) match {
+    // - resolveAliases returns the input if no alias exists
+    // - update requests shall only be directed to a single collection (the first of multiple alias target collections, as done by CloudSolrClient)
+    // - for read requests we also only consider the first alias target, to keep things simple, and solr server
+    //   will still return combined responses from all alias target collections
+    val resolvedCollection = aliases.map(_.resolveAliases(collection).get(0)).getOrElse(collection)
+    collections.get(resolvedCollection) match {
       case Some(CollectionInfo(docCollection, servers)) =>
         val shardKeys = params.get(ShardParams._ROUTE_)
         val slices = docCollection.getRouter.getSearchSlices(shardKeys, params, docCollection)

@@ -4,9 +4,11 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.impl.CloudSolrClient
+import org.apache.solr.client.solrj.request.CollectionAdminRequest
 import org.scalatest.Assertion
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
-import org.scalatest.concurrent.{Eventually, IntegrationPatience}
+import org.scalatest.concurrent.Eventually
+import org.scalatest.concurrent.IntegrationPatience
 import org.slf4j.LoggerFactory
 
 import scala.annotation.tailrec
@@ -32,7 +34,10 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
   private var cut: AsyncSolrClient[Future] = _
   private var solrJClient: CloudSolrClient = _
 
-  private val q = new SolrQuery("*:*").setRows(Int.MaxValue)
+  private val collection1 = "collection1"
+  private val collection2 = "collection2"
+
+  private val q = new SolrQuery("*:*").setRows(1000)
 
   private val logger = LoggerFactory.getLogger(getClass)
 
@@ -42,17 +47,17 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
     solrRunner = SolrCloudRunner.start(
       numServers = 2,
       collections = List(
-        SolrCollection("collection1", replicas = 2, shards = 1),
-        SolrCollection("collection2", replicas = 2, shards = 1)
+        SolrCollection(collection1, replicas = 2, shards = 1),
+        SolrCollection(collection2, replicas = 2, shards = 1)
       ),
-      defaultCollection = Some("collection1")
+      defaultCollection = Some(collection1)
     )
     solrJClient = solrRunner.solrJClient
 
     solrServers = new CloudSolrServers(
       solrRunner.zkAddress,
       clusterStateUpdateInterval = 100 millis,
-      defaultCollection = Some("collection1"))
+      defaultCollection = Some(collection1))
     // We need to configure a retry policy as otherwise requests fail because server status is not
     // updated fast enough...
     cut = AsyncSolrClient.Builder(RoundRobinLB(solrServers)).withRetryPolicy(RetryPolicy.TryAvailableServers).build
@@ -152,6 +157,45 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
       awaitAllServersBeingEnabled()
     }
 
+    it("should handle a standard (non-routed) collection alias") {
+
+      awaitAllServersBeingEnabled()
+
+      val otherDocs = manyDocs.filterNot(someDocs.contains).take(42)
+      import scala.collection.JavaConverters.seqAsJavaListConverter
+      solrJClient.add(collection2, otherDocs.asJava)
+      solrJClient.commit(collection2)
+
+      val alias = "testalias"
+      val aliasCombined = "testaliascombined"
+      CollectionAdminRequest.createAlias(alias, collection1).process(solrJClient)
+      CollectionAdminRequest.createAlias(aliasCombined, collection1 + "," + collection2).process(solrJClient)
+
+      // ensure that the alias has been registered// ensure that the aliases have been registered
+      var aliases = new CollectionAdminRequest.ListAliases().process(solrJClient).getAliases
+      aliases.get(alias) shouldBe collection1
+      aliases.get(aliasCombined) shouldBe collection1 + "," + collection2
+
+      eventually {
+        await(cut.query(collection1, q).map(getIds)) should contain theSameElementsAs someDocsIds
+        await(cut.query(alias, q).map(getIds)) should contain theSameElementsAs someDocsIds
+      }
+
+      // switch alias to collection2 and test...
+      CollectionAdminRequest.createAlias(alias, collection2).process(solrJClient)
+
+      val otherDocsIds = otherDocs.map(_.getFieldValue("id").toString)
+      eventually {
+        await(cut.query(collection2, q).map(getIds)) should contain theSameElementsAs otherDocsIds
+        await(cut.query(alias, q).map(getIds)) should contain theSameElementsAs otherDocsIds
+      }
+
+      // verify that combined alias returns docs from all target collections
+      someDocsIds ::: otherDocsIds should not contain theSameElementsAs (someDocsIds)
+      await(cut.query(aliasCombined, q).map(getIds)) should contain theSameElementsAs (someDocsIds ::: otherDocsIds)
+
+    }
+
   }
 
   private def awaitAllServersBeingEnabled(): Assertion = {
@@ -161,14 +205,14 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
   }
 
   @tailrec
-  private def runQueries(q: SolrQuery, run: AtomicBoolean, res: List[Future[List[String]]] = Nil): List[Future[List[String]]] = run.get() match {
-    case false => res
-    case true =>
-      val response = cut.query(q).map(getIds)
-      response.failed.foreach {
-        case NonFatal(e) => logger.error("Query failed.", e)
-      }
-      runQueries(q, run, awaitReady(response) :: res)
+  private def runQueries(q: SolrQuery, run: AtomicBoolean, res: List[Future[List[String]]] = Nil): List[Future[List[String]]] = if (run.get()) {
+    val response = cut.query(q).map(getIds)
+    response.failed.foreach {
+      case NonFatal(e) => logger.error("Query failed.", e)
+    }
+    runQueries(q, run, awaitReady(response) :: res)
+  } else {
+    res
   }
 
 }

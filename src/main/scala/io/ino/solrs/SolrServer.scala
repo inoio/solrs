@@ -3,7 +3,7 @@ package io.ino.solrs
 final case class SolrServerId(url: String) extends AnyVal
 
 /**
- * Represents a solr host.
+ * Represents a solr host, or a shard replica in a SolrCloud setup.
  *
  * @param baseUrl the solr server's base url, must not end with a slash.
  */

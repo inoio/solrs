@@ -36,7 +36,7 @@ resolvers ++= Seq(
   "Restlet Repositories" at "http://maven.restlet.org"
 )
 
-val solrVersion = "7.2.1"
+val solrVersion = "7.4.0"
 val slf4jVersion = "1.7.25"
 
 libraryDependencies ++= Seq(

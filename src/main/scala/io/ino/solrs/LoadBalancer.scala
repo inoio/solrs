@@ -9,6 +9,7 @@ import io.ino.solrs.LoadBalancer.NoSolrServersAvailableException
 import io.ino.solrs.ServerStateChangeObservable.Removed
 import io.ino.solrs.ServerStateChangeObservable.StateChange
 import io.ino.solrs.ServerStateChangeObservable.StateChanged
+import io.ino.solrs.ShardReplica.filterByShardPreference
 import io.ino.solrs.Utils.OptionOps
 import io.ino.solrs.future.Future
 import io.ino.solrs.future.FutureFactory
@@ -78,17 +79,16 @@ class RoundRobinLB(override val solrServers: SolrServers) extends LoadBalancer {
     val servers = matching.filter(_.isEnabled)
     if(servers.isEmpty) {
       Failure(NoSolrServersAvailableException(matching))
+    } else if(preferred.isDefined && servers.exists(_.baseUrl == preferred.get.baseUrl)) {
+      Success(preferred.get)
+    } else if (r.isInstanceOf[IsUpdateRequest] && solrServers.findLeader(servers).isDefined) {
+      solrServers.findLeader(servers).toTry("no leader found")
     } else {
-      if(preferred.isDefined && servers.exists(_.baseUrl == preferred.get.baseUrl)) {
-        Success(preferred.get)
-      } else if (r.isInstanceOf[IsUpdateRequest] && servers.exists(_.isLeader)) {
-        servers.find(_.isLeader).toTry("no leader found")
-      } else {
-        // idx + 1 might be > servers.length, so let's use % to get a valid start position
-        val newIndex = (idx + 1) % servers.length
-        idx = newIndex
-        Success(servers(newIndex))
-      }
+      val preferred = filterByShardPreference(r, servers)
+      // idx + 1 might be > servers.length, so let's use % to get a valid start position
+      val newIndex = (idx + 1) % preferred.length
+      idx = newIndex
+      Success(preferred(newIndex))
     }
   }
 
@@ -266,10 +266,11 @@ class FastestServerLB[F[_]](override val solrServers: SolrServers,
     val servers = matching.filter(_.isEnabled)
     if(servers.isEmpty) {
       Failure(NoSolrServersAvailableException(matching))
-    } else if (r.isInstanceOf[IsUpdateRequest] && servers.exists(_.isLeader)) {
-      servers.find(_.isLeader).toTry("no leader found")
+    } else if (r.isInstanceOf[IsUpdateRequest] && solrServers.findLeader(servers).isDefined) {
+      solrServers.findLeader(servers).toTry("no leader found")
     } else {
-      val (serverIdx, result) = findBestServer(servers, lastServerIdx.get(), preferred)
+      val preferredReplicas = filterByShardPreference(r, servers)
+      val (serverIdx, result) = findBestServer(preferredReplicas, lastServerIdx.get(), preferred)
       lastServerIdx.lazySet(serverIdx)
       Success(result)
     }

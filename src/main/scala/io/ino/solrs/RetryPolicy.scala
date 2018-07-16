@@ -1,6 +1,8 @@
 package io.ino.solrs
 
 import scala.annotation.tailrec
+import scala.util.Failure
+import scala.util.Success
 
 /**
  * Specifies a policy for retrying request failures.
@@ -76,9 +78,9 @@ object RetryPolicy {
         } else {
           val maybeServer = lb.solrServer(requestContext.r, preferred)
           maybeServer match {
-            case None => None
-            case Some(s) if s == server || requestContext.triedServers.contains(s) => findAvailable(round + 1)
-            case s@Some(_) => s
+            case Failure(_) => None
+            case Success(s) if s == server || requestContext.triedServers.contains(s) => findAvailable(round + 1)
+            case Success(s) => Some(s)
           }
         }
       }

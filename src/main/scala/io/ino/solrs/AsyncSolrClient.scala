@@ -52,6 +52,8 @@ import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration._
 import scala.collection.JavaConverters._
+import scala.util.Failure
+import scala.util.Success
 import scala.util.control.NonFatal
 
 //noinspection ConvertibleToMethodValue
@@ -556,13 +558,13 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
 
   private def loadBalanceRequest[T <: SolrResponse : SolrResponseFactory](requestContext: RequestContext[T]): Future[(T, SolrServer)] = {
     loadBalancer.solrServer(requestContext.r, requestContext.preferred) match {
-      case Some(solrServer) =>
+      case Success(solrServer) =>
         executeWithRetries(solrServer, requestContext)
-      case None =>
+      case Failure(ex) =>
         val msg =
-          if(requestContext.failedRequests.isEmpty) "No solr server available."
-          else s"No next solr server available. These requests failed:\n- ${requestContext.failedRequests.mkString("\n- ")}"
-        futureFactory.failed(new SolrServerException(msg))
+          if(requestContext.failedRequests.isEmpty) s"No solr server available: ${ex.getMessage}."
+          else s"No next solr server available: ${ex.getMessage}. These requests failed:\n- ${requestContext.failedRequests.mkString("\n- ")}"
+        futureFactory.failed(new SolrServerException(msg, ex))
     }
   }
 

@@ -158,7 +158,7 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
         val id = doc.getFieldValue("id").toString
         val route = id.substring(0, id.indexOf('!') + 1)
         val request = new QueryRequest(new SolrQuery("*:*").setParam(_ROUTE_, route))
-        cut.matching(request).map(_.withLeader(false)) should contain theSameElementsAs expectedServers.map(SolrServer(_, Enabled, isLeader = false))
+        cut.matching(request).get.map(_.withLeader(false)) should contain theSameElementsAs expectedServers.map(SolrServer(_, Enabled, isLeader = false))
       }
 
       // now stop a server
@@ -178,7 +178,7 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
             case serverUrl if serverUrl == solrServers.head.baseUrl => SolrServer(serverUrl, Failed, isLeader = false)
             case serverUrl => SolrServer(serverUrl, Enabled, isLeader = false)
           }
-          cut.matching(request).map(_.withLeader(false)) should contain theSameElementsAs expectedServersWithStatus
+          cut.matching(request).get.map(_.withLeader(false)) should contain theSameElementsAs expectedServersWithStatus
         }
 
     }

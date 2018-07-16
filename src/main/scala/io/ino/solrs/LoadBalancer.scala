@@ -5,9 +5,11 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
+import io.ino.solrs.LoadBalancer.NoSolrServersAvailableException
 import io.ino.solrs.ServerStateChangeObservable.Removed
 import io.ino.solrs.ServerStateChangeObservable.StateChange
 import io.ino.solrs.ServerStateChangeObservable.StateChanged
+import io.ino.solrs.Utils.OptionOps
 import io.ino.solrs.future.Future
 import io.ino.solrs.future.FutureFactory
 import io.ino.solrs.future.JavaFutureFactory
@@ -25,6 +27,9 @@ import scala.collection.breakOut
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
 import scala.concurrent.duration._
+import scala.util.Failure
+import scala.util.Success
+import scala.util.Try
 
 trait LoadBalancer extends RequestInterceptor {
 
@@ -33,7 +38,7 @@ trait LoadBalancer extends RequestInterceptor {
   /**
    * Determines the solr server to use for a new request.
    */
-  def solrServer(r: SolrRequest[_], preferred: Option[SolrServer]): Option[SolrServer]
+  def solrServer(r: SolrRequest[_], preferred: Option[SolrServer]): Try[SolrServer]
 
   /**
    * Intercept the given request, allows implementations to monitor solr server performance.
@@ -50,10 +55,18 @@ trait LoadBalancer extends RequestInterceptor {
 
 }
 
+object LoadBalancer {
+
+  final case class NoSolrServersAvailableException(matchingServers: Iterable[SolrServer]) extends RuntimeException(
+    s"None of the servers matching the request is active. Matching servers: ${matchingServers.mkString(", ")}"
+  )
+
+}
+
 class SingleServerLB(val server: SolrServer) extends LoadBalancer {
   def this(baseUrl: String) = this(SolrServer(baseUrl))
-  private val someServer = Some(server)
-  override def solrServer(r: SolrRequest[_], preferred: Option[SolrServer] = None): Some[SolrServer] = someServer
+  private val someServer = Success(server)
+  override def solrServer(r: SolrRequest[_], preferred: Option[SolrServer] = None): Try[SolrServer] = someServer
   override val solrServers: SolrServers = new StaticSolrServers(IndexedSeq(server))
 }
 
@@ -61,20 +74,20 @@ class RoundRobinLB(override val solrServers: SolrServers) extends LoadBalancer {
 
   private var idx = 0
 
-  override def solrServer(r: SolrRequest[_], preferred: Option[SolrServer] = None): Option[SolrServer] = {
-    val servers = solrServers.matching(r).filter(_.isEnabled)
+  override def solrServer(r: SolrRequest[_], preferred: Option[SolrServer] = None): Try[SolrServer] = solrServers.matching(r).flatMap { matching =>
+    val servers = matching.filter(_.isEnabled)
     if(servers.isEmpty) {
-      None
+      Failure(NoSolrServersAvailableException(matching))
     } else {
       if(preferred.isDefined && servers.exists(_.baseUrl == preferred.get.baseUrl)) {
-        preferred
+        Success(preferred.get)
       } else if (r.isInstanceOf[IsUpdateRequest] && servers.exists(_.isLeader)) {
-        servers.find(_.isLeader)
+        servers.find(_.isLeader).toTry("no leader found")
       } else {
         // idx + 1 might be > servers.length, so let's use % to get a valid start position
         val newIndex = (idx + 1) % servers.length
         idx = newIndex
-        Some(servers(newIndex))
+        Success(servers(newIndex))
       }
     }
   }
@@ -249,16 +262,16 @@ class FastestServerLB[F[_]](override val solrServers: SolrServers,
   /**
    * Determines the solr server to use for a new request.
    */
-  override def solrServer(r: SolrRequest[_], preferred: Option[SolrServer] = None): Option[SolrServer] = {
-    val servers = solrServers.matching(r).filter(_.isEnabled)
+  override def solrServer(r: SolrRequest[_], preferred: Option[SolrServer] = None): Try[SolrServer] = solrServers.matching(r).flatMap { matching =>
+    val servers = matching.filter(_.isEnabled)
     if(servers.isEmpty) {
-      None
+      Failure(NoSolrServersAvailableException(matching))
     } else if (r.isInstanceOf[IsUpdateRequest] && servers.exists(_.isLeader)) {
-      servers.find(_.isLeader)
+      servers.find(_.isLeader).toTry("no leader found")
     } else {
       val (serverIdx, result) = findBestServer(servers, lastServerIdx.get(), preferred)
       lastServerIdx.lazySet(serverIdx)
-      Some(result)
+      Success(result)
     }
   }
 
@@ -271,11 +284,14 @@ class FastestServerLB[F[_]](override val solrServers: SolrServers,
     // test each (fast) server matching the given query
     solrServers
       .matching(r)
-      .filter { server =>
-        val fastServers = fastServersByCollection(collection(server))
-        server.isEnabled && fastServers.contains(server.id)
-      }
-      .foreach(testWithMinDelay)
+      .foreach( matchingServers =>
+        matchingServers
+          .filter { server =>
+            val fastServers = fastServersByCollection(collection(server))
+            server.isEnabled && fastServers.contains(server.id)
+          }
+          .foreach(testWithMinDelay)
+      )
     res
   }
 

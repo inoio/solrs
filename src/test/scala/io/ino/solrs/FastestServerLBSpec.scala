@@ -6,12 +6,19 @@ import io.ino.solrs.Fixtures.shardReplica
 import io.ino.solrs.SolrMatchers.hasQuery
 import io.ino.time.Clock
 import io.ino.time.Clock.MutableClock
-import org.apache.solr.client.solrj.request.QueryRequest
-import org.apache.solr.client.solrj.response.QueryResponse
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.SolrRequest
+import org.apache.solr.client.solrj.request.QueryRequest
 import org.apache.solr.client.solrj.request.UpdateRequest
-import org.mockito.Matchers.{eq => mockEq, _}
+import org.apache.solr.client.solrj.response.QueryResponse
+import org.apache.solr.common.cloud.Replica
+import org.apache.solr.common.cloud.Replica.Type.NRT
+import org.apache.solr.common.cloud.Replica.Type.PULL
+import org.apache.solr.common.cloud.Replica.Type.TLOG
+import org.apache.solr.common.params.ShardParams.SHARDS_PREFERENCE
+import org.apache.solr.common.params.ShardParams.SHARDS_PREFERENCE_REPLICA_TYPE
+import org.mockito.Matchers.{eq => mockEq}
+import org.mockito.Matchers._
 import org.mockito.Mockito._
 import org.scalactic.source.Position
 import org.scalatest.concurrent.Eventually._
@@ -115,6 +122,39 @@ class FastestServerLBSpec extends StandardFunSpec {
 
       servers.head.status = Disabled
       cut.solrServer(r) shouldBe a[Failure[_]]
+    }
+
+    it("should return replicas matching the given shard preferences / replica type") {
+      val server1 = shardReplica("host1", replicaType = NRT)
+      val server2 = shardReplica("host2", replicaType = TLOG)
+      val server3 = shardReplica("host3", replicaType = PULL)
+      val servers = IndexedSeq(server1, server2, server3)
+      val cut = newDynamicLB(new StaticSolrServers(servers))
+
+      // shards.preference=replica.location:local,replica.type:PULL,replica.type:TLOG
+      def q(replicaTypes: Replica.Type*) = new QueryRequest(
+        new SolrQuery("foo")
+          .setParam(
+            SHARDS_PREFERENCE,
+            "replica.location:local," + // just some noice to test the parsing
+              replicaTypes.mkString(s"$SHARDS_PREFERENCE_REPLICA_TYPE:", s",$SHARDS_PREFERENCE_REPLICA_TYPE:", ""
+              )))
+
+      // don't test expecing server1, 2, 3 since this would be the default RR result anyways...
+      cut.solrServer(q(PULL)) should be (Success(server3))
+      cut.solrServer(q(PULL)) should be (Success(server3))
+      cut.solrServer(q(TLOG)) should be (Success(server2))
+      cut.solrServer(q(TLOG)) should be (Success(server2))
+      cut.solrServer(q(NRT)) should be (Success(server1))
+      cut.solrServer(q(NRT)) should be (Success(server1))
+
+      cut.solrServer(q(TLOG, PULL)) should (be (Success(server2)) or be (Success(server3)))
+      cut.solrServer(q(PULL, TLOG)) should (be (Success(server2)) or be (Success(server3)))
+      cut.solrServer(q(NRT, PULL)) should (be (Success(server1)) or be (Success(server3)))
+      cut.solrServer(q(PULL, NRT)) should (be (Success(server1)) or be (Success(server3)))
+
+      servers(0).status = Disabled
+      cut.solrServer(q(NRT, PULL)) shouldBe Success(server3)
     }
 
     it("should return the fastest server by default") {

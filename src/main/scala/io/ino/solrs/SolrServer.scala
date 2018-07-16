@@ -1,8 +1,14 @@
 package io.ino.solrs
 
 import io.ino.solrs.SolrServer.fixUrl
+import org.apache.solr.client.solrj.SolrRequest
 import org.apache.solr.common.cloud.Replica
+import org.apache.solr.common.cloud.Replica.Type.NRT
+import org.apache.solr.common.cloud.Replica.Type.PULL
+import org.apache.solr.common.cloud.Replica.Type.TLOG
 import org.apache.solr.common.cloud.ZkStateReader
+import org.apache.solr.common.params.ShardParams
+import org.apache.solr.common.params.ShardParams.SHARDS_PREFERENCE_REPLICA_TYPE
 
 final case class SolrServerId(url: String) extends AnyVal
 
@@ -81,6 +87,28 @@ object ShardReplica {
   private[solrs] def findLeader(servers: Iterable[SolrServer]): Option[ShardReplica] = servers.collectFirst {
     case s: ShardReplica if s.isLeader => s
   }
+
+  private val replicaTypePattern = s"$SHARDS_PREFERENCE_REPLICA_TYPE:($NRT|$TLOG|$PULL)"r
+
+  private[solrs] def filterByShardPreference(r: SolrRequest[_], servers: IndexedSeq[SolrServer]): IndexedSeq[SolrServer] = {
+    if (r.getParams == null || r.getParams.get(ShardParams.SHARDS_PREFERENCE) == null) servers
+    else {
+      r.getParams.get(ShardParams.SHARDS_PREFERENCE) match {
+        // check early if we have ShardReplicas at all, otherwise all the work isn't worth it...
+        case preference if preference.contains(SHARDS_PREFERENCE_REPLICA_TYPE) && hasShardReplicas(servers) =>
+          val replicaTypes: Set[Replica.Type] = replicaTypePattern.findAllMatchIn(preference).foldLeft(Set.empty[Replica.Type]) { case (res, m) =>
+            res + Replica.Type.valueOf(m.group(1))
+          }
+          val preferredReplicas = servers.collect {
+            case s: ShardReplica if replicaTypes.contains(s.replicaType) => s
+          }
+          if (preferredReplicas.nonEmpty) preferredReplicas else servers
+        case _ => servers
+      }
+    }
+  }
+
+  private def hasShardReplicas(servers: IndexedSeq[SolrServer]): Boolean = servers.nonEmpty && servers(0).isInstanceOf[ShardReplica]
 
 }
 

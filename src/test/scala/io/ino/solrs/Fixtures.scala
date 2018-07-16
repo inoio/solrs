@@ -5,7 +5,12 @@ import org.apache.solr.common.cloud.ZkStateReader
 
 object Fixtures {
 
-  def shardReplica(baseUrl: String, status: ServerStatus = Enabled, isLeader: Boolean): ShardReplica = {
+  def shardReplica(
+      baseUrl: String,
+      status: ServerStatus = Enabled,
+      replicaType: Replica.Type = Replica.Type.NRT,
+      isLeader: Boolean = false
+    ): ShardReplica = {
     import scala.collection.JavaConverters.mapAsJavaMapConverter
     val leaderProps: Map[String, AnyRef] = if(isLeader) Map(ZkStateReader.LEADER_PROP -> true.toString) else Map.empty
     val replicaStatus = status match {
@@ -14,7 +19,8 @@ object Fixtures {
       case Failed => Replica.State.RECOVERY_FAILED
     }
     val replica = new Replica(baseUrl, (Map[String, AnyRef](
-      ZkStateReader.STATE_PROP -> replicaStatus.toString
+      ZkStateReader.STATE_PROP -> replicaStatus.toString,
+      ZkStateReader.REPLICA_TYPE -> replicaType.name()
     ) ++ leaderProps).asJava)
     ShardReplica(baseUrl, replica)
   }

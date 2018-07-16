@@ -9,6 +9,7 @@ import io.ino.solrs.LoadBalancer.NoSolrServersAvailableException
 import io.ino.solrs.ServerStateChangeObservable.Removed
 import io.ino.solrs.ServerStateChangeObservable.StateChange
 import io.ino.solrs.ServerStateChangeObservable.StateChanged
+import io.ino.solrs.ShardReplica.filterByShardPreference
 import io.ino.solrs.Utils.OptionOps
 import io.ino.solrs.future.Future
 import io.ino.solrs.future.FutureFactory
@@ -23,7 +24,6 @@ import org.apache.solr.client.solrj.request.QueryRequest
 import org.apache.solr.client.solrj.response.QueryResponse
 import org.slf4j.LoggerFactory
 
-import scala.annotation.tailrec
 import scala.collection.breakOut
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
@@ -84,10 +84,11 @@ class RoundRobinLB(override val solrServers: SolrServers) extends LoadBalancer {
     } else if (r.isInstanceOf[IsUpdateRequest] && solrServers.findLeader(servers).isDefined) {
       solrServers.findLeader(servers).toTry("no leader found")
     } else {
+      val preferred = filterByShardPreference(r, servers)
       // idx + 1 might be > servers.length, so let's use % to get a valid start position
-      val newIndex = (idx + 1) % servers.length
+      val newIndex = (idx + 1) % preferred.length
       idx = newIndex
-      Success(servers(newIndex))
+      Success(preferred(newIndex))
     }
   }
 
@@ -268,7 +269,8 @@ class FastestServerLB[F[_]](override val solrServers: SolrServers,
     } else if (r.isInstanceOf[IsUpdateRequest] && solrServers.findLeader(servers).isDefined) {
       solrServers.findLeader(servers).toTry("no leader found")
     } else {
-      val (serverIdx, result) = findBestServer(servers, lastServerIdx.get(), preferred)
+      val preferredReplicas = filterByShardPreference(r, servers)
+      val (serverIdx, result) = findBestServer(preferredReplicas, lastServerIdx.get(), preferred)
       lastServerIdx.lazySet(serverIdx)
       Success(result)
     }

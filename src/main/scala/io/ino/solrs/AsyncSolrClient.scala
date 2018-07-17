@@ -677,13 +677,15 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
   protected def toSolrResponse[T <: SolrResponse : SolrResponseFactory](r: SolrRequest[_ <: T], response: Response, url: String, startTime: Long)(implicit server: SolrServer): T = {
     var rsp: NamedList[Object] = null
 
-    validateResponse(response, responseParser)
+    withResponseParser(r)(validateResponse(response, _))
 
     val httpStatus = response.getStatusCode
 
     try {
       val charset = getContentCharSet(response.getContentType).orNull
-      rsp = responseParser.processResponse(response.getResponseBodyAsStream, charset)
+
+      rsp = withResponseParser(r)(_.processResponse(response.getResponseBodyAsStream, charset))
+
     } catch {
       case NonFatal(e) =>
         metrics.countRemoteException
@@ -702,6 +704,11 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
     res.setElapsedTime(elapsedTime)
     metrics.requestTime(elapsedTime)
     res
+  }
+
+
+  private def withResponseParser[T <: SolrResponse, R](r: SolrRequest[_ <: T])(f:ResponseParser => R): R = {
+    f(Option(r.getResponseParser).getOrElse(responseParser))
   }
 
   @throws[RemoteSolrException]

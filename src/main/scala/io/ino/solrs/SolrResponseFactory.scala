@@ -1,7 +1,7 @@
 package io.ino.solrs
 
 import org.apache.solr.client.solrj.request.{QueryRequest, SolrPing, UpdateRequest}
-import org.apache.solr.client.solrj.response.{QueryResponse, SolrPingResponse, UpdateResponse}
+import org.apache.solr.client.solrj.response.{QueryResponse, SimpleSolrResponse, SolrPingResponse, UpdateResponse}
 import org.apache.solr.client.solrj.{SolrRequest, SolrResponse}
 
 trait SolrResponseFactory[T <: SolrResponse] {
@@ -18,6 +18,9 @@ object SolrResponseFactory {
 
   implicit val queryResponseFactory: SolrResponseFactory[QueryResponse] =
     instance(_ => new QueryResponse(null))
+
+  implicit val simpleSolrResponseFactory: SolrResponseFactory[SimpleSolrResponse] =
+    instance(_ => new SimpleSolrResponse)
 
   implicit val updateResponseFactory: SolrResponseFactory[UpdateResponse] =
     instance(_ => new UpdateResponse)

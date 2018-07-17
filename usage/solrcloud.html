@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+
+<head>
+<title>Solr Cloud Support · solrs - async solr client for java/scala</title>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="description" content='A solr client for scala, providing a query interface like SolrJ, just asynchronously / non-blocking'/>
+<link href="https://fonts.googleapis.com/css?family=Roboto:100normal,100italic,300normal,300italic,400normal,400italic,500normal,500italic,700normal,700italic,900normal,900italicc" rel="stylesheet" type="text/css"/>
+<script type="text/javascript" src="../lib/jquery/jquery.min.js"></script>
+<script type="text/javascript" src="../js/page.js"></script>
+<script type="text/javascript" src="../js/warnOldVersion.js"></script>
+<script type="text/javascript" src="../js/groups.js"></script>
+<link rel="stylesheet" type="text/css" href="../lib/normalize.css/normalize.css"/>
+<link rel="stylesheet" type="text/css" href="../lib/foundation/dist/foundation.min.css"/>
+<link rel="stylesheet" type="text/css" href="../css/page.css"/>
+
+<!--
+<link rel="shortcut icon" href="../images/favicon.ico" />
+-->
+</head>
+
+<body>
+<div class="off-canvas-wrapper">
+<div class="off-canvas-wrapper-inner" data-off-canvas-wrapper>
+
+<div class="off-canvas position-left" id="off-canvas-menu" data-off-canvas>
+<nav class="off-canvas-nav">
+<div class="nav-home">
+<a href="../index.html" >
+<span class="home-icon">⌂</span>solrs - async solr client for java/scala
+</a>
+<div class="version-number">
+2.1.0
+</div>
+</div>
+<select class="supergroup" name="Language"><option class="group" value="group-scala">Scala</option><option class="group" value="group-java">Java</option></select>
+<div class="nav-toc">
+<ul>
+  <li><a href="../usage/index.html" class="page">Basic Usage</a></li>
+  <li><a href="../usage/adding-data.html" class="page">Adding Data to Solr</a></li>
+  <li><a href="../usage/load-balancing.html" class="page">Load Balancing</a></li>
+  <li><a href="../usage/solrcloud.html" class="active page">Solr Cloud Support</a></li>
+  <li><a href="../usage/retry-policy.html" class="page">Retry Policy</a></li>
+  <li><a href="../usage/request-interception.html" class="page">Request Interception</a></li>
+  <li><a href="../usage/metrics.html" class="page">Metrics</a></li>
+</ul>
+</div>
+
+</nav>
+</div>
+
+<div class="off-canvas-content" data-off-canvas-content>
+
+<header class="site-header expanded row">
+<div class="small-12 column">
+<a href="#" class="off-canvas-toggle hide-for-medium" data-toggle="off-canvas-menu"><svg class="svg-icon svg-icon-menu" version="1.1" id="Menu" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 20 20" enable-background="new 0 0 20 20" xml:space="preserve"> <path class="svg-icon-menu-path" fill="#53CDEC" d="M16.4,9H3.6C3.048,9,3,9.447,3,10c0,0.553,0.048,1,0.6,1H16.4c0.552,0,0.6-0.447,0.6-1C17,9.447,16.952,9,16.4,9z M16.4,13
+H3.6C3.048,13,3,13.447,3,14c0,0.553,0.048,1,0.6,1H16.4c0.552,0,0.6-0.447,0.6-1C17,13.447,16.952,13,16.4,13z M3.6,7H16.4
+C16.952,7,17,6.553,17,6c0-0.553-0.048-1-0.6-1H3.6C3.048,5,3,5.447,3,6C3,6.553,3.048,7,3.6,7z"/></svg>
+</a>
+<div class="title"><a href="../index.html">solrs - async solr client for java/scala</a></div>
+
+<!--
+<a href="https://www.example.com" class="logo show-for-medium">logo</a>
+-->
+</div>
+</header>
+
+<div class="expanded row">
+
+<div class="medium-3 large-2 show-for-medium column">
+<nav class="site-nav">
+<div class="nav-home">
+<a href="../index.html" >
+<span class="home-icon">⌂</span>solrs - async solr client for java/scala
+</a>
+<div class="version-number">
+2.1.0
+</div>
+</div>
+<select class="supergroup" name="Language"><option class="group" value="group-scala">Scala</option><option class="group" value="group-java">Java</option></select>
+<div class="nav-toc">
+<ul>
+  <li><a href="../usage/index.html" class="page">Basic Usage</a></li>
+  <li><a href="../usage/adding-data.html" class="page">Adding Data to Solr</a></li>
+  <li><a href="../usage/load-balancing.html" class="page">Load Balancing</a></li>
+  <li><a href="../usage/solrcloud.html" class="active page">Solr Cloud Support</a></li>
+  <li><a href="../usage/retry-policy.html" class="page">Retry Policy</a></li>
+  <li><a href="../usage/request-interception.html" class="page">Request Interception</a></li>
+  <li><a href="../usage/metrics.html" class="page">Metrics</a></li>
+</ul>
+</div>
+
+</nav>
+</div>
+
+<div class="small-12 medium-9 large-10 column">
+<section class="site-content">
+
+<span id="version-warning"></span>
+
+<div class="page-header row">
+<div class="medium-12 show-for-medium column">
+<div class="nav-breadcrumbs">
+<ul>
+  <li><a href="../index.html">solrs - async solr client for java/scala</a></li>
+  <li>Solr Cloud Support</li>
+</ul>
+</div>
+</div>
+</div>
+
+<div class="page-content row">
+<div class="small-12 large-9 column" id="docs">
+<h2><a href="#solr-cloud-support" name="solr-cloud-support" class="anchor"><span class="anchor-link"></span></a>Solr Cloud Support</h2>
+<p>Solr Cloud is supported by <code>io.ino.solrs.CloudSolrServers</code>, which is a <code>SolrServers</code> implementation (can be passed to <code>RoundRobinLB</code>/<code>FastestServerLB</code>).</p>
+<p>Solr Cloud is supported with the following properties / restrictions:</p>
+<ul>
+  <li>Standard collection aliases are supported, no support for (time) routed aliases (see also <a href="https://lucene.apache.org/solr/guide/7_4/collections-api.html#createalias">Collections API / CreateAlias docs</a>)</li>
+  <li>Can use a default collection, if this is not provided, per request the <code>SolrQuery</code> must specify  the collection via the &ldquo;collection&rdquo; parameter.</li>
+  <li>New solr servers or solr servers that changed their state from inactive (e.g. down) to active can be tested  with warmup queries before they&rsquo;re used for load balancing queries, for this a <code>WarmupQueries</code> instance  can be set.</li>
+  <li>Querying solr is possible when ZooKeeper is temporarily not available</li>
+  <li>Construction of <code>CloudSolrServers</code> is possible while ZooKeeper is not available. When ZK becomes  available <code>CloudSolrServers</code> will be connected to ZK. As interval for trying to connect the  <code>CloudSolrServers.zkConnectTimeout</code> property is (re)used (10 seconds by default). Connection is tried &ldquo;forever&rdquo;,  but of course this does not prevent <code>CloudSolrServers</code> or <code>AsyncSolrClient</code> to be shutdown.</li>
+  <li>Construction of <code>CloudSolrServers</code> is possible when no solr instances are known by ZK. When solr servers  have registered at ZK, <code>CloudSolrServers</code> will notice this. As retry interval the <code>CloudSolrServers.clusterStateUpdateInterval</code>  property is (re)used (1 second by default).</li>
+  <li>ZK cluster state updates are read using the <code>CloudSolrServers.clusterStateUpdateInterval</code>.</li>
+</ul>
+<p>To run solrs connected to SolrCloud / ZooKeeper, you pass an instance of <code>CloudSolrServers</code> to <code>RoundRobinLB</code>/<code>FastestServerLB</code>. The simplest case looks like this:</p>
+<dl>
+  <dt>Java</dt>
+  <dd>
+  <pre class="prettyprint"><code class="language-java">CloudSolrServers&lt;?&gt; servers = CloudSolrServers.builder(&quot;localhost:2181&quot;).build();
+JavaAsyncSolrClient solr = JavaAsyncSolrClient.builder(new RoundRobinLB(servers)).build();</code></pre><a href="https://github.com/inoio/solrs/tree/master/src/main/paradox/resources/SolrCloud.java#L8-L9">Full source at GitHub</a></dd>
+  <dt>Scala</dt>
+  <dd>
+  <pre class="prettyprint"><code class="language-scala">val servers = new CloudSolrServers(&quot;localhost:2181&quot;)
+val solr = AsyncSolrClient.Builder(RoundRobinLB(servers)).build</code></pre><a href="https://github.com/inoio/solrs/tree/master/src/main/paradox/resources/SolrCloud.scala#L7-L8">Full source at GitHub</a></dd>
+</dl>
+<p>Here&rsquo;s an example that shows all configuration properties in use:</p>
+<dl>
+  <dt>Java</dt>
+  <dd>
+  <pre class="prettyprint"><code class="language-java">CloudSolrServers&lt;?&gt; servers = CloudSolrServers.builder(&quot;host1:2181,host2:2181&quot;)
+  .withZkClientTimeout(15, SECONDS)
+  .withZkConnectTimeout(10, SECONDS)
+  .withClusterStateUpdateInterval(1, SECONDS)
+  .withDefaultCollection(&quot;collection1&quot;)
+  .withWarmupQueries((collection) -&gt; Collections.singletonList(new SolrQuery(&quot;*:*&quot;)), 10)
+  .build();
+JavaAsyncSolrClient solr = JavaAsyncSolrClient.builder(new RoundRobinLB(servers)).build();</code></pre><a href="https://github.com/inoio/solrs/tree/master/src/main/paradox/resources/SolrCloud.java#L13-L20">Full source at GitHub</a></dd>
+  <dt>Scala</dt>
+  <dd>
+  <pre class="prettyprint"><code class="language-scala">val servers = new CloudSolrServers(
+  zkHost = &quot;host1:2181,host2:2181&quot;,
+  zkClientTimeout = 15 seconds,
+  zkConnectTimeout = 10 seconds,
+  clusterStateUpdateInterval = 1 second,
+  defaultCollection = Some(&quot;collection1&quot;),
+  warmupQueries = WarmupQueries(&quot;collection1&quot; =&gt; Seq(new SolrQuery(&quot;*:*&quot;)), count = 10))
+val solr = AsyncSolrClient.Builder(RoundRobinLB(servers)).build</code></pre><a href="https://github.com/inoio/solrs/tree/master/src/main/paradox/resources/SolrCloud.scala#L12-L19">Full source at GitHub</a></dd>
+</dl><div class="callout note "><div class="callout-title">Note</div>
+<p>Remember to either specify a default collection (as shown above) or set the collection to use per query (via <code>new SolrQuery(&quot;scala&quot;).setParam(&quot;collection&quot;, &quot;collection1&quot;)</code>).</p></div>
+<p>When running SolrCloud you should also configure a retry policy (<code>RetryPolicy.TryAvailableServers</code> to be concrete), because restarts of solr nodes are not that fast registered by ZooKeeper (and therefore also not by our <code>CloudSolrServers</code>), so that for a short period of time queries might be failing because a solr node just became not available.</p>
+<div class="source-github">
+The source code for this page can be found <a href="https://github.com/inoio/solrs/tree/master/src/main/paradox/usage/solrcloud.md">here</a>.
+</div>
+
+<div class="nav-next">
+<p><strong>Next:</strong> <a href="../usage/retry-policy.html">Retry Policy</a></p>
+</div>
+</div>
+<div class="large-3 show-for-large column" data-sticky-container>
+</div>
+</div>
+
+</section>
+</div>
+
+</div>
+
+<footer class="site-footer">
+
+<section class="site-footer-nav">
+<div class="expanded row">
+<div class="small-12 large-offset-2 large-10 column">
+<div class="row site-footer-content">
+
+<div class="small-12 medium-4 large-3 text-center column">
+<div class="nav-links">
+<ul>
+<!-- <li><a href="https://www.example.com/products/">Products</a> -->
+</ul>
+</div>
+</div>
+
+</div>
+</div>
+</div>
+</section>
+
+<section class="site-footer-base">
+<div class="expanded row">
+<div class="small-12 large-offset-2 large-10 column">
+<div class="row site-footer-content">
+
+<div class="small-12 text-center large-9 column">
+
+<!--
+<div class="copyright">
+<span class="text">&copy; 2018</span>
+<a href="https://www.example.com" class="logo">logo</a>
+</div>
+-->
+</div>
+
+</div>
+</div>
+</div>
+</section>
+</footer>
+
+</div>
+</div>
+</div>
+</body>
+
+<script type="text/javascript" src="../lib/foundation/dist/foundation.min.js"></script>
+<script type="text/javascript">jQuery(document).foundation();</script>
+<script type="text/javascript" src="../js/magellan.js"></script>
+
+<style type="text/css">@import "../lib/prettify/prettify.css";</style>
+<script type="text/javascript" src="../lib/prettify/prettify.js"></script>
+<script type="text/javascript" src="../lib/prettify/lang-scala.js"></script>
+<script type="text/javascript">jQuery(function(){window.prettyPrint && prettyPrint()});</script>
+<script type="text/javascript">jQuery(function(jq){initOldVersionWarnings(jq, '2.1.0', '')});</script>
+
+
+</html>

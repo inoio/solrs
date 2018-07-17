@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+
+<head>
+<title>Adding Data to Solr · solrs - async solr client for java/scala</title>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="description" content='A solr client for scala, providing a query interface like SolrJ, just asynchronously / non-blocking'/>
+<link href="https://fonts.googleapis.com/css?family=Roboto:100normal,100italic,300normal,300italic,400normal,400italic,500normal,500italic,700normal,700italic,900normal,900italicc" rel="stylesheet" type="text/css"/>
+<script type="text/javascript" src="../lib/jquery/jquery.min.js"></script>
+<script type="text/javascript" src="../js/page.js"></script>
+<script type="text/javascript" src="../js/warnOldVersion.js"></script>
+<script type="text/javascript" src="../js/groups.js"></script>
+<link rel="stylesheet" type="text/css" href="../lib/normalize.css/normalize.css"/>
+<link rel="stylesheet" type="text/css" href="../lib/foundation/dist/foundation.min.css"/>
+<link rel="stylesheet" type="text/css" href="../css/page.css"/>
+
+<!--
+<link rel="shortcut icon" href="../images/favicon.ico" />
+-->
+</head>
+
+<body>
+<div class="off-canvas-wrapper">
+<div class="off-canvas-wrapper-inner" data-off-canvas-wrapper>
+
+<div class="off-canvas position-left" id="off-canvas-menu" data-off-canvas>
+<nav class="off-canvas-nav">
+<div class="nav-home">
+<a href="../index.html" >
+<span class="home-icon">⌂</span>solrs - async solr client for java/scala
+</a>
+<div class="version-number">
+2.1.0
+</div>
+</div>
+<select class="supergroup" name="Language"><option class="group" value="group-scala">Scala</option><option class="group" value="group-java">Java</option></select>
+<div class="nav-toc">
+<ul>
+  <li><a href="../usage/index.html" class="page">Basic Usage</a></li>
+  <li><a href="../usage/adding-data.html" class="active page">Adding Data to Solr</a></li>
+  <li><a href="../usage/load-balancing.html" class="page">Load Balancing</a></li>
+  <li><a href="../usage/solrcloud.html" class="page">Solr Cloud Support</a></li>
+  <li><a href="../usage/retry-policy.html" class="page">Retry Policy</a></li>
+  <li><a href="../usage/request-interception.html" class="page">Request Interception</a></li>
+  <li><a href="../usage/metrics.html" class="page">Metrics</a></li>
+</ul>
+</div>
+
+</nav>
+</div>
+
+<div class="off-canvas-content" data-off-canvas-content>
+
+<header class="site-header expanded row">
+<div class="small-12 column">
+<a href="#" class="off-canvas-toggle hide-for-medium" data-toggle="off-canvas-menu"><svg class="svg-icon svg-icon-menu" version="1.1" id="Menu" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 20 20" enable-background="new 0 0 20 20" xml:space="preserve"> <path class="svg-icon-menu-path" fill="#53CDEC" d="M16.4,9H3.6C3.048,9,3,9.447,3,10c0,0.553,0.048,1,0.6,1H16.4c0.552,0,0.6-0.447,0.6-1C17,9.447,16.952,9,16.4,9z M16.4,13
+H3.6C3.048,13,3,13.447,3,14c0,0.553,0.048,1,0.6,1H16.4c0.552,0,0.6-0.447,0.6-1C17,13.447,16.952,13,16.4,13z M3.6,7H16.4
+C16.952,7,17,6.553,17,6c0-0.553-0.048-1-0.6-1H3.6C3.048,5,3,5.447,3,6C3,6.553,3.048,7,3.6,7z"/></svg>
+</a>
+<div class="title"><a href="../index.html">solrs - async solr client for java/scala</a></div>
+
+<!--
+<a href="https://www.example.com" class="logo show-for-medium">logo</a>
+-->
+</div>
+</header>
+
+<div class="expanded row">
+
+<div class="medium-3 large-2 show-for-medium column">
+<nav class="site-nav">
+<div class="nav-home">
+<a href="../index.html" >
+<span class="home-icon">⌂</span>solrs - async solr client for java/scala
+</a>
+<div class="version-number">
+2.1.0
+</div>
+</div>
+<select class="supergroup" name="Language"><option class="group" value="group-scala">Scala</option><option class="group" value="group-java">Java</option></select>
+<div class="nav-toc">
+<ul>
+  <li><a href="../usage/index.html" class="page">Basic Usage</a></li>
+  <li><a href="../usage/adding-data.html" class="active page">Adding Data to Solr</a></li>
+  <li><a href="../usage/load-balancing.html" class="page">Load Balancing</a></li>
+  <li><a href="../usage/solrcloud.html" class="page">Solr Cloud Support</a></li>
+  <li><a href="../usage/retry-policy.html" class="page">Retry Policy</a></li>
+  <li><a href="../usage/request-interception.html" class="page">Request Interception</a></li>
+  <li><a href="../usage/metrics.html" class="page">Metrics</a></li>
+</ul>
+</div>
+
+</nav>
+</div>
+
+<div class="small-12 medium-9 large-10 column">
+<section class="site-content">
+
+<span id="version-warning"></span>
+
+<div class="page-header row">
+<div class="medium-12 show-for-medium column">
+<div class="nav-breadcrumbs">
+<ul>
+  <li><a href="../index.html">solrs - async solr client for java/scala</a></li>
+  <li>Adding Data to Solr</li>
+</ul>
+</div>
+</div>
+</div>
+
+<div class="page-content row">
+<div class="small-12 large-9 column" id="docs">
+<h2><a href="#adding-data-to-solr" name="adding-data-to-solr" class="anchor"><span class="anchor-link"></span></a>Adding Data to Solr</h2>
+<p>Indexing documents is done as expected:</p>
+<dl>
+  <dt>Java</dt>
+  <dd>
+  <pre class="prettyprint"><code class="language-java">JavaAsyncSolrClient solr = JavaAsyncSolrClient.create(&quot;http://localhost:8983/solr/collection1&quot;);
+
+SolrInputDocument doc1 = new SolrInputDocument();
+doc1.addField(&quot;id&quot;, &quot;id1&quot;);
+doc1.addField(&quot;name&quot;, &quot;doc1&quot;);
+doc1.addField(&quot;cat&quot;, &quot;cat1&quot;);
+doc1.addField(&quot;price&quot;, 10);
+
+SolrInputDocument doc2 = new SolrInputDocument();
+doc2.addField(&quot;id&quot;, &quot;id2&quot;);
+doc2.addField(&quot;name&quot;, &quot;doc2&quot;);
+doc2.addField(&quot;cat&quot;, &quot;cat1&quot;);
+doc2.addField(&quot;price&quot;, 20);
+
+solr.addDocs(asList(doc1, doc2))
+  .thenCompose(r -&gt; solr.commit())
+  .thenAccept(r -&gt; System.out.println(&quot;docs added&quot;));</code></pre><a href="https://github.com/inoio/solrs/tree/master/src/main/paradox/resources/AddingData.java#L36-L52">Full source at GitHub</a></dd>
+  <dt>Scala</dt>
+  <dd>
+  <pre class="prettyprint"><code class="language-scala">val solr = AsyncSolrClient(&quot;http://localhost:8983/solr/collection1&quot;)
+
+val doc1 = new SolrInputDocument()
+doc1.addField(&quot;id&quot;, &quot;id1&quot;)
+doc1.addField(&quot;name&quot;, &quot;doc1&quot;)
+doc1.addField(&quot;cat&quot;, &quot;cat1&quot;)
+doc1.addField(&quot;price&quot;, 10)
+
+val doc2 = new SolrInputDocument()
+doc2.addField(&quot;id&quot;, &quot;id2&quot;)
+doc2.addField(&quot;name&quot;, &quot;doc2&quot;)
+doc2.addField(&quot;cat&quot;, &quot;cat1&quot;)
+doc2.addField(&quot;price&quot;, 20)
+
+for {
+  _ &lt;- solr.addDocs(docs = Iterable(doc1, doc2))
+  _ &lt;- solr.commit()
+} yield print(&quot;docs added&quot;)</code></pre><a href="https://github.com/inoio/solrs/tree/master/src/main/paradox/resources/AddingData.scala#L24-L41">Full source at GitHub</a></dd>
+</dl>
+<p>It&rsquo;s also possible to directly index annotated beans:</p>
+<dl>
+  <dt>Java</dt>
+  <dd>
+  <pre class="prettyprint"><code class="language-java">import org.apache.solr.client.solrj.beans.Field;
+
+class Item {
+	@Field
+	String id;
+
+	@Field
+	String name;
+
+	@Field(&quot;cat&quot;)
+	String category;
+
+	@Field
+	float price;
+
+	TestBean(String id, String name, String category, float price) {
+		this.id = id;
+		this.name = name;
+		this.category = category;
+		this.price = price;
+	}
+}
+
+JavaAsyncSolrClient solr = JavaAsyncSolrClient.create(&quot;http://localhost:8983/solr/collection1&quot;);
+
+Item item1 = new Item(&quot;id1&quot;, &quot;doc1&quot;, &quot;cat1&quot;, 10);
+Item item2 = new Item(&quot;id2&quot;, &quot;doc2&quot;, &quot;cat1&quot;, 20);
+
+solr.addBeans(asList(item1, item2))
+  .thenCompose(r -&gt; solr.commit())
+  .thenAccept(r -&gt; System.out.println(&quot;beans added&quot;));</code></pre><a href="https://github.com/inoio/solrs/tree/master/src/main/paradox/resources/AddingData.java#L4-L63">Full source at GitHub</a></dd>
+  <dt>Scala</dt>
+  <dd>
+  <pre class="prettyprint"><code class="language-scala">import org.apache.solr.client.solrj.beans.Field
+import scala.annotation.meta.field
+
+case class Item(@(Field @field) id: String,
+                @(Field @field) name: String,
+                @(Field @field)(&quot;cat&quot;) category: String,
+                @(Field @field) price: Float) {
+  def this() = this(null, null, null, 0)
+}
+
+val solr = AsyncSolrClient(&quot;http://localhost:8983/solr/collection1&quot;)
+
+val item1 = Item(&quot;id1&quot;, &quot;doc1&quot;, &quot;cat1&quot;, 10)
+val item2 = Item(&quot;id2&quot;, &quot;doc2&quot;, &quot;cat1&quot;, 20)
+
+for {
+  _ &lt;- solr.addBeans(beans = Iterable(item1, item2))
+  _ &lt;- solr.commit()
+} yield print(&quot;beans added&quot;)</code></pre><a href="https://github.com/inoio/solrs/tree/master/src/main/paradox/resources/AddingData.scala#L6-L53">Full source at GitHub</a></dd>
+</dl>
+<div class="source-github">
+The source code for this page can be found <a href="https://github.com/inoio/solrs/tree/master/src/main/paradox/usage/adding-data.md">here</a>.
+</div>
+
+<div class="nav-next">
+<p><strong>Next:</strong> <a href="../usage/load-balancing.html">Load Balancing</a></p>
+</div>
+</div>
+<div class="large-3 show-for-large column" data-sticky-container>
+</div>
+</div>
+
+</section>
+</div>
+
+</div>
+
+<footer class="site-footer">
+
+<section class="site-footer-nav">
+<div class="expanded row">
+<div class="small-12 large-offset-2 large-10 column">
+<div class="row site-footer-content">
+
+<div class="small-12 medium-4 large-3 text-center column">
+<div class="nav-links">
+<ul>
+<!-- <li><a href="https://www.example.com/products/">Products</a> -->
+</ul>
+</div>
+</div>
+
+</div>
+</div>
+</div>
+</section>
+
+<section class="site-footer-base">
+<div class="expanded row">
+<div class="small-12 large-offset-2 large-10 column">
+<div class="row site-footer-content">
+
+<div class="small-12 text-center large-9 column">
+
+<!--
+<div class="copyright">
+<span class="text">&copy; 2018</span>
+<a href="https://www.example.com" class="logo">logo</a>
+</div>
+-->
+</div>
+
+</div>
+</div>
+</div>
+</section>
+</footer>
+
+</div>
+</div>
+</div>
+</body>
+
+<script type="text/javascript" src="../lib/foundation/dist/foundation.min.js"></script>
+<script type="text/javascript">jQuery(document).foundation();</script>
+<script type="text/javascript" src="../js/magellan.js"></script>
+
+<style type="text/css">@import "../lib/prettify/prettify.css";</style>
+<script type="text/javascript" src="../lib/prettify/prettify.js"></script>
+<script type="text/javascript" src="../lib/prettify/lang-scala.js"></script>
+<script type="text/javascript">jQuery(function(){window.prettyPrint && prettyPrint()});</script>
+<script type="text/javascript">jQuery(function(jq){initOldVersionWarnings(jq, '2.1.0', '')});</script>
+
+
+</html>

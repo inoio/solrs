@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+
+<head>
+<title>Load Balancing · solrs - async solr client for java/scala</title>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="description" content='A solr client for scala, providing a query interface like SolrJ, just asynchronously / non-blocking'/>
+<link href="https://fonts.googleapis.com/css?family=Roboto:100normal,100italic,300normal,300italic,400normal,400italic,500normal,500italic,700normal,700italic,900normal,900italicc" rel="stylesheet" type="text/css"/>
+<script type="text/javascript" src="../lib/jquery/jquery.min.js"></script>
+<script type="text/javascript" src="../js/page.js"></script>
+<script type="text/javascript" src="../js/warnOldVersion.js"></script>
+<script type="text/javascript" src="../js/groups.js"></script>
+<link rel="stylesheet" type="text/css" href="../lib/normalize.css/normalize.css"/>
+<link rel="stylesheet" type="text/css" href="../lib/foundation/dist/foundation.min.css"/>
+<link rel="stylesheet" type="text/css" href="../css/page.css"/>
+
+<!--
+<link rel="shortcut icon" href="../images/favicon.ico" />
+-->
+</head>
+
+<body>
+<div class="off-canvas-wrapper">
+<div class="off-canvas-wrapper-inner" data-off-canvas-wrapper>
+
+<div class="off-canvas position-left" id="off-canvas-menu" data-off-canvas>
+<nav class="off-canvas-nav">
+<div class="nav-home">
+<a href="../index.html" >
+<span class="home-icon">⌂</span>solrs - async solr client for java/scala
+</a>
+<div class="version-number">
+2.1.0
+</div>
+</div>
+<select class="supergroup" name="Language"><option class="group" value="group-scala">Scala</option><option class="group" value="group-java">Java</option></select>
+<div class="nav-toc">
+<ul>
+  <li><a href="../usage/index.html" class="page">Basic Usage</a></li>
+  <li><a href="../usage/adding-data.html" class="page">Adding Data to Solr</a></li>
+  <li><a href="../usage/load-balancing.html" class="active page">Load Balancing</a></li>
+  <li><a href="../usage/solrcloud.html" class="page">Solr Cloud Support</a></li>
+  <li><a href="../usage/retry-policy.html" class="page">Retry Policy</a></li>
+  <li><a href="../usage/request-interception.html" class="page">Request Interception</a></li>
+  <li><a href="../usage/metrics.html" class="page">Metrics</a></li>
+</ul>
+</div>
+
+</nav>
+</div>
+
+<div class="off-canvas-content" data-off-canvas-content>
+
+<header class="site-header expanded row">
+<div class="small-12 column">
+<a href="#" class="off-canvas-toggle hide-for-medium" data-toggle="off-canvas-menu"><svg class="svg-icon svg-icon-menu" version="1.1" id="Menu" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 20 20" enable-background="new 0 0 20 20" xml:space="preserve"> <path class="svg-icon-menu-path" fill="#53CDEC" d="M16.4,9H3.6C3.048,9,3,9.447,3,10c0,0.553,0.048,1,0.6,1H16.4c0.552,0,0.6-0.447,0.6-1C17,9.447,16.952,9,16.4,9z M16.4,13
+H3.6C3.048,13,3,13.447,3,14c0,0.553,0.048,1,0.6,1H16.4c0.552,0,0.6-0.447,0.6-1C17,13.447,16.952,13,16.4,13z M3.6,7H16.4
+C16.952,7,17,6.553,17,6c0-0.553-0.048-1-0.6-1H3.6C3.048,5,3,5.447,3,6C3,6.553,3.048,7,3.6,7z"/></svg>
+</a>
+<div class="title"><a href="../index.html">solrs - async solr client for java/scala</a></div>
+
+<!--
+<a href="https://www.example.com" class="logo show-for-medium">logo</a>
+-->
+</div>
+</header>
+
+<div class="expanded row">
+
+<div class="medium-3 large-2 show-for-medium column">
+<nav class="site-nav">
+<div class="nav-home">
+<a href="../index.html" >
+<span class="home-icon">⌂</span>solrs - async solr client for java/scala
+</a>
+<div class="version-number">
+2.1.0
+</div>
+</div>
+<select class="supergroup" name="Language"><option class="group" value="group-scala">Scala</option><option class="group" value="group-java">Java</option></select>
+<div class="nav-toc">
+<ul>
+  <li><a href="../usage/index.html" class="page">Basic Usage</a></li>
+  <li><a href="../usage/adding-data.html" class="page">Adding Data to Solr</a></li>
+  <li><a href="../usage/load-balancing.html" class="active page">Load Balancing</a></li>
+  <li><a href="../usage/solrcloud.html" class="page">Solr Cloud Support</a></li>
+  <li><a href="../usage/retry-policy.html" class="page">Retry Policy</a></li>
+  <li><a href="../usage/request-interception.html" class="page">Request Interception</a></li>
+  <li><a href="../usage/metrics.html" class="page">Metrics</a></li>
+</ul>
+</div>
+
+</nav>
+</div>
+
+<div class="small-12 medium-9 large-10 column">
+<section class="site-content">
+
+<span id="version-warning"></span>
+
+<div class="page-header row">
+<div class="medium-12 show-for-medium column">
+<div class="nav-breadcrumbs">
+<ul>
+  <li><a href="../index.html">solrs - async solr client for java/scala</a></li>
+  <li>Load Balancing</li>
+</ul>
+</div>
+</div>
+</div>
+
+<div class="page-content row">
+<div class="small-12 large-9 column" id="docs">
+<h2><a href="#load-balancing" name="load-balancing" class="anchor"><span class="anchor-link"></span></a>Load Balancing</h2>
+<p>Solrs supports load balancing of queries over multiple solr servers. There are 2 load balancers provided out of the box, a simple round robin LB and statistics based LB that selects the &ldquo;fastest&rdquo; server. If none of them is suitable for you, of course you can write your own load balancer by implementing <code>io.ino.solrs.LoadBalancer</code>.</p>
+<h3><a href="#round-robin-load-balancer" name="round-robin-load-balancer" class="anchor"><span class="anchor-link"></span></a>Round Robin Load Balancer</h3>
+<p>The <code>RoundRobinLB</code> is a simple round robin load balancer. It load balances over a given list of solr server urls (if statically known), alternatively you can provide a <code>SolrServers</code> instance, which allows runtime resolution of solr server urls, e.g. by reading them from ZooKeeper (see <a href="solrcloud.html">Solr Cloud Support</a> for more details).</p>
+<p>To run solrs with a <code>RoundRobinLB</code> you have to pass it to the <code>Builder</code></p>
+<dl>
+  <dt>Java</dt>
+  <dd>
+  <pre class="prettyprint"><code class="language-java">RoundRobinLB lb = RoundRobinLB.create(asList(
+  &quot;http://localhost:8983/solr/collection1&quot;,
+  &quot;http://localhost:8984/solr/collection1&quot;
+));
+JavaAsyncSolrClient solr = JavaAsyncSolrClient.builder(lb).build();</code></pre><a href="https://github.com/inoio/solrs/tree/master/src/main/paradox/resources/LoadBalancing.java#L12-L16">Full source at GitHub</a></dd>
+  <dt>Scala</dt>
+  <dd>
+  <pre class="prettyprint"><code class="language-scala">val lb = RoundRobinLB(IndexedSeq(
+  &quot;http://localhost:8983/solr/collection1&quot;,
+  &quot;http://localhost:8984/solr/collection1&quot;
+))
+val solr = AsyncSolrClient.Builder(lb).build</code></pre><a href="https://github.com/inoio/solrs/tree/master/src/main/paradox/resources/LoadBalancing.scala#L11-L15">Full source at GitHub</a></dd>
+</dl>
+<h3><a href="#fastest-server-load-balancer" name="fastest-server-load-balancer" class="anchor"><span class="anchor-link"></span></a>Fastest Server Load Balancer</h3>
+<p>The <code>FastestServerLB</code> is a statistics based load balancer that classifies servers as &ldquo;fast&rdquo; and &ldquo;slow&rdquo; servers (based on their latest average response time) and selects one of the &ldquo;fast&rdquo; servers (round robin) when asked for one. This is useful e.g. when some solr server is currently performing major GC, or when for some nodes network latency is increased (temporary or permanent).</p>
+<p>The latest average response time is determined in the following order (the first found measure is used):</p>
+<ol>
+  <li>currently still running requests (if they&rsquo;re lasting longer than previous, already completed requests)</li>
+  <li>average response time of the current or the previous second</li>
+  <li>average response time of the last ten seconds</li>
+  <li>total average resonse time</li>
+</ol>
+<p>The response time is measured using a configured test query (per collection). A dedicated test query is used, because user queries can have very different performance characteristics, so that most often it would even be hard for an application to classify them. With the dedicated test query you can control what is used to measure response time.</p>
+<p>Servers are considered &ldquo;fast&rdquo; when the response time is &lt;= the average response time of all servers. This is the default, you can also override this (by specifying a <code>filterFastServers</code> function).</p>
+<p>Because nobody likes log spamming and burning CPU time while everybody else is sleeping, the test query is not executed with a fixed rate.<br/> For &ldquo;fast&rdquo; servers test queries are run whenever a request comes in, with a lower bound of <code>minDelay</code> (default: 100 millis). With high traffic this leads to high resolution statistics so that e.g. sub-second GC pauses should be detected.<br/> For &ldquo;slow&rdquo; servers (response time &gt; average) tests are run with a fixed <code>maxDelay</code> (default: 10 seconds), this is also the case for &ldquo;fast&rdquo; servers when there are no users queries in the meantime.</p>
+<p>To have initial stats, after the <code>FastestServerLB</code> was created it runs the test queries several times (default: 10). This can be overridden with <code>initialTestRuns</code>.</p><div class="callout note "><div class="callout-title">Hint</div>
+<p><code>FastestServerLB</code> also exports stats via JMX (under object name <code>io.ino.solrs:type=FastestServerLB</code>), in case you&rsquo;re interested in this.</p></div>
+<p>Here&rsquo;s a code sample of the <code>FastestServerLB</code>:</p>
+<dl>
+  <dt>Java</dt>
+  <dd>
+  <pre class="prettyprint"><code class="language-java">import io.ino.solrs.*;
+import static java.util.Arrays.asList;
+import scala.Tuple2;
+import static java.util.concurrent.TimeUnit.*;
+
+StaticSolrServers servers = StaticSolrServers.create(Arrays.asList(
+  &quot;http://localhost:8983/solr/collection1&quot;,
+  &quot;http://localhost:8984/solr/collection1&quot;
+));
+Tuple2&lt;String, SolrQuery&gt; col1TestQuery = new Tuple2&lt;&gt;(&quot;collection1&quot;, new SolrQuery(&quot;*:*&quot;).setRows(0));
+Function&lt;SolrServer, Tuple2&lt;String, SolrQuery&gt;&gt; collectionAndTestQuery = server -&gt; col1TestQuery;
+FastestServerLB&lt;?&gt; lb = FastestServerLB.builder(servers, collectionAndTestQuery)
+        .withMinDelay(50, MILLISECONDS)
+        .withMaxDelay(5, SECONDS)
+        .withInitialTestRuns(50)
+        .build();
+JavaAsyncSolrClient solr = JavaAsyncSolrClient.builder(lb).build();</code></pre><a href="https://github.com/inoio/solrs/tree/master/src/main/paradox/resources/LoadBalancing.java#L2-L31">Full source at GitHub</a></dd>
+  <dt>Scala</dt>
+  <dd>
+  <pre class="prettyprint"><code class="language-scala">import io.ino.solrs._
+import io.ino.solrs.future.ScalaFutureFactory.Implicit
+import scala.concurrent.duration._
+
+val lb = {
+  val servers = StaticSolrServers(IndexedSeq(
+    &quot;http://localhost:8983/solr/collection1&quot;,
+    &quot;http://localhost:8984/solr/collection1&quot;
+  ))
+  val col1TestQuery = &quot;collection1&quot; -&gt; new SolrQuery(&quot;*:*&quot;).setRows(0)
+  def collectionAndTestQuery(server: SolrServer) = col1TestQuery
+  new FastestServerLB(servers, collectionAndTestQuery, minDelay = 50 millis, maxDelay = 5 seconds, initialTestRuns = 50)
+}
+val solr = AsyncSolrClient.Builder(lb).build</code></pre><a href="https://github.com/inoio/solrs/tree/master/src/main/paradox/resources/LoadBalancing.scala#L2-L28">Full source at GitHub</a></dd>
+</dl>
+<div class="source-github">
+The source code for this page can be found <a href="https://github.com/inoio/solrs/tree/master/src/main/paradox/usage/load-balancing.md">here</a>.
+</div>
+
+<div class="nav-next">
+<p><strong>Next:</strong> <a href="../usage/solrcloud.html">Solr Cloud Support</a></p>
+</div>
+</div>
+<div class="large-3 show-for-large column" data-sticky-container>
+<nav class="sidebar sticky" data-sticky data-anchor="docs" data-sticky-on="large">
+<div class="page-nav">
+<div class="nav-title">On this page:</div>
+<div class="nav-toc">
+<ul>
+  <li><a href="../usage/load-balancing.html#load-balancing" class="header">Load Balancing</a>
+  <ul>
+    <li><a href="../usage/load-balancing.html#round-robin-load-balancer" class="header">Round Robin Load Balancer</a></li>
+    <li><a href="../usage/load-balancing.html#fastest-server-load-balancer" class="header">Fastest Server Load Balancer</a></li>
+  </ul></li>
+</ul>
+</div>
+</div>
+</nav>
+</div>
+</div>
+
+</section>
+</div>
+
+</div>
+
+<footer class="site-footer">
+
+<section class="site-footer-nav">
+<div class="expanded row">
+<div class="small-12 large-offset-2 large-10 column">
+<div class="row site-footer-content">
+
+<div class="small-12 medium-4 large-3 text-center column">
+<div class="nav-links">
+<ul>
+<!-- <li><a href="https://www.example.com/products/">Products</a> -->
+</ul>
+</div>
+</div>
+
+</div>
+</div>
+</div>
+</section>
+
+<section class="site-footer-base">
+<div class="expanded row">
+<div class="small-12 large-offset-2 large-10 column">
+<div class="row site-footer-content">
+
+<div class="small-12 text-center large-9 column">
+
+<!--
+<div class="copyright">
+<span class="text">&copy; 2018</span>
+<a href="https://www.example.com" class="logo">logo</a>
+</div>
+-->
+</div>
+
+</div>
+</div>
+</div>
+</section>
+</footer>
+
+</div>
+</div>
+</div>
+</body>
+
+<script type="text/javascript" src="../lib/foundation/dist/foundation.min.js"></script>
+<script type="text/javascript">jQuery(document).foundation();</script>
+<script type="text/javascript" src="../js/magellan.js"></script>
+
+<style type="text/css">@import "../lib/prettify/prettify.css";</style>
+<script type="text/javascript" src="../lib/prettify/prettify.js"></script>
+<script type="text/javascript" src="../lib/prettify/lang-scala.js"></script>
+<script type="text/javascript">jQuery(function(){window.prettyPrint && prettyPrint()});</script>
+<script type="text/javascript">jQuery(function(jq){initOldVersionWarnings(jq, '2.1.0', '')});</script>
+
+
+</html>

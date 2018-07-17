@@ -600,7 +600,7 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
   private[solrs] def doExecute[T <: SolrResponse : SolrResponseFactory](solrServer: SolrServer, r: SolrRequest[_ <: T]): Future[T] = {
 
     val wparams = new ModifiableSolrParams(r.getParams)
-    if (responseParser != null) {
+    if (responseParser != null && r.getResponseParser == null) {
       wparams.set(CommonParams.WT, responseParser.getWriterType)
       wparams.set(CommonParams.VERSION, responseParser.getVersion)
     }
@@ -677,14 +677,14 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
   protected def toSolrResponse[T <: SolrResponse : SolrResponseFactory](r: SolrRequest[_ <: T], response: Response, url: String, startTime: Long)(implicit server: SolrServer): T = {
     var rsp: NamedList[Object] = null
 
-    withResponseParser(r)(validateResponse(response, _))
+    withResponseParserFromRequest(r)(validateResponse(response, _))
 
     val httpStatus = response.getStatusCode
 
     try {
       val charset = getContentCharSet(response.getContentType).orNull
 
-      rsp = withResponseParser(r)(_.processResponse(response.getResponseBodyAsStream, charset))
+      rsp = withResponseParserFromRequest(r)(_.processResponse(response.getResponseBodyAsStream, charset))
 
     } catch {
       case NonFatal(e) =>
@@ -707,7 +707,7 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
   }
 
 
-  private def withResponseParser[T <: SolrResponse, R](r: SolrRequest[_ <: T])(f:ResponseParser => R): R = {
+  private def withResponseParserFromRequest[T <: SolrResponse, R](r: SolrRequest[_ <: T])(f:ResponseParser => R): R = {
     f(Option(r.getResponseParser).getOrElse(responseParser))
   }
 

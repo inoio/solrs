@@ -116,7 +116,7 @@ class AsyncSolrClientIntegrationSpec extends StandardFunSpec with RunningSolr {
 
     it("should allow to override the response parser per request") {
 
-      val solr = AsyncSolrClient.Builder(solrUrl).withResponseParser(new XMLResponseParser()).build
+      val solr = AsyncSolrClient.Builder(solrUrl).build
 
       val request = new GenericSolrRequest(
       SolrRequest.METHOD.POST,

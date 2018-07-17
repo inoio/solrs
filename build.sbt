@@ -8,6 +8,8 @@ organization := "io.ino"
 
 version := "2.1.0"
 
+scmInfo := Some(ScmInfo(url("https://github.com/inoio/solrs"), "git@github.com:inoio/solrs.git"))
+
 licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.html"))
 
 scalaVersion := "2.11.12"
@@ -61,6 +63,21 @@ libraryDependencies ++= Seq(
 
 // Fork tests so that SolrRunner's shutdown hook kicks in
 fork in Test := true
+
+enablePlugins(ParadoxPlugin)
+paradoxTheme := Some(builtinParadoxTheme("generic"))
+paradoxGroups := Map("Language" -> Seq("Scala", "Java"))
+
+/*
+// paradoxGroups switcher not aligned: https://github.com/jonas/paradox-material-theme/issues/11
+enablePlugins(ParadoxMaterialThemePlugin)
+paradoxMaterialTheme in Compile := {
+  ParadoxMaterialTheme()
+    .withoutSearch()
+    .withColor("indigo", "orange")
+    .withRepository(uri("https://github.com/inoio/solrs"))
+}
+*/
 
 // Publish settings
 publishTo in ThisBuild := {

@@ -1,0 +1,44 @@
+@@@ index
+
+* [Basic Usage](usage/index.md)
+* [Adding Data](usage/adding-data.md)
+* [Load Balancing](usage/load-balancing.md)
+* [SolrCloud Support](usage/solrcloud.md)
+* [Retry Policy](usage/retry-policy.md)
+* [Request Interception](usage/request-interception.md)
+* [Metrics](usage/metrics.md)
+
+@@@
+
+# solrs - async solr client for java/scala
+
+This is a java/scala solr client providing an interface like SolrJ, just asynchronously / non-blocking
+(built on top of [async-http-client](https://github.com/AsyncHttpClient/async-http-client) / [netty](https://github.com/netty/netty)).
+
+The github repo is [inoio/solrs](https://github.com/inoio/solrs), for questions please [join the chat](https://gitter.im/inoio/solrs).
+
+## Key Features
+
+* Async, non-blocking API to Solr on the JVM: supports `CompletableFuture` for Java, for Scala you can choose between Twitter's `Future` or the standard/SDK `Future`.
+* SolrCloud support
+* Optimized request routing (e.g. updates go to leaders, `_route_` param is respected, `replica.type` is supported for `shards.preference` param)
+* Pluggable load balancing strategies, comes with a performance/statistics based load balancer
+* Support for retry policies in case of failures
+
+## Installation
+
+Each solrs version is compatible with a certain Solr version. For Solr 7.2.x use solrs 2.1.0, for Solr 6.x use solrs 2.0.0.
+
+You must add the library to the dependencies of the build file:
+    
+@@dependency[sbt,Maven,Gradle] {
+  group="io.ino"
+  artifact="solrs_2.11"
+  version="$project.version$"
+}
+
+solrs is published to maven central for both scala 2.11 and 2.12.
+
+## License
+
+The license is Apache 2.0, see LICENSE.txt.

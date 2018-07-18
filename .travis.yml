@@ -2,7 +2,7 @@ language: scala
 
 scala:
    - 2.11.12
-   - 2.12.6
+   - 2.12.6 # remember to update/check the deploy condition below!
 
 jdk:
    - oraclejdk8
@@ -12,10 +12,29 @@ before_install:
    - ulimit -t 166384
    # get the actually set values
    - ulimit -a
+   # Record minimal build information via the Git user ident
+   - git config --global user.name "$USER"
+   - git config --global user.email "$TRAVIS_BUILD_NUMBER@$TRAVIS_COMMIT"
+   # decrypt ssh-key for deploying the site (see https://www.scala-sbt.org/sbt-site/publishing.html)
+   - openssl aes-256-cbc -K $encrypted_1f2617a5d8c8_key -iv $encrypted_1f2617a5d8c8_iv -in project/travis-deploy-key.enc -out project/travis-deploy-key -d
+   - chmod 600 project/travis-deploy-key
+   # Start ssh-agent in the background and load the deploy key
+   - eval "$(ssh-agent -s)"
+   - ssh-add project/travis-deploy-key
+
+# site publishing (see https://www.scala-sbt.org/sbt-site/publishing.html)
+deploy:
+  provider: script
+  script: sbt ghpagesPushSite
+  skip_cleanup: true
+  on:
+    branch: master
+    condition: $TRAVIS_PULL_REQUEST = false && $TRAVIS_SCALA_VERSION = 2.12*
 
 cache:
   directories:
     - $HOME/.sbt
+    - $HOME/.ivy2
     - $HOME/.coursier
 
 # use container 

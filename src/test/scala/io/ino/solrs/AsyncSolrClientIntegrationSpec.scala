@@ -7,8 +7,8 @@ import org.asynchttpclient.DefaultAsyncHttpClient
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.SolrRequest
 import org.apache.solr.client.solrj.SolrResponse
-import org.apache.solr.client.solrj.impl.XMLResponseParser
-import org.apache.solr.client.solrj.request.QueryRequest
+import org.apache.solr.client.solrj.impl.{NoOpResponseParser, XMLResponseParser}
+import org.apache.solr.client.solrj.request.{GenericSolrRequest, QueryRequest}
 import org.apache.solr.client.solrj.response.QueryResponse
 import org.mockito.Matchers._
 import org.mockito.Mockito.verify
@@ -22,6 +22,8 @@ import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.language.postfixOps
+import scala.xml.XML
 
 class AsyncSolrClientIntegrationSpec extends StandardFunSpec with RunningSolr {
 
@@ -108,6 +110,26 @@ class AsyncSolrClientIntegrationSpec extends StandardFunSpec with RunningSolr {
       val response = solr.query(new SolrQuery("cat:cat1"))
 
       await(response).getResults.getNumFound should be (2)
+
+      solr.shutdown()
+    }
+
+    it("should allow to override the response parser per request") {
+
+      val solr = AsyncSolrClient.Builder(solrUrl).build
+
+      val request = new GenericSolrRequest(
+      SolrRequest.METHOD.POST,
+      null,
+        new SolrQuery("cat:cat1").add("wt", "xml")
+      )
+      request.setResponseParser(new NoOpResponseParser)
+
+      val response = solr.execute(request)
+
+      var xml = XML.loadString(await(response).getResponse.get("response").toString)
+
+      (xml \ "result" \ "@numFound").text.toInt should be (2)
 
       solr.shutdown()
     }

@@ -104,10 +104,6 @@ publishArtifact in (Test, packageBin) := true
 pomIncludeRepository := { _ => false }
 
 pomExtra := (
-  <scm>
-    <url>git@github.com:inoio/solrs.git</url>
-    <connection>scm:git:git@github.com:inoio/solrs.git</connection>
-  </scm>
   <developers>
     <developer>
       <id>martin.grotzke</id>

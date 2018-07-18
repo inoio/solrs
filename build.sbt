@@ -64,6 +64,12 @@ libraryDependencies ++= Seq(
 // Fork tests so that SolrRunner's shutdown hook kicks in
 fork in Test := true
 
+enablePlugins(ParadoxSitePlugin)
+sourceDirectory in Paradox := sourceDirectory.value / "main" / "paradox"
+
+enablePlugins(GhpagesPlugin)
+git.remoteRepo := scmInfo.value.get.connection
+
 enablePlugins(ParadoxPlugin)
 paradoxTheme := Some(builtinParadoxTheme("generic"))
 paradoxGroups := Map("Language" -> Seq("Scala", "Java"))

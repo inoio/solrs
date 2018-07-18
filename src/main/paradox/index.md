@@ -41,4 +41,4 @@ solrs is published to maven central for both scala 2.11 and 2.12.
 
 ## License
 
-The license is Apache 2.0, see LICENSE.txt.
+This software is licensed under the Apache 2 license

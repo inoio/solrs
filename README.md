@@ -6,7 +6,14 @@
 
 This is a java/scala solr client providing an interface like SolrJ, just asynchronously / non-blocking
 (built on top of [async-http-client](https://github.com/AsyncHttpClient/async-http-client) / [netty](https://github.com/netty/netty)).
-For java it supports `CompletableFuture`, for scala you can choose between twitter's `Future` or the standard/SDK `Future`.
+
+## Key Features
+
+* Async, non-blocking API to Solr on the JVM: supports `CompletableFuture` for Java, for Scala you can choose between Twitter's `Future` or the standard/SDK `Future`.
+* SolrCloud support
+* Optimized request routing (e.g. updates go to leaders, `_route_` param is respected, `replica.type` is supported for `shards.preference` param)
+* Pluggable load balancing strategies, comes with a performance/statistics based load balancer
+* Support for retry policies in case of failures
 
 ## Documentation
 

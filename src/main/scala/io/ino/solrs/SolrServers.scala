@@ -271,9 +271,9 @@ class CloudSolrServers[F[_]](zkHost: String,
    */
   override def matching(r: SolrRequest[_]): Try[IndexedSeq[SolrServer]] = {
     val params = r.getParams
-    val collection = Option(params.get("collection")).orElse(defaultCollection).getOrElse(
-      throw new SolrServerException("No collection param specified on request and no default collection has been set.")
-    )
+    val collection =
+      Option(params).flatMap(p => Option(params.get("collection"))).orElse(defaultCollection).getOrElse(
+        throw new SolrServerException("No collection param specified on request and no default collection has been set."))
     // - resolveAliases returns the input if no alias exists
     // - update requests shall only be directed to a single collection (the first of multiple alias target collections, as done by CloudSolrClient)
     // - for read requests we also only consider the first alias target, to keep things simple, and solr server
@@ -281,7 +281,7 @@ class CloudSolrServers[F[_]](zkHost: String,
     val resolvedCollection = aliases.map(_.resolveAliases(collection).get(0)).getOrElse(collection)
     collections.get(resolvedCollection) match {
       case Some(CollectionInfo(docCollection, servers)) =>
-        val shardKeys = params.get(ShardParams._ROUTE_)
+        val shardKeys = Option(params).flatMap(p => Option(params.get(ShardParams._ROUTE_))).orNull
         val slices = docCollection.getRouter.getSearchSlices(shardKeys, params, docCollection)
         val serverUrls: Set[String] = mapSliceReplicas(slices)(repl =>
           SolrServer.fixUrl(repl.getCoreUrl)

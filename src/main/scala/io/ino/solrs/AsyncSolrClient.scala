@@ -34,6 +34,7 @@ import org.apache.solr.client.solrj.SolrRequest.METHOD.POST
 import org.apache.solr.client.solrj.SolrResponse
 import org.apache.solr.client.solrj.SolrServerException
 import org.apache.solr.client.solrj.StreamingResponseCallback
+import org.apache.solr.client.solrj.request.CollectionAdminRequest.AsyncCollectionAdminRequest
 import org.apache.solr.common.SolrDocument
 import org.apache.solr.common.SolrDocumentList
 import org.apache.solr.common.SolrException
@@ -597,6 +598,13 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
     ).getOrElse(monitoredRequest(solrServer, r))
   }
 
+  private def baseUrl(solrServer: SolrServer, request: SolrRequest[_ <: SolrResponse]) = {
+    request match {
+      case _: AsyncCollectionAdminRequest => solrServer.adminBaseUrl
+      case _ => solrServer.baseUrl
+    }
+  }
+
   private[solrs] def doExecute[T <: SolrResponse : SolrResponseFactory](solrServer: SolrServer, r: SolrRequest[_ <: T]): Future[T] = {
 
     val wparams = new ModifiableSolrParams(r.getParams)
@@ -610,7 +618,7 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
     val promise = futureFactory.newPromise[T]
     val startTime = System.currentTimeMillis()
 
-    val url = solrServer.baseUrl + getPath(r)
+    val url = baseUrl(solrServer, r) + getPath(r)
 
     // the new Solr7 ContentWriter interface
     val maybeContentWriter = Option(requestWriter.getContentWriter(r))

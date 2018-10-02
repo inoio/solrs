@@ -1,6 +1,6 @@
 package io.ino.solrs
 
-import org.apache.solr.client.solrj.request.{QueryRequest, SolrPing, UpdateRequest}
+import org.apache.solr.client.solrj.request.{CollectionAdminRequest, QueryRequest, SolrPing, UpdateRequest}
 import org.apache.solr.client.solrj.response._
 import org.apache.solr.client.solrj.{SolrRequest, SolrResponse}
 
@@ -36,6 +36,7 @@ object SolrResponseFactory {
       case r: QueryRequest => SolrResponseFactory[QueryResponse].createResponse(r)
       case r: UpdateRequest => SolrResponseFactory[UpdateResponse].createResponse(r)
       case r: SolrPing => SolrResponseFactory[SolrPingResponse].createResponse(r)
+      case r: CollectionAdminRequest.Create => SolrResponseFactory[CollectionAdminResponse].createResponse(r)
     }
 }
 

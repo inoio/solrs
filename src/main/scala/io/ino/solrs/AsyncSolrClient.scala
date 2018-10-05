@@ -18,13 +18,8 @@ import org.apache.solr.client.solrj.impl.BinaryResponseParser
 import org.apache.solr.client.solrj.impl.StreamingBinaryResponseParser
 import org.apache.solr.client.solrj.request.AbstractUpdateRequest.ACTION.COMMIT
 import org.apache.solr.client.solrj.request.AbstractUpdateRequest.ACTION.OPTIMIZE
-import org.apache.solr.client.solrj.request.QueryRequest
-import org.apache.solr.client.solrj.request.RequestWriter
-import org.apache.solr.client.solrj.request.SolrPing
-import org.apache.solr.client.solrj.request.UpdateRequest
-import org.apache.solr.client.solrj.response.QueryResponse
-import org.apache.solr.client.solrj.response.SolrPingResponse
-import org.apache.solr.client.solrj.response.UpdateResponse
+import org.apache.solr.client.solrj.request._
+import org.apache.solr.client.solrj.response.{CollectionAdminResponse, QueryResponse, SolrPingResponse, UpdateResponse}
 import org.apache.solr.client.solrj.ResponseParser
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.SolrRequest
@@ -601,6 +596,7 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
   private def baseUrl(solrServer: SolrServer, request: SolrRequest[_ <: SolrResponse]) = {
     request match {
       case _: AsyncCollectionAdminRequest => solrServer.adminBaseUrl
+      case _:  CollectionAdminRequest[CollectionAdminResponse] => solrServer.adminBaseUrl
       case _ => solrServer.baseUrl
     }
   }

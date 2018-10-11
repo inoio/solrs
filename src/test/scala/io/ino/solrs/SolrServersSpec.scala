@@ -1,11 +1,12 @@
 package io.ino.solrs
 
-import org.apache.solr.client.solrj.SolrQuery
-import org.apache.solr.client.solrj.request.QueryRequest
+import org.apache.solr.client.solrj.{SolrQuery, SolrRequest}
+import org.apache.solr.client.solrj.request.{CollectionAdminRequest, GenericSolrRequest, QueryRequest}
 import org.scalatest.{FunSpec, Matchers}
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.util.Success
 
 class SolrServersSpec extends FunSpec with Matchers with FutureAwaits {
 
@@ -20,6 +21,17 @@ class SolrServersSpec extends FunSpec with Matchers with FutureAwaits {
       val found = cut.matching(q).get
 
       found should contain theSameElementsAs solrServers
+    }
+
+    it("should deliver base url for admin requests") {
+      val solrServers = IndexedSeq(SolrServer("http://solr1:8983/solr/testCollection1"), SolrServer("http://solr2:8983/solr/testCollection2"))
+      val staticServerSpec = new StaticSolrServers(solrServers)
+
+      val queryRequest = new GenericSolrRequest(SolrRequest.METHOD.POST, "sampleUrl", new SolrQuery())
+      val adminRequest = CollectionAdminRequest.createAlias("sampleAlias", "sampleCollection")
+
+      staticServerSpec.matching(queryRequest) shouldBe Success(solrServers)
+      staticServerSpec.matching(adminRequest) shouldBe Success(IndexedSeq(SolrServer("http://solr1:8983/solr"), SolrServer("http://solr2:8983/solr")))
     }
   }
 
@@ -49,5 +61,30 @@ class SolrServersSpec extends FunSpec with Matchers with FutureAwaits {
       cut.matching(q).get should contain theSameElementsAs Seq(SolrServer("host1"), SolrServer("host2"))
 
     }
+
+    it("should deliver base url for admin requests") {
+      val solrServers = IndexedSeq(SolrServer("http://solr1:8983/solr/testCollection1"), SolrServer("http://solr2:8983/solr/testCollection2"))
+
+      def parse(data: Array[Byte]): IndexedSeq[SolrServer] = {
+        new String(data).split(",").map(SolrServer(_))
+      }
+
+      val reloadingServers =
+        new ReloadingSolrServers[Future]("http://some.url", parse, null) {
+          override def loadUrl() = {
+            val promise = io.ino.solrs.future.ScalaFutureFactory.newPromise[Array[Byte]]
+            promise.success("http://solr1:8983/solr/testCollection1,http://solr2:8983/solr/testCollection2".getBytes)
+            promise.future
+          }
+      }
+      await(reloadingServers.reload())
+
+      val queryRequest = new GenericSolrRequest(SolrRequest.METHOD.POST, "sampleUrl", new SolrQuery())
+      val adminRequest = CollectionAdminRequest.createAlias("sampleAlias", "sampleCollection")
+
+      reloadingServers.matching(queryRequest).get.toIndexedSeq shouldBe solrServers
+      reloadingServers.matching(adminRequest).get.toIndexedSeq shouldBe IndexedSeq(SolrServer("http://solr1:8983/solr"), SolrServer("http://solr2:8983/solr"))
+    }
+
   }
 }

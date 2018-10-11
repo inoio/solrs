@@ -18,8 +18,13 @@ import org.apache.solr.client.solrj.impl.BinaryResponseParser
 import org.apache.solr.client.solrj.impl.StreamingBinaryResponseParser
 import org.apache.solr.client.solrj.request.AbstractUpdateRequest.ACTION.COMMIT
 import org.apache.solr.client.solrj.request.AbstractUpdateRequest.ACTION.OPTIMIZE
-import org.apache.solr.client.solrj.request._
-import org.apache.solr.client.solrj.response.{CollectionAdminResponse, QueryResponse, SolrPingResponse, UpdateResponse}
+import org.apache.solr.client.solrj.request.QueryRequest
+import org.apache.solr.client.solrj.request.RequestWriter
+import org.apache.solr.client.solrj.request.SolrPing
+import org.apache.solr.client.solrj.request.UpdateRequest
+import org.apache.solr.client.solrj.response.QueryResponse
+import org.apache.solr.client.solrj.response.SolrPingResponse
+import org.apache.solr.client.solrj.response.UpdateResponse
 import org.apache.solr.client.solrj.ResponseParser
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.SolrRequest
@@ -29,7 +34,6 @@ import org.apache.solr.client.solrj.SolrRequest.METHOD.POST
 import org.apache.solr.client.solrj.SolrResponse
 import org.apache.solr.client.solrj.SolrServerException
 import org.apache.solr.client.solrj.StreamingResponseCallback
-import org.apache.solr.client.solrj.request.CollectionAdminRequest.AsyncCollectionAdminRequest
 import org.apache.solr.common.SolrDocument
 import org.apache.solr.common.SolrDocumentList
 import org.apache.solr.common.SolrException
@@ -205,8 +209,8 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
   private val DEFAULT_PATH = "/select"
 
   /**
-   * User-Agent String.
-   */
+    * User-Agent String.
+    */
   private val agent = "Solr[" + classOf[AsyncSolrClient[F]].getName + "] 1.0"
 
   private val logger = LoggerFactory.getLogger(getClass)
@@ -247,8 +251,8 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
   }
 
   /**
-   * Closes the http client (asynchronously) if it was not provided but created by this class.
-   */
+    * Closes the http client (asynchronously) if it was not provided but created by this class.
+    */
   def shutdown(): Unit = {
     cancellableObservation.foreach(_.cancel(true))
     if(shutdownHttpClient) {
@@ -535,12 +539,12 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
     futureFactory.toBase[SolrDocumentList](doGetByIds(collection, ids, params))
 
   /**
-   * Performs a query to a solr server taking the preferred server into account if provided.
-   * @param q the query to send to the solr server.
-   * @param preferred the server that should be preferred to process the query. Specific [[io.ino.solrs.LoadBalancer LoadBalancer]]
-   *                  implementations have to support this and might add their own semantics.
-   * @return the response and the server that handled the query.
-   */
+    * Performs a query to a solr server taking the preferred server into account if provided.
+    * @param q the query to send to the solr server.
+    * @param preferred the server that should be preferred to process the query. Specific [[io.ino.solrs.LoadBalancer LoadBalancer]]
+    *                  implementations have to support this and might add their own semantics.
+    * @return the response and the server that handled the query.
+    */
   def queryPreferred(q: SolrQuery, preferred: Option[SolrServer]): F[(QueryResponse, SolrServer)] =
     executePreferred(new QueryRequest(q), preferred)
 
@@ -593,14 +597,6 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
     ).getOrElse(monitoredRequest(solrServer, r))
   }
 
-  private def baseUrl(solrServer: SolrServer, request: SolrRequest[_ <: SolrResponse]) = {
-    request match {
-      case _: AsyncCollectionAdminRequest => solrServer.adminBaseUrl
-      case _:  CollectionAdminRequest[CollectionAdminResponse] => solrServer.adminBaseUrl
-      case _ => solrServer.baseUrl
-    }
-  }
-
   private[solrs] def doExecute[T <: SolrResponse : SolrResponseFactory](solrServer: SolrServer, r: SolrRequest[_ <: T]): Future[T] = {
 
     val wparams = new ModifiableSolrParams(r.getParams)
@@ -614,7 +610,7 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
     val promise = futureFactory.newPromise[T]
     val startTime = System.currentTimeMillis()
 
-    val url = baseUrl(solrServer, r) + getPath(r)
+    val url = solrServer.baseUrl + getPath(r)
 
     // the new Solr7 ContentWriter interface
     val maybeContentWriter = Option(requestWriter.getContentWriter(r))

@@ -1,10 +1,19 @@
 package io.ino.solrs
 
 import java.nio.file.{Files, Paths}
+import java.util.concurrent.CompletionStage
+import io.ino.solrs.SolrServer
 
+import io.ino.solrs.CloudSolrServers.CollectionInfo
 import io.ino.solrs.Fixtures.shardReplica
-import org.apache.solr.common.cloud.ClusterState
+import io.ino.solrs.future.{FutureFactory, JavaFutureFactory}
+import org.apache.solr.client.solrj.{SolrQuery, SolrRequest}
+import org.apache.solr.client.solrj.request.{CollectionAdminRequest, GenericSolrRequest}
+import org.apache.solr.common.cloud.{ClusterState, ZkStateReader}
 import org.scalatest._
+import org.mockito.Mockito.{mock, when}
+
+import scala.concurrent.Future
 
 
 /**
@@ -56,6 +65,48 @@ class CloudSolrServersSpec extends FunSpec with Matchers {
         shardReplica("http://server4:8983/solr/my-collection_shard2_replica2", Enabled, isLeader = false),
         shardReplica("http://server5:8983/solr/my-collection_shard3_replica1", Enabled, isLeader = true),
         shardReplica("http://server6:8983/solr/my-collection_shard3_replica2", Enabled, isLeader = false))
+    }
+
+    it("should deliver http base url for admin requests") {
+      import scala.collection.JavaConverters._
+
+      val bytes = Files.readAllBytes(Paths.get(this.getClass.getResource("/cluster_status.json").toURI))
+      val cs = ClusterState.load(1, bytes, Set("server1:8983_solr").asJava)
+
+      val collectionToServers = CloudSolrServers.getCollections(cs)
+
+      val cloudServer = new CloudSolrServers[CompletionStage]("zooKeeperHost:2181", defaultCollection = Some("my-collection"))(JavaFutureFactory)
+      cloudServer.collections = collectionToServers
+      cloudServer.nodes = cs.getLiveNodes.asScala.toSeq
+
+      val queryRequest = new GenericSolrRequest(SolrRequest.METHOD.POST, "sampleUrl", new SolrQuery())
+      val adminRequest = CollectionAdminRequest.createAlias("sampleAlias", "sampleCollection")
+
+      cloudServer.matching(queryRequest).get should contain allOf(
+        shardReplica("http://server1:8983/solr/my-collection_shard1_replica1", Enabled, isLeader = true),
+        shardReplica("http://server2:8983/solr/my-collection_shard1_replica2", Enabled, isLeader = false),
+        shardReplica("http://server3:8983/solr/my-collection_shard2_replica1", Enabled, isLeader = true),
+        shardReplica("http://server4:8983/solr/my-collection_shard2_replica2", Enabled, isLeader = false),
+        shardReplica("http://server5:8983/solr/my-collection_shard3_replica1", Enabled, isLeader = true),
+        shardReplica("http://server6:8983/solr/my-collection_shard3_replica2", Enabled, isLeader = false))
+
+      cloudServer.matching(adminRequest).get should contain(SolrServer("http://server1:8983/solr"))
+
+    }
+
+    it("should deliver https base url for admin requests") {
+      import scala.collection.JavaConverters._
+      val bytes = Files.readAllBytes(Paths.get(this.getClass.getResource("/cluster_status.json").toURI))
+      val cs = ClusterState.load(1, bytes, Set("server1:8983_solr").asJava)
+
+      val collectionToServers = CloudSolrServers.getCollections(cs)
+
+      val cloudServer = new CloudSolrServers[CompletionStage]("zooKeeperHost:2181", defaultCollection = Some("my-collection"), isSsl = true)(JavaFutureFactory)
+      cloudServer.collections = collectionToServers
+      cloudServer.nodes = cs.getLiveNodes.asScala.toSeq
+
+      val adminRequest = CollectionAdminRequest.createAlias("sampleAlias", "sampleCollection")
+      cloudServer.matching(adminRequest).get should contain(SolrServer("https://server1:8983/solr"))
     }
 
   }

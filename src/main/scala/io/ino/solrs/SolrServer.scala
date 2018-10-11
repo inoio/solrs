@@ -25,9 +25,6 @@ class SolrServer(val baseUrl: String) {
 
   val id: SolrServerId = SolrServerId(baseUrl)
 
-  //the admin api does not use a specific collection endpoint
-  val adminBaseUrl: String = baseUrl.replaceAll("\\/([^/]+)/?$", "")
-
   @volatile
   var status: ServerStatus = Enabled
 

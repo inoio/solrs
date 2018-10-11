@@ -2,18 +2,12 @@ package io.ino.solrs
 
 import java.nio.file.{Files, Paths}
 import java.util.concurrent.CompletionStage
-import io.ino.solrs.SolrServer
-
-import io.ino.solrs.CloudSolrServers.CollectionInfo
 import io.ino.solrs.Fixtures.shardReplica
 import io.ino.solrs.future.{FutureFactory, JavaFutureFactory}
 import org.apache.solr.client.solrj.{SolrQuery, SolrRequest}
 import org.apache.solr.client.solrj.request.{CollectionAdminRequest, GenericSolrRequest}
-import org.apache.solr.common.cloud.{ClusterState, ZkStateReader}
+import org.apache.solr.common.cloud.ClusterState
 import org.scalatest._
-import org.mockito.Mockito.{mock, when}
-
-import scala.concurrent.Future
 
 
 /**

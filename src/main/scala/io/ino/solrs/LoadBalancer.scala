@@ -67,7 +67,11 @@ object LoadBalancer {
 class SingleServerLB(val server: SolrServer) extends LoadBalancer {
   def this(baseUrl: String) = this(SolrServer(baseUrl))
   private val someServer = Success(server)
-  override def solrServer(r: SolrRequest[_], preferred: Option[SolrServer] = None): Try[SolrServer] = someServer
+  override def solrServer(r: SolrRequest[_], preferred: Option[SolrServer] = None): Try[SolrServer] = {
+    if(Utils.isAdminType(r)) {
+      Success(SolrServer(Utils.solrUrl(server.baseUrl), server.status))
+    } else someServer
+  }
   override val solrServers: SolrServers = new StaticSolrServers(IndexedSeq(server))
 }
 

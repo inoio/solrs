@@ -23,7 +23,7 @@ import org.asynchttpclient.AsyncCompletionHandler
 import org.asynchttpclient.AsyncHttpClient
 import org.asynchttpclient.Response
 import org.slf4j.LoggerFactory
-
+import scala.collection.JavaConverters._
 import scala.collection.breakOut
 import scala.collection.generic.CanBuildFrom
 import scala.collection.mutable
@@ -54,7 +54,15 @@ trait SolrServers {
 }
 
 class StaticSolrServers(override val all: IndexedSeq[SolrServer]) extends SolrServers {
-  override def matching(r: SolrRequest[_]): Try[IndexedSeq[SolrServer]] = Success(all)
+  override def matching(r: SolrRequest[_]): Try[IndexedSeq[SolrServer]] = {
+    if(!Utils.isAdminType(r)) {
+      Success(all)
+    } else {
+      Success(all.map(solrServer => {
+        SolrServer(Utils.solrUrl(solrServer.baseUrl), solrServer.status)
+      }))
+    }
+  }
 }
 object StaticSolrServers {
   def apply(baseUrls: IndexedSeq[String]): StaticSolrServers = new StaticSolrServers(baseUrls.map(SolrServer(_)))
@@ -116,7 +124,9 @@ class CloudSolrServers[F[_]](zkHost: String,
                              zkConnectTimeout: Duration = 10 seconds, /* default from solrj CloudSolrServer*/
                              clusterStateUpdateInterval: Duration = 1 second,
                              defaultCollection: Option[String] = None,
-                             warmupQueries: Option[WarmupQueries] = None)
+                             warmupQueries: Option[WarmupQueries] = None,
+                             isSsl: Boolean = false
+                            )
                             (implicit futureFactory: FutureFactory[F]) extends SolrServers with AsyncSolrClientAware[F] with ServerStateChangeObservable {
 
   import CloudSolrServers._
@@ -124,10 +134,12 @@ class CloudSolrServers[F[_]](zkHost: String,
   private var maybeZk: Option[ZkStateReader] = None
 
   @volatile
-  private var collections = Map.empty[String, CollectionInfo]
+  private[solrs] var collections = Map.empty[String, CollectionInfo]
   private def collectionToServers: Map[String, IndexedSeq[ShardReplica]] = collections.mapValues(_.servers)
   @volatile
-  private var aliases: Option[Aliases] = None
+  private[solrs] var aliases: Option[Aliases] = None
+  @volatile
+  private[solrs] var nodes: Seq[String] = Nil
 
   private val scheduledExecutor: ScheduledExecutorService = Executors.newScheduledThreadPool(1, new ZkClusterStateUpdateTF)
 
@@ -194,7 +206,9 @@ class CloudSolrServers[F[_]](zkHost: String,
 
     aliases = Some(zkStateReader.getAliases)
 
+
     val clusterState = zkStateReader.getClusterState
+    nodes = clusterState.getLiveNodes.asScala.toSeq
 
     def set(newCollections: Map[String, CollectionInfo]): Unit = {
       notifyObservers(collectionToServers, newCollections.mapValues(_.servers))
@@ -270,26 +284,41 @@ class CloudSolrServers[F[_]](zkHost: String,
    * the iterator must reflect this.
    */
   override def matching(r: SolrRequest[_]): Try[IndexedSeq[SolrServer]] = {
-    val params = r.getParams
-    val collection = Option(params.get("collection")).orElse(defaultCollection).getOrElse(
-      throw new SolrServerException("No collection param specified on request and no default collection has been set.")
-    )
-    // - resolveAliases returns the input if no alias exists
-    // - update requests shall only be directed to a single collection (the first of multiple alias target collections, as done by CloudSolrClient)
-    // - for read requests we also only consider the first alias target, to keep things simple, and solr server
-    //   will still return combined responses from all alias target collections
-    val resolvedCollection = aliases.map(_.resolveAliases(collection).get(0)).getOrElse(collection)
-    collections.get(resolvedCollection) match {
-      case Some(CollectionInfo(docCollection, servers)) =>
-        val shardKeys = params.get(ShardParams._ROUTE_)
-        val slices = docCollection.getRouter.getSearchSlices(shardKeys, params, docCollection)
-        val serverUrls: Set[String] = mapSliceReplicas(slices)(repl =>
-          SolrServer.fixUrl(repl.getCoreUrl)
-        )(breakOut)
-        Success(servers.filter(server => serverUrls.contains(server.baseUrl)))
-      case None =>
-        Failure(UnknownCollectionException(collection))
+    if(Utils.isAdminType(r)) {
+      if(nodes.isEmpty) {
+        Failure(NoLiveNodesAvailableException())
+      } else {
+        //FIXME: currently no idea how to get the protocol for cluster without any collections
+        val protocol = if(isSsl) "https://" else "http://"
+        Success(nodes.toIndexedSeq.map(node => protocol + node.replace("_solr","/solr")).map(node => {
+          SolrServer(node, Enabled)
+        }))
+      }
+    } else {
+      val params = r.getParams
+      val collection =
+        Option(params).flatMap(p => Option(params.get("collection"))).orElse(defaultCollection).getOrElse(
+          throw new SolrServerException("No collection param specified on request and no default collection has been set."))
+      // - resolveAliases returns the input if no alias exists
+      // - update requests shall only be directed to a single collection (the first of multiple alias target collections, as done by CloudSolrClient)
+      // - for read requests we also only consider the first alias target, to keep things simple, and solr server
+      //   will still return combined responses from all alias target collections
+      val resolvedCollection = aliases.map(_.resolveAliases(collection).get(0)).getOrElse(collection)
+      collections.get(resolvedCollection) match {
+        case Some(CollectionInfo(docCollection, servers)) =>
+          val shardKeys = Option(params).flatMap(p => Option(params.get(ShardParams._ROUTE_))).orNull
+          val slices = docCollection.getRouter.getSearchSlices(shardKeys, params, docCollection)
+          val serverUrls: Set[String] = mapSliceReplicas(slices)(repl =>
+            SolrServer.fixUrl(repl.getCoreUrl)
+          )(breakOut)
+          Success(servers.filter(server => serverUrls.contains(server.baseUrl)))
+        case None =>
+          Failure(UnknownCollectionException(collection))
+      }
     }
+
+
+
   }
 
   // server state change
@@ -315,6 +344,8 @@ object CloudSolrServers {
   final case class UnknownCollectionException(collection: String) extends IllegalArgumentException(
     s"The collection '$collection' is not known"
   )
+
+  final case class NoLiveNodesAvailableException() extends RuntimeException("not live nodes configured for cluster")
 
   /* Java API */
   case class Builder(zkHost: String,
@@ -432,7 +463,11 @@ class ReloadingSolrServers[F[_]](url: String, extractor: Array[Byte] => IndexedS
    * it should start from the first one again. When the known solr servers change,
    * the iterator must reflect this.
    */
-  override def matching(r: SolrRequest[_]): Try[IndexedSeq[SolrServer]] = Success(solrServers)
+  override def matching(r: SolrRequest[_]): Try[IndexedSeq[SolrServer]] = {
+    if(!Utils.isAdminType(r)) {
+      Success(solrServers)
+    } else Success(solrServers.map(solrServer => SolrServer(Utils.solrUrl(solrServer.baseUrl), solrServer.status)))
+  }
 
   def reload(): F[IndexedSeq[SolrServer]] = {
     val f = loadUrl().map { data =>

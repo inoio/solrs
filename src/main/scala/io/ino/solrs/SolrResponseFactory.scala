@@ -1,7 +1,7 @@
 package io.ino.solrs
 
-import org.apache.solr.client.solrj.request.{QueryRequest, SolrPing, UpdateRequest}
-import org.apache.solr.client.solrj.response.{QueryResponse, SimpleSolrResponse, SolrPingResponse, UpdateResponse}
+import org.apache.solr.client.solrj.request.{CollectionAdminRequest, QueryRequest, SolrPing, UpdateRequest}
+import org.apache.solr.client.solrj.response._
 import org.apache.solr.client.solrj.{SolrRequest, SolrResponse}
 
 trait SolrResponseFactory[T <: SolrResponse] {
@@ -25,6 +25,9 @@ object SolrResponseFactory {
   implicit val updateResponseFactory: SolrResponseFactory[UpdateResponse] =
     instance(_ => new UpdateResponse)
 
+  implicit val adminResponseFactory: SolrResponseFactory[CollectionAdminResponse] =
+    instance(_ => new CollectionAdminResponse)
+
   implicit val pingResponseFactory: SolrResponseFactory[SolrPingResponse] =
     instance(_ => new SolrPingResponse)
 
@@ -33,6 +36,7 @@ object SolrResponseFactory {
       case r: QueryRequest => SolrResponseFactory[QueryResponse].createResponse(r)
       case r: UpdateRequest => SolrResponseFactory[UpdateResponse].createResponse(r)
       case r: SolrPing => SolrResponseFactory[SolrPingResponse].createResponse(r)
+      case r: CollectionAdminRequest.Create => SolrResponseFactory[CollectionAdminResponse].createResponse(r)
     }
 }
 

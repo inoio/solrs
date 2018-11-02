@@ -10,7 +10,7 @@ homepage := Some(url("https://github.com/inoio/solrs"))
 
 organization := "io.ino"
 
-version := "2.2.2-nemo"
+version := "2.2.3-nemo"
 
 scmInfo := Some(ScmInfo(url("https://github.com/inoio/solrs"), "git@github.com:inoio/solrs.git"))
 
@@ -47,7 +47,7 @@ val slf4jVersion = "1.7.25"
 
 libraryDependencies ++= Seq(
   "org.apache.solr"         % "solr-solrj"        % solrVersion,
-  "org.asynchttpclient"     % "async-http-client" % "2.5.1",
+  "org.asynchttpclient"     % "async-http-client" % "2.0.24",
   "org.scala-lang.modules" %% "scala-xml"         % "1.1.0",
   "org.scala-lang.modules" %% "scala-java8-compat"% "0.9.0",
   "io.dropwizard.metrics"   % "metrics-core"      % "3.2.6" % "optional",

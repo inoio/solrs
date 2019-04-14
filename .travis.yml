@@ -31,7 +31,7 @@ deploy:
   skip_cleanup: true
   on:
     branch: master
-    condition: $TRAVIS_PULL_REQUEST = false && $TRAVIS_SCALA_VERSION = 2.12*
+    condition: ! grep SNAPSHOT version.sbt && $TRAVIS_PULL_REQUEST = false && $TRAVIS_SCALA_VERSION = 2.12*
 
 cache:
   directories:

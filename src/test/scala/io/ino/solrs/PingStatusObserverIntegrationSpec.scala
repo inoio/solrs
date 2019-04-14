@@ -10,7 +10,7 @@ import org.apache.solr.client.solrj.impl.HttpSolrClient
 import org.asynchttpclient.{DefaultAsyncHttpClient, DefaultAsyncHttpClientConfig}
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
-import org.scalatest.mockito.MockitoSugar
+import org.scalatestplus.mockito.MockitoSugar
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, FunSpec, Matchers}
 
 import scala.concurrent.duration._

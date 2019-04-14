@@ -53,7 +53,6 @@ libraryDependencies ++= Seq(
   "com.novocode"            % "junit-interface"   % "0.11" % "test",
   "org.mockito"             % "mockito-core"      % "1.10.19" % "test",
   "org.hamcrest"            % "hamcrest-library"  % "1.3" % "test",
-  "org.clapper"            %% "grizzled-scala"    % "4.5.1" % "test",
   // Cloud testing, solr-core for ZkController (upconfig)
   "org.apache.solr"         % "solr-core"         % solrVersion % "test",
   "org.apache.solr"         % "solr-test-framework" % solrVersion % "test",

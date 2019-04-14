@@ -14,7 +14,7 @@ licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.
 
 scalaVersion := "2.11.12"
 
-crossScalaVersions := Seq("2.11.12", "2.12.6")
+crossScalaVersions := Seq("2.11.12", "2.12.8")
 
 scalacOptions ++= Seq(
   "-unchecked",
@@ -39,25 +39,24 @@ resolvers ++= Seq(
 )
 
 val solrVersion = "7.4.0"
-val slf4jVersion = "1.7.25"
+val slf4jVersion = "1.7.26"
 
 libraryDependencies ++= Seq(
   "org.apache.solr"         % "solr-solrj"        % solrVersion,
-  "org.asynchttpclient"     % "async-http-client" % "2.5.1",
-  "org.scala-lang.modules" %% "scala-xml"         % "1.1.0",
+  "org.asynchttpclient"     % "async-http-client" % "2.8.1",
+  "org.scala-lang.modules" %% "scala-xml"         % "1.2.0",
   "org.scala-lang.modules" %% "scala-java8-compat"% "0.9.0",
   "io.dropwizard.metrics"   % "metrics-core"      % "3.2.6" % "optional",
   "org.slf4j"               % "slf4j-api"         % slf4jVersion,
   "org.slf4j"               % "slf4j-simple"      % slf4jVersion % "test",
-  "org.scalatest"          %% "scalatest"         % "3.0.5" % "test",
+  "org.scalatest"          %% "scalatest"         % "3.0.7" % "test",
   "com.novocode"            % "junit-interface"   % "0.11" % "test",
   "org.mockito"             % "mockito-core"      % "1.10.19" % "test",
   "org.hamcrest"            % "hamcrest-library"  % "1.3" % "test",
-  "org.clapper"            %% "grizzled-scala"    % "4.5.1" % "test",
   // Cloud testing, solr-core for ZkController (upconfig)
   "org.apache.solr"         % "solr-core"         % solrVersion % "test",
   "org.apache.solr"         % "solr-test-framework" % solrVersion % "test",
-  "com.twitter"            %% "util-core"         % "18.7.0" % "optional",
+  "com.twitter"            %% "util-core"         % "19.3.0" % "optional",
   "commons-logging"         % "commons-logging"   % "1.2"
 )
 

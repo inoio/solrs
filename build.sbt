@@ -6,7 +6,7 @@ homepage := Some(url("https://github.com/inoio/solrs"))
 
 organization := "io.ino"
 
-version := "2.2.1-SNAPSHOT"
+// version is defined in version.sbt
 
 scmInfo := Some(ScmInfo(url("https://github.com/inoio/solrs"), "git@github.com:inoio/solrs.git"))
 

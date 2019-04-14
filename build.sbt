@@ -56,7 +56,7 @@ libraryDependencies ++= Seq(
   // Cloud testing, solr-core for ZkController (upconfig)
   "org.apache.solr"         % "solr-core"         % solrVersion % "test",
   "org.apache.solr"         % "solr-test-framework" % solrVersion % "test",
-  "com.twitter"            %% "util-core"         % "18.7.0" % "optional",
+  "com.twitter"            %% "util-core"         % "19.3.0" % "optional",
   "commons-logging"         % "commons-logging"   % "1.2"
 )
 

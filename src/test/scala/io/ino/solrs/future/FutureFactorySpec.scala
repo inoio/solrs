@@ -17,7 +17,7 @@ class ScalaFutureFactorySpec extends FutureFactorySpec[SFuture] with FutureAwait
 }
 
 class TwitterFutureFactorySpec extends FutureFactorySpec[TFuture] with FutureAwaits {
-  import com.twitter.conversions.time._
+  import com.twitter.conversions.DurationOps._
   import com.twitter.util.Await
   override protected lazy val factory = TwitterFutureFactory
   override protected def awaitBase[T](future: TFuture[T]): T = Await.result(future, 1.second)

@@ -1,7 +1,3 @@
-import scala.xml.Elem
-import scala.xml.transform.RewriteRule
-import scala.xml.transform.RuleTransformer
-
 name := "solrs"
 
 description := "A solr client for scala, providing a query interface like SolrJ, just asynchronously / non-blocking"
@@ -77,17 +73,6 @@ git.remoteRepo := scmInfo.value.get.connection
 enablePlugins(ParadoxPlugin)
 paradoxTheme := Some(builtinParadoxTheme("generic"))
 paradoxGroups := Map("Language" -> Seq("Scala", "Java"))
-
-val pomTransformer = new RuleTransformer(new RewriteRule {
-  override def transform(node: xml.Node): Seq[xml.Node] = node match {
-    case e: Elem if e.label == "dependency" && e.child.exists(child => child.label == "artifactId" && child.text.contains("paradox")) =>
-      Seq.empty
-    case _ => node
-  }
-})
-
-// ugly hack for https://github.com/lightbend/paradox/issues/225
-pomPostProcess := { node: xml.Node => pomTransformer.transform(node).head }
 
 /*
 // paradoxGroups switcher not aligned: https://github.com/jonas/paradox-material-theme/issues/11

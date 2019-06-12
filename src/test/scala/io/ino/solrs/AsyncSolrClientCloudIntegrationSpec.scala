@@ -140,7 +140,7 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
       solrRunner.restartZookeeper()
 
       // Wait some time after ZK was stopped
-      Thread.sleep(1000)
+      Thread.sleep(10000)
 
       // Stop queries
       run.set(false)

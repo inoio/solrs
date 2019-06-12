@@ -27,7 +27,11 @@ The github repo is [inoio/solrs](https://github.com/inoio/solrs), for questions 
 
 ## Installation
 
-Each solrs version is compatible with a certain Solr version. For Solr 7.2.x use solrs 2.1.0, for Solr 6.x use solrs 2.0.0.
+Each solrs version is compatible with a certain Solr version:
+* Solr 7.6.x: solrs 2.3.0
+* Solr 7.4.x: solrs 2.2.0
+* Solr 7.2.x: solrs 2.1.0
+* Solr 6.x.x: solrs 2.0.0
 
 You must add the library to the dependencies of the build file:
     

@@ -28,6 +28,7 @@ The github repo is [inoio/solrs](https://github.com/inoio/solrs), for questions 
 ## Installation
 
 Each solrs version is compatible with a certain Solr version:
+
 * Solr 7.6.x: solrs 2.3.0
 * Solr 7.4.x: solrs 2.2.0
 * Solr 7.2.x: solrs 2.1.0

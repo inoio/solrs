@@ -103,13 +103,13 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
       SolrRunner.stopJetty(solrRunner.jettySolrRunners.last)
 
       // Wait some time after Jetty was stopped
-      Thread.sleep(500)
+      Thread.sleep(100)
 
       // Restart solr
       SolrRunner.startJetty(solrRunner.jettySolrRunners.last)
 
       // Wait some time after Jetty was restarted
-      Thread.sleep(500)
+      Thread.sleep(200)
 
       // Stop queries
       run.set(false)
@@ -140,7 +140,7 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
       solrRunner.restartZookeeper()
 
       // Wait some time after ZK was stopped
-      Thread.sleep(10000)
+      Thread.sleep(500)
 
       // Stop queries
       run.set(false)

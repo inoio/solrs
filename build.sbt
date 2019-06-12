@@ -38,25 +38,25 @@ resolvers ++= Seq(
   "Restlet Repositories" at "http://maven.restlet.org"
 )
 
-val solrVersion = "7.5.0"
+val solrVersion = "7.6.0"
 val slf4jVersion = "1.7.26"
 
 libraryDependencies ++= Seq(
   "org.apache.solr"         % "solr-solrj"        % solrVersion,
-  "org.asynchttpclient"     % "async-http-client" % "2.8.1",
+  "org.asynchttpclient"     % "async-http-client" % "2.10.0",
   "org.scala-lang.modules" %% "scala-xml"         % "1.2.0",
   "org.scala-lang.modules" %% "scala-java8-compat"% "0.9.0",
   "io.dropwizard.metrics"   % "metrics-core"      % "3.2.6" % "optional",
   "org.slf4j"               % "slf4j-api"         % slf4jVersion,
   "org.slf4j"               % "slf4j-simple"      % slf4jVersion % "test",
-  "org.scalatest"          %% "scalatest"         % "3.0.7" % "test",
+  "org.scalatest"          %% "scalatest"         % "3.0.8" % "test",
   "com.novocode"            % "junit-interface"   % "0.11" % "test",
   "org.mockito"             % "mockito-core"      % "1.10.19" % "test",
   "org.hamcrest"            % "hamcrest-library"  % "1.3" % "test",
   // Cloud testing, solr-core for ZkController (upconfig)
   "org.apache.solr"         % "solr-core"         % solrVersion % "test",
   "org.apache.solr"         % "solr-test-framework" % solrVersion % "test",
-  "com.twitter"            %% "util-core"         % "19.3.0" % "optional",
+  "com.twitter"            %% "util-core"         % "19.5.1" % "optional",
   "commons-logging"         % "commons-logging"   % "1.2"
 )
 

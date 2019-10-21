@@ -271,7 +271,7 @@ class CloudSolrServers[F[_]](zkHost: String,
    */
   override def matching(r: SolrRequest[_]): Try[IndexedSeq[SolrServer]] = {
     val params = r.getParams
-    val collection = Option(params.get("collection")).orElse(defaultCollection).getOrElse(
+    val collection = Option(params.get("collection")).orElse(defaultCollection).map(_.split(",")(0)).getOrElse(
       throw new SolrServerException("No collection param specified on request and no default collection has been set.")
     )
     // - resolveAliases returns the input if no alias exists

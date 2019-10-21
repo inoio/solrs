@@ -196,6 +196,22 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
 
     }
 
+    it("should handle multiple collections param") {
+
+      awaitAllServersBeingEnabled()
+
+      val otherDocs = manyDocs.filterNot(someDocs.contains).take(42)
+      import scala.collection.JavaConverters.seqAsJavaListConverter
+      solrJClient.add(collection2, otherDocs.asJava)
+      solrJClient.commit(collection2)
+      val otherDocsIds = otherDocs.map(_.getFieldValue("id").toString)
+
+      eventually {
+        await(cut.query(collection1, q).map(getIds)) should contain theSameElementsAs someDocsIds
+        await(cut.query(s"$collection1,$collection2", q).map(getIds)) should contain theSameElementsAs (someDocsIds ::: otherDocsIds)
+      }
+    }
+
   }
 
   private def awaitAllServersBeingEnabled(): Assertion = {

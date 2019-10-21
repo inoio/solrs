@@ -74,7 +74,7 @@ class SingleServerLB(val server: SolrServer) extends LoadBalancer {
 
 class RoundRobinLB(override val solrServers: SolrServers) extends LoadBalancer {
 
-  private final val idx = new AtomicInteger(0)
+  private final val idx = new AtomicInteger(1)
 
   private final val op = new IntUnaryOperator {
     override def applyAsInt(operand: Int): Int = if (operand == Int.MaxValue) 0 else operand + 1

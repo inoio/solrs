@@ -7,6 +7,11 @@ scala:
 jdk:
    - oraclejdk8
 
+# needed for jdk8:
+# https://travis-ci.community/t/solved-oraclejdk8-installation-failing-still-again/3428
+# https://blog.travis-ci.com/2019-04-15-xenial-default-build-environment
+dist: trusty
+
 before_install:
    # prevent OutOfMemoryError: unable to create new native thread
    - ulimit -t 166384

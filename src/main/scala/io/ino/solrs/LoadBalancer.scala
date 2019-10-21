@@ -4,6 +4,7 @@ import java.util.concurrent.CompletionStage
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.function.IntUnaryOperator
 
 import io.ino.solrs.LoadBalancer.NoSolrServersAvailableException
 import io.ino.solrs.ServerStateChangeObservable.Removed
@@ -73,7 +74,11 @@ class SingleServerLB(val server: SolrServer) extends LoadBalancer {
 
 class RoundRobinLB(override val solrServers: SolrServers) extends LoadBalancer {
 
-  private var idx = 0
+  private final val idx = new AtomicInteger(1)
+
+  private final val op = new IntUnaryOperator {
+    override def applyAsInt(operand: Int): Int = if (operand == Int.MaxValue) 0 else operand + 1
+  }
 
   override def solrServer(r: SolrRequest[_], preferred: Option[SolrServer] = None): Try[SolrServer] = solrServers.matching(r).flatMap { matching =>
     val servers = matching.filter(_.isEnabled)
@@ -86,8 +91,8 @@ class RoundRobinLB(override val solrServers: SolrServers) extends LoadBalancer {
     } else {
       val preferred = filterByShardPreference(r, servers)
       // idx + 1 might be > servers.length, so let's use % to get a valid start position
-      val newIndex = (idx + 1) % preferred.length
-      idx = newIndex
+      val next = idx.getAndUpdate(op)
+      val newIndex = next % preferred.length
       Success(preferred(newIndex))
     }
   }

@@ -39,7 +39,7 @@ class PingStatusObserverIntegrationSpec extends FunSpec with BeforeAndAfterAll w
     solrRunner.stop()
   }
 
-  override def beforeEach() {
+  override def beforeEach(): Unit = {
     responseDelayMillis.set(0)
     doReturn404.set(false)
     eventually {
@@ -47,7 +47,7 @@ class PingStatusObserverIntegrationSpec extends FunSpec with BeforeAndAfterAll w
     }
   }
 
-  override def afterEach() {
+  override def afterEach(): Unit = {
     if (solrRunner.jetty.isStopped) {
       solrRunner.jetty.start()
     }

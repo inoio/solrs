@@ -82,7 +82,7 @@ class SolrRunner(val port: Int,
 
   def isStarted: Boolean = jetty != null && jetty.isRunning
 
-  def stop() {
+  def stop(): Unit = {
     if(isStarted) {
       logger.info(s"Stopping Solr Jetty running on port $port")
       SolrRunner.stopJetty(jetty)
@@ -147,7 +147,7 @@ object SolrRunner {
       solrRunners += port -> solrRunner
 
       Runtime.getRuntime.addShutdownHook(new Thread() {
-        override def run() {
+        override def run(): Unit = {
           solrRunner.stop()
         }
       })

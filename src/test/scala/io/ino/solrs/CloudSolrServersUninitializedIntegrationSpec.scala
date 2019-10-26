@@ -24,7 +24,7 @@ class CloudSolrServersUninitializedIntegrationSpec extends StandardFunSpec {
 
   private type AsyncSolrClient = io.ino.solrs.AsyncSolrClient[Future]
 
-  override def afterEach() {
+  override def afterEach(): Unit = {
     cut.foreach(_.shutdown())
     cut = None
 

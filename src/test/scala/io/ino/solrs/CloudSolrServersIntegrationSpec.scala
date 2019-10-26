@@ -22,7 +22,6 @@ import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.time.Millis
 import org.scalatest.time.Span
 
-import scala.collection.breakOut
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -51,7 +50,7 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
 
   import io.ino.solrs.SolrUtils._
 
-  override def beforeAll() {
+  override def beforeAll(): Unit = {
     // create a 2 node cluster with one collection that has 2 shards with 2 replicas
     solrRunner = SolrCloudRunner.start(
       numServers = 4,
@@ -64,8 +63,8 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
     eventually(Timeout(10 seconds)) {
       solrJClient.deleteByQuery("*:*")
     }
-    import scala.collection.JavaConverters.seqAsJavaListConverter
-    solrJClient.add(someDocs.asJava)
+    import scala.jdk.CollectionConverters._
+    solrJClient.add(someDocs.asJavaCollection)
     solrJClient.commit()
   }
 
@@ -82,7 +81,7 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
     super.afterEach()
   }
 
-  override def afterAll() {
+  override def afterAll(): Unit = {
     for (asyncSolrClient <- asyncSolrClients.values) {
       asyncSolrClient.shutdown()
     }
@@ -157,7 +156,7 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
         val id = doc.getFieldValue("id").toString
         val expectedServers = solrServerUrls.filter(serverContainsDoc(_, id))
         doc -> expectedServers
-      }(breakOut)
+      }.toMap
 
       expectedServersByDoc.foreach { case (doc, expectedServers) =>
         val id = doc.getFieldValue("id").toString
@@ -200,7 +199,7 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
       cut.setAsyncSolrClient(asyncSolrClient)
 
       // initially the list of servers should be empty
-      cut.all should be ('empty)
+      assert(cut.all.isEmpty)
 
       // as soon as the response is set the LB should provide the servers...
       standardResponsePromise.success(new QueryResponse())
@@ -241,8 +240,8 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
     val docs = (1 to 10).map { i =>
       newInputDoc(s"${shardKey(i)}!id$i", s"doc$i", s"cat$i", i)
     }.toList
-    import scala.collection.JavaConverters.seqAsJavaListConverter
-    solrJClient.add(docs.asJava)
+    import scala.jdk.CollectionConverters._
+    solrJClient.add(docs.asJavaCollection)
     solrJClient.commit()
 
     eventually {

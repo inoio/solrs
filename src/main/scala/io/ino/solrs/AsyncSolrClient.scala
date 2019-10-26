@@ -637,7 +637,7 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
       }.getOrElse {
         // POST/PUT with FORM data
         val req = if (r.getMethod == POST) httpClient.preparePost(url) else httpClient.preparePut(url)
-        req.setFormParams(wparams.getMap.asScala.mapValues(asList[String](_: _*)).asJava)
+        req.setFormParams(MapConverter.convert(wparams.getMap))
       }
     }
     val request = requestBuilder.addHeader("User-Agent", agent).build()
@@ -654,7 +654,7 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
           response
         }
 
-        override def onThrowable(t: Throwable) {
+        override def onThrowable(t: Throwable): Unit = {
           metrics.countException
           promise.failure(t)
         }
@@ -712,7 +712,7 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
   }
 
   @throws[RemoteSolrException]
-  private def validateResponse(response: Response, responseParser: ResponseParser)(implicit server: SolrServer) {
+  private def validateResponse(response: Response, responseParser: ResponseParser)(implicit server: SolrServer): Unit = {
     validateMimeType(responseParser.getContentType, response)
 
     val httpStatus = response.getStatusCode

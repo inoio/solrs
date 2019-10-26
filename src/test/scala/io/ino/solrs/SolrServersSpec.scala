@@ -32,6 +32,8 @@ class SolrServersSpec extends FunSpec with Matchers with FutureAwaits {
 
       var data = "host1,host2"
 
+      import io.ino.solrs.future.ScalaFutureFactory.Implicit
+
       val cut = new ReloadingSolrServers[Future]("http://some.url", parse, null) {
         override def loadUrl() = {
           val promise = io.ino.solrs.future.ScalaFutureFactory.newPromise[Array[Byte]]

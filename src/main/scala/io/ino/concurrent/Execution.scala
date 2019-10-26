@@ -5,8 +5,13 @@ import scala.concurrent.ExecutionContext
 object Execution {
 
   val sameThreadContext: ExecutionContext = new ExecutionContext {
-    def reportFailure(t: Throwable) { t.printStackTrace() }
-    def execute(runnable: Runnable) {runnable.run()}
+    def reportFailure(t: Throwable) : Unit = {
+      t.printStackTrace()
+    }
+
+    def execute(runnable: Runnable) : Unit = {
+      runnable.run()
+    }
   }
 
   object Implicits {

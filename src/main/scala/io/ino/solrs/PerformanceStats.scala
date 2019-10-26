@@ -114,8 +114,10 @@ class PerformanceStats(val solrServer: SolrServer, initialPredictedResponseTime:
           }
         }
       }
-      val averagesByQueryClass = countsAndDurationsByQueryClass.mapValues { case (count, durationSum) => durationSum / count }
-      requestAveragesPer10Seconds.update(idx, averagesByQueryClass)
+
+      requestAveragesPer10Seconds.update(idx, countsAndDurationsByQueryClass.toSeq.map {
+        case (queryClass, (count, durationSum)) => (queryClass, durationSum / count)
+      }.toMap)
     }
   }
 

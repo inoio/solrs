@@ -40,7 +40,7 @@ class AsyncSolrClientIntegrationSpec extends StandardFunSpec with RunningSolr {
 
   import io.ino.solrs.SolrUtils._
 
-  override def beforeEach() {
+  override def beforeEach(): Unit = {
     eventually(Timeout(10 seconds)) {
       solrJClient.deleteByQuery("*:*")
     }

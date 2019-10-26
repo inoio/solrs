@@ -57,7 +57,7 @@ class SolrCloudRunner(numServers: Int, collections: List[SolrCollection] = List.
 
   // shutdown hook clean up for tests that don't call shutdown explicitly
   Runtime.getRuntime.addShutdownHook(new Thread() {
-    override def run() {
+    override def run(): Unit = {
       shutdown()
     }
   })

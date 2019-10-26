@@ -38,11 +38,11 @@ You must add the library to the dependencies of the build file:
     
 @@dependency[sbt,Maven,Gradle] {
   group="io.ino"
-  artifact="solrs_2.11"
+  artifact="solrs_2.12"
   version="$project.version$"
 }
 
-solrs is published to maven central for both scala 2.11 and 2.12.
+solrs is published to maven central for both scala 2.11 (up to version 2.3.0), 2.12 and 2.13.
 
 ## License
 

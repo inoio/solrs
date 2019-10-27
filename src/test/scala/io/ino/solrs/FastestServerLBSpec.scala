@@ -370,8 +370,8 @@ class FastestServerLBSpec extends StandardFunSpec {
                            mapPredictedResponseTime: Long => Long = identity): FastestServerLB = {
     cut = new FastestServerLB(solrServers, _ => ("collection1", q), minDelay, maxDelay = 30 seconds, initialTestRuns = 1,
       mapPredictedResponseTime = mapPredictedResponseTime, clock = clock) {
-      override protected def scheduleTests(): Unit = Unit
-      override protected def scheduleUpdateStats(): Unit = Unit
+      override protected def scheduleTests(): Unit = ()
+      override protected def scheduleUpdateStats(): Unit = ()
     }
     cut.setAsyncSolrClient(solrs)
     cut

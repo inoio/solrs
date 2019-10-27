@@ -43,7 +43,7 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
 
   import io.ino.solrs.SolrUtils._
 
-  override def beforeAll() {
+  override def beforeAll(): Unit = {
     solrRunner = SolrCloudRunner.start(
       numServers = 2,
       collections = List(
@@ -80,7 +80,7 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
     }
   }
 
-  override def afterAll() {
+  override def afterAll(): Unit = {
     solrJClient.close()
     cut.shutdown()
     solrServers.shutdown()
@@ -162,8 +162,8 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
       awaitAllServersBeingEnabled()
 
       val otherDocs = manyDocs.filterNot(someDocs.contains).take(42)
-      import scala.collection.JavaConverters.seqAsJavaListConverter
-      solrJClient.add(collection2, otherDocs.asJava)
+      import scala.jdk.CollectionConverters._
+      solrJClient.add(collection2, otherDocs.asJavaCollection)
       solrJClient.commit(collection2)
 
       val alias = "testalias"
@@ -201,8 +201,10 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
       awaitAllServersBeingEnabled()
 
       val otherDocs = manyDocs.filterNot(someDocs.contains).take(42)
-      import scala.collection.JavaConverters.seqAsJavaListConverter
-      solrJClient.add(collection2, otherDocs.asJava)
+
+      import scala.jdk.CollectionConverters._
+      solrJClient.add(collection2, otherDocs.asJavaCollection)
+
       solrJClient.commit(collection2)
       val otherDocsIds = otherDocs.map(_.getFieldValue("id").toString)
 

@@ -25,7 +25,6 @@ import org.apache.solr.client.solrj.request.QueryRequest
 import org.apache.solr.client.solrj.response.QueryResponse
 import org.slf4j.LoggerFactory
 
-import scala.collection.breakOut
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
 import scala.concurrent.duration._
@@ -255,8 +254,8 @@ class FastestServerLB[F[_]](override val solrServers: SolrServers,
 
     // gather initial stats
     val futures = solrServers.all.filter(_.isEnabled).map { server =>
-      (1 to initialTestRuns).foldLeft(futureFactory.successful(Unit))((res, _) =>
-        res.flatMap(_ => test(server).map(_ => Unit))
+      (1 to initialTestRuns).foldLeft(futureFactory.successful(()))((res, _) =>
+        res.flatMap(_ => test(server).map(_ => ()))
       )
     }
     FutureFactory.sequence(futures).onComplete(_ =>
@@ -361,12 +360,14 @@ class FastestServerLB[F[_]](override val solrServers: SolrServers,
     if(statsByServer.nonEmpty) {
       val statsByCollection = statsByServer.values.groupBy(stats => collection(stats.solrServer))
       statsByCollection.foreach { case (collection, stats) =>
-        val durationByServer: Map[SolrServer, Long] = stats.map(s => s.solrServer -> s.predictDuration(TestQueryClass))(breakOut)
+        val durationByServer: Map[SolrServer, Long] = stats.map(s => s.solrServer -> s.predictDuration(TestQueryClass)).toMap
         val average = durationByServer.values.sum / durationByServer.size
         val serverFilter = filterFastServers(average)
+
         val fastServers: Set[SolrServerId] = durationByServer.collect {
-          case (server, duration) if serverFilter(server, duration) => server.id
-        }(breakOut)
+          case (server : SolrServer, duration: Long) if serverFilter(server, duration) => server.id
+        }.toSet
+
         if(fastServers != fastServersByCollection(collection)) {
           onBeforeFastServersChanged(collection, fastServers, durationByServer, average)
           fastServersByCollection += (collection -> fastServers)
@@ -577,7 +578,7 @@ trait FastestServerLBJmxSupport[F[_]] extends FastestServerLBMBean { self: Faste
   private def serversByCollection(collection: String): Array[SolrServer] = {
     statsByServer.values.collect {
       case stats if collectionAndTestQuery(stats.solrServer)._1 == collection => stats.solrServer
-    }(breakOut)
+    }.toArray
   }
 
   private def compositeType(itemNames: Array[String]): CompositeType = {

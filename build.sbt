@@ -12,9 +12,9 @@ scmInfo := Some(ScmInfo(url("https://github.com/inoio/solrs"), "git@github.com:i
 
 licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.html"))
 
-scalaVersion := "2.11.12"
+scalaVersion := "2.12.8"
 
-crossScalaVersions := Seq("2.11.12", "2.12.8")
+crossScalaVersions := Seq("2.12.8", "2.13.1")
 
 scalacOptions ++= Seq(
   "-unchecked",
@@ -56,7 +56,7 @@ libraryDependencies ++= Seq(
   // Cloud testing, solr-core for ZkController (upconfig)
   "org.apache.solr"         % "solr-core"         % solrVersion % "test",
   "org.apache.solr"         % "solr-test-framework" % solrVersion % "test",
-  "com.twitter"            %% "util-core"         % "19.5.1" % "optional",
+  "com.twitter"            %% "util-core"         % "19.10.0" % "optional",
   "commons-logging"         % "commons-logging"   % "1.2"
 )
 

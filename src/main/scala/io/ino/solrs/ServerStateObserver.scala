@@ -66,10 +66,10 @@ class PingStatusObserver[F[_]](solrServers: SolrServers, httpClient: AsyncHttpCl
       })
       promise.future
     }
-    FutureFactory.sequence(futures).map(_ => Unit)
+    FutureFactory.sequence(futures).map(_ => ())
   }
 
-  private def updateServerStatus(server: SolrServer, response: Response, url: String) {
+  private def updateServerStatus(server: SolrServer, response: Response, url: String): Unit = {
     if (response.getStatusCode != 200) {
       logger.warn(s"Got ping response status != 200 (${response.getStatusCode}) from $url, with response '${new String(response.getResponseBodyAsBytes)}'")
       server.status = Failed

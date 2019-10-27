@@ -494,7 +494,7 @@ class JavaAsyncSolrClient(override private[solrs] val loadBalancer: LoadBalancer
     * @return an [[org.apache.solr.client.solrj.response.UpdateResponse UpdateResponse]] containing the response
     *         from the server
     */
-  def deleteByIds(ids: util.List[String]): CompletionStage[UpdateResponse] = super.deleteByIds(ids = ids.asScala)
+  def deleteByIds(ids: util.List[String]): CompletionStage[UpdateResponse] = super.deleteByIds(ids = ids.asScala.toSeq)
 
   /**
     * Deletes a list of documents by unique ID, specifying max time before commit
@@ -505,7 +505,7 @@ class JavaAsyncSolrClient(override private[solrs] val loadBalancer: LoadBalancer
     *         from the server
     */
   def deleteByIds(ids: util.List[String], commitWithinMs: Int): CompletionStage[UpdateResponse] =
-    super.deleteByIds(ids = ids.asScala, commitWithinMs = commitWithinMs)
+    super.deleteByIds(ids = ids.asScala.toSeq, commitWithinMs = commitWithinMs)
 
   /**
     * Deletes a list of documents by unique ID, specifying max time before commit
@@ -516,7 +516,7 @@ class JavaAsyncSolrClient(override private[solrs] val loadBalancer: LoadBalancer
     *         from the server
     */
   def deleteByIds(collection: String, ids: util.List[String]): CompletionStage[UpdateResponse] =
-    super.deleteByIds(Option(collection), ids.asScala)
+    super.deleteByIds(Option(collection), ids.asScala.toSeq)
 
   /**
     * Deletes a list of documents by unique ID, specifying max time before commit
@@ -528,7 +528,7 @@ class JavaAsyncSolrClient(override private[solrs] val loadBalancer: LoadBalancer
     *         from the server
     */
   def deleteByIds(collection: String, ids: util.List[String], commitWithinMs: Int): CompletionStage[UpdateResponse] =
-    super.deleteByIds(Option(collection), ids.asScala, commitWithinMs)
+    super.deleteByIds(Option(collection), ids.asScala.toSeq, commitWithinMs)
 
   /**
     * Deletes documents from the index based on a query, specifying max time before commit

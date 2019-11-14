@@ -31,7 +31,7 @@
 <span class="home-icon">⌂</span>solrs - async solr client for java/scala
 </a>
 <div class="version-number">
-2.3.0
+2.3.2*
 </div>
 </div>
 <select class="supergroup" name="Language"><option class="group" value="group-scala">Scala</option><option class="group" value="group-java">Java</option></select>
@@ -75,7 +75,7 @@ C16.952,7,17,6.553,17,6c0-0.553-0.048-1-0.6-1H3.6C3.048,5,3,5.447,3,6C3,6.553,3.
 <span class="home-icon">⌂</span>solrs - async solr client for java/scala
 </a>
 <div class="version-number">
-2.3.0
+2.3.2*
 </div>
 </div>
 <select class="supergroup" name="Language"><option class="group" value="group-scala">Scala</option><option class="group" value="group-java">Java</option></select>
@@ -124,14 +124,14 @@ C16.952,7,17,6.553,17,6c0-0.553-0.048-1-0.6-1H3.6C3.048,5,3,5.447,3,6C3,6.553,3.
   &quot;http://localhost:8983/solr/collection1&quot;,
   &quot;http://localhost:8984/solr/collection1&quot;
 ));
-JavaAsyncSolrClient solr = JavaAsyncSolrClient.builder(lb).build();</code></pre><a href="https://github.com/inoio/solrs/tree/v2.3.0/src/main/paradox/resources/LoadBalancing.java#L12-L16">Full source at GitHub</a></dd>
+JavaAsyncSolrClient solr = JavaAsyncSolrClient.builder(lb).build();</code></pre><a href="https://github.com/inoio/solrs/tree/master/src/main/paradox/resources/LoadBalancing.java#L12-L16">Full source at GitHub</a></dd>
   <dt>Scala</dt>
   <dd>
   <pre class="prettyprint"><code class="language-scala">val lb = RoundRobinLB(IndexedSeq(
   &quot;http://localhost:8983/solr/collection1&quot;,
   &quot;http://localhost:8984/solr/collection1&quot;
 ))
-val solr = AsyncSolrClient.Builder(lb).build</code></pre><a href="https://github.com/inoio/solrs/tree/v2.3.0/src/main/paradox/resources/LoadBalancing.scala#L11-L15">Full source at GitHub</a></dd>
+val solr = AsyncSolrClient.Builder(lb).build</code></pre><a href="https://github.com/inoio/solrs/tree/master/src/main/paradox/resources/LoadBalancing.scala#L11-L15">Full source at GitHub</a></dd>
 </dl>
 <h3><a href="#fastest-server-load-balancer" name="fastest-server-load-balancer" class="anchor"><span class="anchor-link"></span></a>Fastest Server Load Balancer</h3>
 <p>The <code>FastestServerLB</code> is a statistics based load balancer that classifies servers as &ldquo;fast&rdquo; and &ldquo;slow&rdquo; servers (based on their latest average response time) and selects one of the &ldquo;fast&rdquo; servers (round robin) when asked for one. This is useful e.g. when some solr server is currently performing major GC, or when for some nodes network latency is increased (temporary or permanent).</p>
@@ -167,7 +167,7 @@ FastestServerLB&lt;?&gt; lb = FastestServerLB.builder(servers, collectionAndTest
         .withMaxDelay(5, SECONDS)
         .withInitialTestRuns(50)
         .build();
-JavaAsyncSolrClient solr = JavaAsyncSolrClient.builder(lb).build();</code></pre><a href="https://github.com/inoio/solrs/tree/v2.3.0/src/main/paradox/resources/LoadBalancing.java#L2-L31">Full source at GitHub</a></dd>
+JavaAsyncSolrClient solr = JavaAsyncSolrClient.builder(lb).build();</code></pre><a href="https://github.com/inoio/solrs/tree/master/src/main/paradox/resources/LoadBalancing.java#L2-L31">Full source at GitHub</a></dd>
   <dt>Scala</dt>
   <dd>
   <pre class="prettyprint"><code class="language-scala">import io.ino.solrs._
@@ -183,7 +183,7 @@ val lb = {
   def collectionAndTestQuery(server: SolrServer) = col1TestQuery
   new FastestServerLB(servers, collectionAndTestQuery, minDelay = 50 millis, maxDelay = 5 seconds, initialTestRuns = 50)
 }
-val solr = AsyncSolrClient.Builder(lb).build</code></pre><a href="https://github.com/inoio/solrs/tree/v2.3.0/src/main/paradox/resources/LoadBalancing.scala#L2-L28">Full source at GitHub</a></dd>
+val solr = AsyncSolrClient.Builder(lb).build</code></pre><a href="https://github.com/inoio/solrs/tree/master/src/main/paradox/resources/LoadBalancing.scala#L2-L28">Full source at GitHub</a></dd>
 </dl>
 <div class="source-github">
 The source code for this page can be found <a href="https://github.com/inoio/solrs/tree/master/src/main/paradox/usage/load-balancing.md">here</a>.
@@ -270,7 +270,7 @@ The source code for this page can be found <a href="https://github.com/inoio/sol
 <script type="text/javascript" src="../lib/prettify/prettify.js"></script>
 <script type="text/javascript" src="../lib/prettify/lang-scala.js"></script>
 <script type="text/javascript">jQuery(function(){window.prettyPrint && prettyPrint()});</script>
-<script type="text/javascript">jQuery(function(jq){initOldVersionWarnings(jq, '2.3.0', '')});</script>
+<script type="text/javascript">jQuery(function(jq){initOldVersionWarnings(jq, '2.3.2-SNAPSHOT', '')});</script>
 
 
 </html>

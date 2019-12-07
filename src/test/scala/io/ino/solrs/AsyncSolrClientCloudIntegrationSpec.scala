@@ -6,7 +6,7 @@ import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.impl.CloudSolrClient
 import org.apache.solr.client.solrj.request.CollectionAdminRequest
 import org.scalatest.Assertion
-import org.scalatest.concurrent.PatienceConfiguration.Timeout
+import org.scalatest.concurrent.PatienceConfiguration.{Interval, Timeout}
 import org.scalatest.concurrent.Eventually
 import org.scalatest.concurrent.IntegrationPatience
 import org.slf4j.LoggerFactory
@@ -43,7 +43,7 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
 
   import io.ino.solrs.SolrUtils._
 
-  override def beforeAll(): Unit = {
+  override def beforeEach(): Unit = {
     solrRunner = SolrCloudRunner.start(
       numServers = 2,
       collections = List(
@@ -75,12 +75,12 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
   }
 
   private def queryAndCheckResponse(): Unit = {
-    eventually(Timeout(2 seconds)) {
+    eventually(Timeout(2 seconds), Interval(50 milliseconds)) {
       getIds(solrJClient.query(q)) should contain theSameElementsAs someDocsIds
     }
   }
 
-  override def afterAll(): Unit = {
+  override def afterEach(): Unit = {
     solrJClient.close()
     cut.shutdown()
     solrServers.shutdown()
@@ -103,7 +103,7 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
       SolrRunner.stopJetty(solrRunner.jettySolrRunners.last)
 
       // Wait some time after Jetty was stopped
-      Thread.sleep(100)
+      Thread.sleep(200)
 
       // Restart solr
       SolrRunner.startJetty(solrRunner.jettySolrRunners.last)
@@ -217,7 +217,8 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
   }
 
   private def awaitAllServersBeingEnabled(): Assertion = {
-    eventually {
+    eventually(Timeout(5 seconds), Interval(100 milliseconds)) {
+      logger.info("Awaiting all servers status is Enabled")
       cut.loadBalancer.solrServers.all.map(_.status) should contain theSameElementsAs solrServerUrls.map(_ => Enabled)
     }
   }

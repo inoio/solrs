@@ -140,7 +140,7 @@ class SolrCloudRunner(numServers: Int, collections: List[SolrCollection] = List.
   def zkAddress: String = zookeeper.getZkAddress
 
   def restartZookeeper(): Unit = {
-    logger.info("Restarting Zookeeper...")
+    logger.info(s"Restarting Zookeeper with zkDir = ${zookeeper.getZkDir} and port = ${zookeeper.getPort}...")
     zookeeper.shutdown()
     zookeeper = new ZkTestServer(zookeeper.getZkDir, zookeeper.getPort)
     startZk(zookeeper)

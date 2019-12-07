@@ -6,6 +6,7 @@ addSbtPlugin("com.typesafe.sbt" % "sbt-ghpages" % "0.6.2")
 addSbtPlugin("com.lightbend.paradox" % "sbt-paradox" % "0.3.6")
 addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.9.7")
 // addSbtPlugin("io.github.jonas" % "sbt-paradox-material-theme" % "0.4.0")
+addSbtPlugin("net.virtual-void" % "sbt-dependency-graph" % "0.10.0-RC1")
 
 /*
 resolvers += Resolver.bintrayIvyRepo("scalacenter", "sbt-releases")

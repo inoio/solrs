@@ -38,8 +38,8 @@ resolvers ++= Seq(
   "Restlet Repositories" at "http://maven.restlet.org"
 )
 
-val solrVersion = "7.6.0"
-val slf4jVersion = "1.7.26"
+val solrVersion = "7.7.2"
+val slf4jVersion = "1.7.29"
 
 libraryDependencies ++= Seq(
   "org.apache.solr"         % "solr-solrj"        % solrVersion,
@@ -53,11 +53,8 @@ libraryDependencies ++= Seq(
   "com.novocode"            % "junit-interface"   % "0.11" % "test",
   "org.mockito"             % "mockito-core"      % "1.10.19" % "test",
   "org.hamcrest"            % "hamcrest-library"  % "1.3" % "test",
-  // Cloud testing, solr-core for ZkController (upconfig)
-  "org.apache.solr"         % "solr-core"         % solrVersion % "test",
-  "org.apache.solr"         % "solr-test-framework" % solrVersion % "test",
-  "com.twitter"            %% "util-core"         % "19.10.0" % "optional",
-  "commons-logging"         % "commons-logging"   % "1.2"
+  "org.apache.solr"         % "solr-test-framework" % solrVersion % "test" excludeAll(ExclusionRule(organization = "org.apache.logging.log4j")),
+  "com.twitter"            %% "util-core"         % "19.11.0" % "optional"
 )
 
 // Fork tests so that SolrRunner's shutdown hook kicks in

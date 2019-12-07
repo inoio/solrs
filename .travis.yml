@@ -33,7 +33,7 @@ before_install:
 # site publishing (see https://www.scala-sbt.org/sbt-site/publishing.html)
 deploy:
   provider: script
-  script: env SBT_GHPAGES_COMMIT_MESSAGE="build $TRAVIS_BUILD_ID updated site ('$TRAVIS_COMMIT_MESSAGE')" sbt ghpagesPushSite
+  script: SBT_GHPAGES_COMMIT_MESSAGE="build $TRAVIS_BUILD_ID updated site ('$TRAVIS_COMMIT_MESSAGE')" sbt ghpagesPushSite
   skip_cleanup: true
   on:
     branch: master

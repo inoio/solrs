@@ -217,7 +217,7 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
   }
 
   private def awaitAllServersBeingEnabled(): Assertion = {
-    eventually(Timeout(5 seconds), Interval(100 milliseconds)) {
+    eventually(Timeout(30 seconds), Interval(100 milliseconds)) {
       logger.info("Awaiting all servers status is Enabled")
       cut.loadBalancer.solrServers.all.map(_.status) should contain theSameElementsAs solrServerUrls.map(_ => Enabled)
     }

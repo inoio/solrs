@@ -17,7 +17,7 @@ This is a java/scala solr client providing an interface like SolrJ, just asynchr
 
 ## Documentation
 
-The documentation is available at [http://inoio.github.io/solrs/](http://inoio.github.io/solrs/)
+The documentation is available at [https://inoio.github.io/solrs/](https://inoio.github.io/solrs/)
 
 ## License
 

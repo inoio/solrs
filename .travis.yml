@@ -34,7 +34,10 @@ before_install:
 deploy:
   provider: script
   script: SBT_GHPAGES_COMMIT_MESSAGE="build $TRAVIS_BUILD_ID updated site ('$TRAVIS_COMMIT_MESSAGE')" sbt ghpagesPushSite
-  skip_cleanup: true
+  cleanup: false
+  # force push, otherwise site deployment failed,
+  # see also https://blog.travis-ci.com/2019-08-27-deployment-tooling-dpl-v2-preview-release
+  keep_history: false
   on:
     branch: master
     condition: $(! grep SNAPSHOT version.sbt && [[ $TRAVIS_PULL_REQUEST = false ]] && [[ $TRAVIS_SCALA_VERSION = 2.12* ]])

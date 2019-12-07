@@ -40,7 +40,7 @@ deploy:
   keep_history: false
   on:
     branch: master
-    condition: grep -v SNAPSHOT version.sbt && [[ $TRAVIS_PULL_REQUEST = false ]] && [[ $TRAVIS_SCALA_VERSION = 2.12* ]]
+    condition: $(grep -v SNAPSHOT version.sbt && [[ $TRAVIS_PULL_REQUEST = false ]] && [[ $TRAVIS_SCALA_VERSION = 2.12* ]])
 
 cache:
   directories:

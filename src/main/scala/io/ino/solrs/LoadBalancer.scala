@@ -32,7 +32,7 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 
-trait LoadBalancer extends RequestInterceptor {
+trait LoadBalancer extends RequestInterceptor with java.io.Serializable {
 
   val solrServers: SolrServers
 

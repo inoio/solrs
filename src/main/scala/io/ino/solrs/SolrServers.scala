@@ -34,7 +34,7 @@ import scala.util.control.NonFatal
 /**
   * Provides the list of solr servers.
   */
-trait SolrServers {
+trait SolrServers extends java.io.Serializable {
 
   /**
     * The currently known solr servers.
@@ -120,7 +120,8 @@ class CloudSolrServers[F[_]](
     clusterStateUpdateInterval: Duration = 1 second,
     defaultCollection: Option[String] = None,
     warmupQueries: Option[WarmupQueries] = None)(implicit futureFactory: FutureFactory[F])
-    extends SolrServers
+    extends java.io.Serializable
+    with SolrServers
     with AsyncSolrClientAware[F]
     with ServerStateChangeObservable {
 

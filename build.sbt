@@ -12,9 +12,9 @@ scmInfo := Some(ScmInfo(url("https://github.com/inoio/solrs"), "git@github.com:i
 
 licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.html"))
 
-scalaVersion := "2.12.8"
+scalaVersion := "2.12.11"
 
-crossScalaVersions := Seq("2.12.8", "2.13.1")
+crossScalaVersions := Seq("2.12.11", "2.13.2")
 
 scalacOptions ++= Seq(
   "-unchecked",

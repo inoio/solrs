@@ -49,7 +49,7 @@ libraryDependencies ++= Seq(
   "io.dropwizard.metrics"   % "metrics-core"      % "3.2.6" % "optional",
   "org.slf4j"               % "slf4j-api"         % slf4jVersion,
   "org.slf4j"               % "slf4j-simple"      % slf4jVersion % "test",
-  "org.scalatest"          %% "scalatest"         % "3.2.0" % "test",
+  "org.scalatest"          %% "scalatest"         % "3.0.8" % "test",
   "com.novocode"            % "junit-interface"   % "0.11" % "test",
   "org.mockito"             % "mockito-core"      % "1.10.19" % "test",
   "org.hamcrest"            % "hamcrest-library"  % "1.3" % "test",

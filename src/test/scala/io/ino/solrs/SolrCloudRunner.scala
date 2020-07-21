@@ -55,6 +55,10 @@ class SolrCloudRunner(numServers: Int, collections: List[SolrCollection] = List.
   // avoid confusing ERROR log entry "Missing Java Option solr.log.dir"
   System.setProperty("solr.log.dir", baseDir.toAbsolutePath.toString)
 
+  // prevent IOException: 6/invalid_frame_length, see also
+  // https://stackoverflow.com/questions/55417706/solr-8-minisolrcloudcluster-with-multiple-servers-gives-java-io-ioexception
+  System.setProperty("jetty.testMode", "true")
+
   // shutdown hook clean up for tests that don't call shutdown explicitly
   Runtime.getRuntime.addShutdownHook(new Thread() {
     override def run(): Unit = {
@@ -158,7 +162,7 @@ class SolrCloudRunner(numServers: Int, collections: List[SolrCollection] = List.
   def solrCoreUrls: List[String] = {
     jettySolrRunners.flatMap { jetty =>
       jetty.getCoreContainer.getAllCoreNames.asScala.map { coreName =>
-        s"http://127.0.0.1:${jetty.getLocalPort}/solr/$coreName"
+        s"${jetty.getBaseUrl}/$coreName"
       }
     }
   }

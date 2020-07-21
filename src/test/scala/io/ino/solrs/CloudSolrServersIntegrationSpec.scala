@@ -58,7 +58,7 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
       defaultCollection = Some("collection1")
     )
     solrJClient = solrRunner.solrJClient
-    asyncSolrClients = solrRunner.jettySolrRunners.map(jetty => jetty -> AsyncSolrClient(s"http://$hostName:${jetty.getLocalPort}/solr/collection1")).toMap
+    asyncSolrClients = solrRunner.jettySolrRunners.map(jetty => jetty -> AsyncSolrClient(s"${jetty.getBaseUrl}/collection1")).toMap
 
     eventually(Timeout(10 seconds)) {
       solrJClient.deleteByQuery("*:*")

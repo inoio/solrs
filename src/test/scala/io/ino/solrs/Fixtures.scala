@@ -21,7 +21,7 @@ object Fixtures {
     val replica = new Replica(baseUrl, (Map[String, AnyRef](
       ZkStateReader.STATE_PROP -> replicaStatus.toString,
       ZkStateReader.REPLICA_TYPE -> replicaType.name()
-    ) ++ leaderProps).asJava)
+    ) ++ leaderProps).asJava, "collection", "slice")
     ShardReplica(baseUrl, replica)
   }
 

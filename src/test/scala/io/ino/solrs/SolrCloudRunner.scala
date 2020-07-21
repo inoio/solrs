@@ -75,7 +75,7 @@ class SolrCloudRunner(numServers: Int, collections: List[SolrCollection] = List.
     // scalastyle:on null
 
     timed("Starting Solr ZK Test Server") {
-      val dataDir = baseDir.resolve("zookeeper/server1/data").toString
+      val dataDir = baseDir.resolve("zookeeper/server1/data")
       zookeeper = maybeZkPort.map(zkPort => new ZkTestServer(dataDir, zkPort)).getOrElse(new ZkTestServer(dataDir))
       startZk(zookeeper)
     }

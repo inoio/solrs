@@ -19,6 +19,8 @@ object Fixtures {
       case Failed => Replica.State.RECOVERY_FAILED
     }
     val replica = new Replica(baseUrl, (Map[String, AnyRef](
+      ZkStateReader.NODE_NAME_PROP -> "node",
+      ZkStateReader.CORE_NAME_PROP -> "core",
       ZkStateReader.STATE_PROP -> replicaStatus.toString,
       ZkStateReader.REPLICA_TYPE -> replicaType.name()
     ) ++ leaderProps).asJava, "collection", "slice")

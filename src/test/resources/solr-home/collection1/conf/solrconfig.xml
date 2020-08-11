@@ -1630,4 +1630,8 @@
       <str name="fvCacheName">QUERY_DOC_FV</str>
     </transformer>
 
+    <initParams path="/admin/ping">
+      <str name="healthcheckFile">server-enabled.txt</str>
+    </initParams>
+  
 </config>

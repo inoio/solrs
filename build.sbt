@@ -28,11 +28,11 @@ scalacOptions ++= Seq(
 
 javacOptions ++= Seq("-source", "1.8", "-target", "1.8", "-Xlint")
 
-// initialize := {
-//   val _ = initialize.value
-//   if (sys.props("java.specification.version") != "1.8")
-//     sys.error(s"Java 8 is required for this project. Running: ${sys.props("java.specification.version")}")
-// }
+initialize := {
+  val _ = initialize.value
+  if (sys.props("java.specification.version") != "1.8")
+    sys.error(s"Java 8 is required for this project. Running: ${sys.props("java.specification.version")}")
+}
 
 resolvers ++= Seq(
   "Restlet Repositories" at "https://maven.restlet.org"

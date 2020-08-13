@@ -2,3 +2,4 @@
 .solr
 target
 .metals
+metals.sbt

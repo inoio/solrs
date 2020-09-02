@@ -35,17 +35,17 @@ initialize := {
 }
 
 resolvers ++= Seq(
-  "Restlet Repositories" at "http://maven.restlet.org"
+  "Restlet Repositories" at "https://maven.restlet.org"
 )
 
-val solrVersion = "7.7.2"
+val solrVersion = "8.6.2"
 val slf4jVersion = "1.7.30"
 
 libraryDependencies ++= Seq(
   "org.apache.solr"         % "solr-solrj"        % solrVersion,
   "org.asynchttpclient"     % "async-http-client" % "2.12.1",
-  "org.scala-lang.modules" %% "scala-xml"         % "1.2.0",
-  "org.scala-lang.modules" %% "scala-java8-compat"% "0.9.0",
+  "org.scala-lang.modules" %% "scala-xml"         % "1.3.0",
+  "org.scala-lang.modules" %% "scala-java8-compat"% "0.9.1",
   "io.dropwizard.metrics"   % "metrics-core"      % "3.2.6" % "optional",
   "org.slf4j"               % "slf4j-api"         % slf4jVersion,
   "org.slf4j"               % "slf4j-simple"      % slf4jVersion % "test",

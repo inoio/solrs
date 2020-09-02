@@ -1,3 +1,5 @@
 .idea
 .solr
 target
+.metals
+metals.sbt

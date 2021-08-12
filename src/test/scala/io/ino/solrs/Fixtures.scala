@@ -18,12 +18,13 @@ object Fixtures {
       case Disabled => Replica.State.RECOVERING
       case Failed => Replica.State.RECOVERY_FAILED
     }
-    val replica = new Replica(baseUrl, (Map[String, AnyRef](
-      ZkStateReader.NODE_NAME_PROP -> "node",
-      ZkStateReader.CORE_NAME_PROP -> "core",
-      ZkStateReader.STATE_PROP -> replicaStatus.toString,
-      ZkStateReader.REPLICA_TYPE -> replicaType.name()
-    ) ++ leaderProps).asJava, "collection", "slice")
+    val propMap = new java.util.HashMap[String, AnyRef]
+    propMap.put(ZkStateReader.NODE_NAME_PROP, "node1:8983_solr")
+    propMap.put(ZkStateReader.CORE_NAME_PROP, "core")
+    propMap.put(ZkStateReader.STATE_PROP, replicaStatus.toString)
+    propMap.put(ZkStateReader.REPLICA_TYPE, replicaType.name())
+    leaderProps.foreach(p => propMap.put(p._1, p._2))
+    val replica = new Replica(baseUrl, propMap, "collection", "slice")
     ShardReplica(baseUrl, replica)
   }
 

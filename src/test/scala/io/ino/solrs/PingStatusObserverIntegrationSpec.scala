@@ -119,7 +119,7 @@ class PingStatusObserverIntegrationSpec extends FunSpec with BeforeAndAfterAll w
 
       eventually {
         val thrown = the [ExecutionException] thrownBy pingAction(solrUrl, "status")
-        thrown.getCause shouldBe a [ConnectException]
+        thrown.getCause shouldBe a [java.util.concurrent.TimeoutException]
       }
 
       // We know that the httpClient will throw a ConnectException, which was not the case with the one

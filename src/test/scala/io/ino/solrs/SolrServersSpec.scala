@@ -2,12 +2,13 @@ package io.ino.solrs
 
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.request.QueryRequest
-import org.scalatest.{FunSpec, Matchers}
+import org.scalatest.funspec.AnyFunSpec
+import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-class SolrServersSpec extends FunSpec with Matchers with FutureAwaits {
+class SolrServersSpec extends AnyFunSpec with Matchers with FutureAwaits {
 
   private val q = new QueryRequest(new SolrQuery("foo"))
   private implicit val timeout = 1.second

@@ -6,13 +6,15 @@ import io.ino.solrs.RetryDecision.Result
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.SolrRequest
 import org.apache.solr.client.solrj.request.QueryRequest
-import org.scalatest.{FunSpec, Inside, Matchers}
+import org.scalatest.funspec.AnyFunSpec
+import org.scalatest.Inside
+import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.duration._
 import scala.util.Failure
 import scala.util.Try
 
-class RetryPolicySpec extends FunSpec with Matchers with Inside {
+class RetryPolicySpec extends AnyFunSpec with Matchers with Inside {
 
   private val e = new RuntimeException("simulated ex")
   private val server1 = SolrServer("host1")

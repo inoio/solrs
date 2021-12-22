@@ -12,15 +12,16 @@ import org.apache.solr.common.cloud.Replica.Type.TLOG
 import org.apache.solr.common.params.ShardParams
 import org.apache.solr.common.params.ShardParams.SHARDS_PREFERENCE
 import org.apache.solr.common.params.ShardParams.SHARDS_PREFERENCE_REPLICA_TYPE
-import org.scalatest.FunSpec
-import org.scalatest.Matchers
+import org.scalatest.funspec.AnyFunSpec
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 
 //noinspection RedundantDefaultArgument
-class RoundRobinLBSpec extends FunSpec with Matchers {
+class RoundRobinLBSpec extends AnyFunSpec with Matchers {
 
   private val q = new QueryRequest(new SolrQuery("foo"))
 

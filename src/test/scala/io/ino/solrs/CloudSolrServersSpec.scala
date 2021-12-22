@@ -1,16 +1,17 @@
 package io.ino.solrs
 
 import java.nio.file.{Files, Paths}
-
 import io.ino.solrs.Fixtures.shardReplica
 import org.apache.solr.common.cloud.ClusterState
 import org.scalatest._
+import org.scalatest.funspec.AnyFunSpec
+import org.scalatest.matchers.should.Matchers
 
 
 /**
  * Test that starts ZK, solrRunners and our Class Under Test before all tests.
  */
-class CloudSolrServersSpec extends FunSpec with Matchers {
+class CloudSolrServersSpec extends AnyFunSpec with Matchers {
 
   import ServerStateChangeObservable._
 

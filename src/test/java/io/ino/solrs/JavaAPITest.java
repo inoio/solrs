@@ -6,7 +6,7 @@ import org.apache.solr.client.solrj.response.QueryResponse;
 import org.asynchttpclient.DefaultAsyncHttpClient;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.scalatest.junit.JUnitSuite;
+import org.scalatestplus.junit.JUnitSuite;
 import scala.Option;
 import scala.Tuple2;
 import scala.concurrent.duration.FiniteDuration;

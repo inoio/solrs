@@ -15,7 +15,7 @@ licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.
 scalaVersion := "2.12.12"
 
 // Remember: also update scala versions in .travis.yml!
-crossScalaVersions := Seq("2.12.12", "2.13.3")
+crossScalaVersions := Seq("2.12.12", "2.13.7")
 
 scalacOptions ++= Seq(
   "-unchecked",
@@ -39,30 +39,31 @@ resolvers ++= Seq(
   "Restlet Repositories" at "https://maven.restlet.org"
 )
 
-val solrVersion = "8.6.2"
-val slf4jVersion = "1.7.30"
+val solrVersion = "8.11.1"
+val slf4jVersion = "1.7.32"
 
 libraryDependencies ++= Seq(
   "org.apache.solr"         % "solr-solrj"        % solrVersion,
-  "org.asynchttpclient"     % "async-http-client" % "2.12.1",
+  "org.asynchttpclient"     % "async-http-client" % "2.12.3",
   "org.scala-lang.modules" %% "scala-xml"         % "1.3.0",
-  "org.scala-lang.modules" %% "scala-java8-compat"% "0.9.1",
+  "org.scala-lang.modules" %% "scala-java8-compat"% "1.0.2",
   "io.dropwizard.metrics"   % "metrics-core"      % "3.2.6" % "optional",
   "org.slf4j"               % "slf4j-api"         % slf4jVersion,
   "org.slf4j"               % "slf4j-simple"      % slf4jVersion % "test",
-  "org.scalatest"          %% "scalatest"         % "3.0.8" % "test",
-  "com.novocode"            % "junit-interface"   % "0.11" % "test",
-  "org.mockito"             % "mockito-core"      % "1.10.19" % "test",
-  "org.hamcrest"            % "hamcrest-library"  % "1.3" % "test",
+  "org.scalatest"          %% "scalatest"         % "3.2.10" % "test",
+  "org.scalatestplus"      %% "mockito-3-4"       % "3.2.10.0" % "test",
+  "org.scalatestplus"      %% "junit-4-13"        % "3.2.10.0" % "test",
+  "com.github.sbt"          % "junit-interface"   % "0.13.2" % Test,
+  "org.mockito"             % "mockito-core"      % "4.2.0" % "test",
+  "org.hamcrest"            % "hamcrest-library"  % "2.2" % "test",
   "org.apache.solr"         % "solr-test-framework" % solrVersion % "test" excludeAll(ExclusionRule(organization = "org.apache.logging.log4j")),
-  "com.twitter"            %% "util-core"         % "19.11.0" % "optional"
+  "com.twitter"            %% "util-core"         % "21.12.0" % "optional"
 )
 
 // Fork tests so that SolrRunner's shutdown hook kicks in
-fork in Test := true
-
+Test / fork := true
 enablePlugins(ParadoxSitePlugin)
-sourceDirectory in Paradox := sourceDirectory.value / "main" / "paradox"
+Paradox / sourceDirectory := sourceDirectory.value / "main" / "paradox"
 
 enablePlugins(GhpagesPlugin)
 git.remoteRepo := scmInfo.value.get.connection
@@ -80,10 +81,10 @@ paradoxMaterialTheme in Compile := {
     .withColor("indigo", "orange")
     .withRepository(uri("https://github.com/inoio/solrs"))
 }
-*/
+ */
 
 // Publish settings
-publishTo in ThisBuild := {
+ThisBuild / publishTo := {
   val nexus = "https://oss.sonatype.org/"
   if (isSnapshot.value)
     Some("snapshots" at nexus + "content/repositories/snapshots")
@@ -93,10 +94,10 @@ publishTo in ThisBuild := {
 
 publishMavenStyle := true
 
-publishArtifact in Test := false
+Test / publishArtifact := false
 
 // enable publishing the jar produced by `test:package`
-publishArtifact in (Test, packageBin) := true
+Test / packageBin / publishArtifact := true
 
 pomIncludeRepository := { _ => false }
 

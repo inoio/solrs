@@ -8,8 +8,8 @@ import org.asynchttpclient.AsyncHandler
 import org.asynchttpclient.AsyncHttpClient
 import org.asynchttpclient.Request
 import org.asynchttpclient.Response
-import org.mockito.Matchers.any
 import org.mockito.Mockito.{doThrow, spy, times, verify}
+import org.mockito.ArgumentMatchers.any
 
 import scala.concurrent.duration._
 import scala.util.control.NoStackTrace

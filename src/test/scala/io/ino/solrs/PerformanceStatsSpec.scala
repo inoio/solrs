@@ -1,20 +1,21 @@
 package io.ino.solrs
 
 import java.util.concurrent.TimeUnit._
-
 import io.ino.solrs.PerformanceStats.EvictingArray
 import io.ino.time.Clock
 import io.ino.time.Clock.MutableClock
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.response.QueryResponse
-import org.scalatest.{BeforeAndAfterEach, FunSpec, Matchers}
+import org.scalatest.BeforeAndAfterEach
+import org.scalatest.funspec.AnyFunSpec
+import org.scalatest.matchers.should.Matchers
 
 import scala.collection.SortedMap
 import scala.concurrent._
 import scala.concurrent.duration.Duration
 import scala.util.{Success, Try}
 
-class PerformanceStatsSpec extends FunSpec with Matchers with BeforeAndAfterEach {
+class PerformanceStatsSpec extends AnyFunSpec with Matchers with BeforeAndAfterEach {
 
   private val clock = new MutableClock
   private val queryClass1 = "q1"

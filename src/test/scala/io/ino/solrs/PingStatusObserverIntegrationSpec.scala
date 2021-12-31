@@ -3,19 +3,20 @@ package io.ino.solrs
 import java.net.ConnectException
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
 import java.util.concurrent.{ExecutionException, TimeUnit, TimeoutException}
-
 import javax.servlet._
 import javax.servlet.http.HttpServletResponse
 import org.apache.solr.client.solrj.impl.HttpSolrClient
 import org.asynchttpclient.{DefaultAsyncHttpClient, DefaultAsyncHttpClientConfig}
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
+import org.scalatest.funspec.AnyFunSpec
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
 import org.scalatestplus.mockito.MockitoSugar
-import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, FunSpec, Matchers}
 
 import scala.concurrent.duration._
 
-class PingStatusObserverIntegrationSpec extends FunSpec with BeforeAndAfterAll with Eventually with IntegrationPatience with BeforeAndAfterEach with Matchers with FutureAwaits with MockitoSugar {
+class PingStatusObserverIntegrationSpec extends AnyFunSpec with BeforeAndAfterAll with Eventually with IntegrationPatience with BeforeAndAfterEach with Matchers with FutureAwaits with MockitoSugar {
 
   import PingStatusObserverIntegrationSpec._
 

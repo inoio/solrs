@@ -2,11 +2,11 @@ package io.ino.solrs.future
 
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.{CompletionStage, ExecutionException, TimeUnit}
-
 import com.twitter.util.{Future => TFuture}
 import io.ino.solrs.FutureAwaits
+import org.scalatest.funspec.AnyFunSpec
+import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.mockito.MockitoSugar
-import org.scalatest.{FunSpec, Matchers}
 
 import scala.concurrent.{Future => SFuture}
 
@@ -34,7 +34,7 @@ class JavaFutureFactorySpec extends FutureFactorySpec[CompletionStage] with Futu
   }
 }
 
-abstract class FutureFactorySpec[BaseFuture[_]] extends FunSpec with Matchers with MockitoSugar {
+abstract class FutureFactorySpec[BaseFuture[_]] extends AnyFunSpec with Matchers with MockitoSugar {
 
   protected implicit def factory: FutureFactory[BaseFuture]
   protected def awaitBase[T](future: BaseFuture[T]): T

@@ -2,7 +2,6 @@ package io.ino.solrs
 
 import java.util.Arrays.asList
 import java.util.concurrent.Executors
-
 import org.asynchttpclient.DefaultAsyncHttpClient
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.SolrRequest
@@ -10,7 +9,8 @@ import org.apache.solr.client.solrj.SolrResponse
 import org.apache.solr.client.solrj.impl.{NoOpResponseParser, XMLResponseParser}
 import org.apache.solr.client.solrj.request.{GenericSolrRequest, QueryRequest}
 import org.apache.solr.client.solrj.response.QueryResponse
-import org.mockito.Matchers._
+import org.mockito.ArgumentMatcher._
+import org.mockito.ArgumentMatchers.anyLong
 import org.mockito.Mockito.verify
 import org.scalatest.concurrent.Eventually._
 import org.scalatest.concurrent.Eventually.eventually

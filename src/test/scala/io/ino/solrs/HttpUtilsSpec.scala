@@ -1,11 +1,13 @@
 package io.ino.solrs
 
-import org.scalatest.{Matchers, FunSpec}
+import org.scalatest.funspec.AnyFunSpec
+import org.scalatest.matchers.should.Matchers
+
 
 /**
  * Created by magro on 4/29/14.
  */
-class HttpUtilsSpec extends FunSpec with Matchers with FutureAwaits {
+class HttpUtilsSpec extends AnyFunSpec with Matchers with FutureAwaits {
 
   describe("HttpUtils") {
 

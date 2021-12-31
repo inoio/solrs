@@ -86,7 +86,7 @@ class AsyncSolrClientFunSpec extends StandardFunSpec with RunningSolr {
       await(solrs.addBeans(beanIterator = Iterator(bean1, bean2)))
       solrJClient.commit()
       val response = solrJClient.query(new SolrQuery("*:*"))
-      response.getResults.getNumFound should be (2)
+      response.getResults.getNumFound shouldBe (2)
       response.getBeans(classOf[TestBean]).asScala should contain theSameElementsAs List(bean1, bean2)
     }
 

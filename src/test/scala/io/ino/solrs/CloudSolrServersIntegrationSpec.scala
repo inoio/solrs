@@ -14,7 +14,7 @@ import org.apache.solr.client.solrj.response.QueryResponse
 import org.apache.solr.common.SolrInputDocument
 import org.apache.solr.common.params.ShardParams.SHARDS
 import org.apache.solr.common.params.ShardParams._ROUTE_
-import org.mockito.Matchers._
+import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito._
 import org.scalatest.concurrent.Eventually._
 import org.scalatest.concurrent.Eventually.eventually

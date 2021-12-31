@@ -5,6 +5,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toList;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.collection.IsIterableContainingInAnyOrder.containsInAnyOrder;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.*;
 
 import java.io.IOException;
@@ -27,7 +28,6 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import org.scalatestplus.junit.JUnitSuite;
-import scala.Option;
 
 public class JavaAPIFunTest extends JUnitSuite {
 

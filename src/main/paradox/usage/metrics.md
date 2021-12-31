@@ -2,7 +2,7 @@
 
 There's basic metrics support for request timings and number of exceptions. You can provide your own
 implementation of `io.ino.solrs.Metrics` or use the `CodaHaleMetrics` class shipped with solrs if you're
-just happy with this [metrics library](http://metrics.codahale.com/) :-)
+just happy with this [metrics library](https://metrics.dropwizard.io/) :-)
 
 To configure solrs with the `Metrics` implementation pass an initialized instance like this:
 

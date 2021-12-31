@@ -114,7 +114,7 @@ C16.952,7,17,6.553,17,6c0-0.553-0.048-1-0.6-1H3.6C3.048,5,3,5.447,3,6C3,6.553,3.
 <div class="page-content row">
 <div class="small-12 large-9 column" id="docs">
 <h2><a href="#metrics" name="metrics" class="anchor"><span class="anchor-link"></span></a>Metrics</h2>
-<p>There&rsquo;s basic metrics support for request timings and number of exceptions. You can provide your own implementation of <code>io.ino.solrs.Metrics</code> or use the <code>CodaHaleMetrics</code> class shipped with solrs if you&rsquo;re just happy with this <a href="http://metrics.codahale.com/">metrics library</a> :-)</p>
+<p>There&rsquo;s basic metrics support for request timings and number of exceptions. You can provide your own implementation of <code>io.ino.solrs.Metrics</code> or use the <code>CodaHaleMetrics</code> class shipped with solrs if you&rsquo;re just happy with this <a href="https://metrics.dropwizard.io/">metrics library</a> :-)</p>
 <p>To configure solrs with the <code>Metrics</code> implementation pass an initialized instance like this:</p>
 <pre class="prettyprint"><button class="snippet-button copy-snippet" title="Copy snippet to clipboard">copy</button><a class="snippet-button go-to-source" href="https://github.com/inoio/solrs/tree/v2.6.0/src/main/paradox/resources/Metrics.scala#L7-L9" target="_blank" title="Go to snippet source">source</a><code class="language-scala">val solr = AsyncSolrClient.Builder(&quot;http://localhost:8983/solr/collection1&quot;)
   .withMetrics(new CodaHaleMetrics())

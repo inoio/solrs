@@ -12,10 +12,10 @@ scmInfo := Some(ScmInfo(url("https://github.com/inoio/solrs"), "git@github.com:i
 
 licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.html"))
 
-scalaVersion := "2.12.15"
+scalaVersion := "2.12.17"
 
 // Remember: also update scala versions in .travis.yml!
-crossScalaVersions := Seq("2.12.15", "2.13.7")
+crossScalaVersions := Seq("2.12.17", "2.13.10")
 
 scalacOptions ++= Seq(
   "-unchecked",
@@ -40,25 +40,25 @@ resolvers ++= Seq(
   "Restlet Repositories" at "https://maven.restlet.org"
 )
 
-val solrVersion = "8.11.1"
-val slf4jVersion = "1.7.32"
+val solrVersion = "8.11.2"
+val slf4jVersion = "1.7.36"
 
 libraryDependencies ++= Seq(
   "org.apache.solr"         % "solr-solrj"        % solrVersion,
   "org.asynchttpclient"     % "async-http-client" % "2.12.3",
-  "org.scala-lang.modules" %% "scala-xml"         % "2.0.1",
+  "org.scala-lang.modules" %% "scala-xml"         % "2.1.0",
   "org.scala-lang.modules" %% "scala-java8-compat"% "1.0.2",
-  "io.dropwizard.metrics"   % "metrics-core"      % "4.2.7" % "optional",
+  "io.dropwizard.metrics"   % "metrics-core"      % "4.2.13" % "optional",
   "org.slf4j"               % "slf4j-api"         % slf4jVersion,
   "org.slf4j"               % "slf4j-simple"      % slf4jVersion % "test",
-  "org.scalatest"          %% "scalatest"         % "3.2.10" % "test",
+  "org.scalatest"          %% "scalatest"         % "3.2.14" % "test",
   "org.scalatestplus"      %% "mockito-3-4"       % "3.2.10.0" % "test",
-  "org.scalatestplus"      %% "junit-4-13"        % "3.2.10.0" % "test",
+  "org.scalatestplus"      %% "junit-4-13"        % "3.2.14.0" % "test",
   "com.github.sbt"          % "junit-interface"   % "0.13.3" % Test,
-  "org.mockito"             % "mockito-core"      % "4.2.0" % "test",
+  "org.mockito"             % "mockito-core"      % "4.8.1" % "test",
   "org.hamcrest"            % "hamcrest-library"  % "2.2" % "test",
   "org.apache.solr"         % "solr-test-framework" % solrVersion % "test" excludeAll(ExclusionRule(organization = "org.apache.logging.log4j")),
-  "com.twitter"            %% "util-core"         % "21.12.0" % "optional"
+  "com.twitter"            %% "util-core"         % "22.7.0" % "optional"
 )
 
 // Fork tests so that SolrRunner's shutdown hook kicks in

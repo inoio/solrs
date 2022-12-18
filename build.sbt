@@ -31,8 +31,9 @@ javacOptions ++= Seq("-source", "1.8", "-target", "1.8", "-Xlint")
 
 initialize := {
   val _ = initialize.value
-  if (sys.props("java.specification.version") != "1.8")
-    sys.error(s"Java 8 is required for this project. Running: ${sys.props("java.specification.version")}")
+  val javaVersion = sys.props("java.specification.version")
+  if (javaVersion != "1.8" && javaVersion.toDouble < 9)
+    sys.error(s"At least java 8 is required for this project. Running: $javaVersion")
 }
 
 resolvers ++= Seq(

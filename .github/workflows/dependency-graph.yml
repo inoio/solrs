@@ -1,0 +1,19 @@
+name: Update Dependency Graph
+
+on:
+  push:
+    branches:
+      - master # default branch of the project
+
+jobs:
+  update-graph:
+    name: Update Dependency Graph
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: scalacenter/sbt-dependency-submission@v2.0.1
+        with:
+          ## Optional: Define the working directory of your build.
+          ## It should contain the build.sbt file.
+          working-directory: './'
+

@@ -1,7 +1,6 @@
 package io.ino.solrs
 
 import java.util.concurrent.atomic.AtomicBoolean
-
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.impl.CloudSolrClient
 import org.apache.solr.client.solrj.request.CollectionAdminRequest
@@ -11,6 +10,8 @@ import org.scalatest.concurrent.Eventually
 import org.scalatest.concurrent.IntegrationPatience
 import org.slf4j.LoggerFactory
 
+import java.io.IOException
+import java.net.ServerSocket
 import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -50,7 +51,9 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
         SolrCollection(collection1, replicas = 2, shards = 1),
         SolrCollection(collection2, replicas = 2, shards = 1)
       ),
-      defaultCollection = Some(collection1)
+      defaultCollection = Some(collection1),
+      // for the restart we need a fixed port
+      maybeZkPort = Some(freePort())
     )
     solrJClient = solrRunner.solrJClient
 
@@ -232,6 +235,18 @@ class AsyncSolrClientCloudIntegrationSpec extends StandardFunSpec with Eventuall
     runQueries(q, run, awaitReady(response) :: res)
   } else {
     res
+  }
+
+  private def freePort(): Int = {
+    var socket: ServerSocket = null
+    try {
+      socket = new ServerSocket(0)
+      socket.setReuseAddress(true)
+      socket.getLocalPort
+    } finally if (socket != null) {
+      try socket.close()
+      catch { case _: IOException => }
+    }
   }
 
 }

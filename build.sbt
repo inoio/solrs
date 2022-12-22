@@ -52,10 +52,9 @@ libraryDependencies ++= Seq(
   "org.slf4j"               % "slf4j-api"         % slf4jVersion,
   "org.slf4j"               % "slf4j-simple"      % slf4jVersion % "test",
   "org.scalatest"          %% "scalatest"         % "3.2.14" % "test",
-  "org.scalatestplus"      %% "mockito-3-4"       % "3.2.10.0" % "test",
+  "org.scalatestplus"      %% "mockito-4-6"       % "3.2.14.0" % "test",
   "org.scalatestplus"      %% "junit-4-13"        % "3.2.14.0" % "test",
   "com.github.sbt"          % "junit-interface"   % "0.13.3" % Test,
-  "org.mockito"             % "mockito-core"      % "4.8.1" % "test",
   "org.hamcrest"            % "hamcrest-library"  % "2.2" % "test",
   "org.apache.solr"         % "solr-test-framework" % solrVersion % "test" excludeAll(ExclusionRule(organization = "org.apache.logging.log4j")),
   "com.twitter"            %% "util-core"         % "22.7.0" % "optional"

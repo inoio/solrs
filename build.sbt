@@ -57,7 +57,7 @@ libraryDependencies ++= Seq(
   "com.github.sbt"          % "junit-interface"   % "0.13.3" % Test,
   "org.hamcrest"            % "hamcrest-library"  % "2.2" % "test",
   "org.apache.solr"         % "solr-test-framework" % solrVersion % "test" excludeAll(ExclusionRule(organization = "org.apache.logging.log4j")),
-  "com.twitter"            %% "util-core"         % "22.7.0" % "optional"
+  "com.twitter"            %% "util-core"         % "22.12.0" % "optional"
 )
 
 // Fork tests so that SolrRunner's shutdown hook kicks in

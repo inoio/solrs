@@ -36,8 +36,8 @@ case class RetryServer(server: SolrServer) extends RetryDecision {
 
 object RetryDecision {
 
-  final val Fail = StandardRetryDecision(Result.Fail)
-  final val Retry = StandardRetryDecision(Result.Retry)
+  final val Fail: StandardRetryDecision = StandardRetryDecision(Result.Fail)
+  final val Retry: StandardRetryDecision = StandardRetryDecision(Result.Retry)
 
   sealed trait Result
   object Result {

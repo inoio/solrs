@@ -20,7 +20,7 @@ class PingStatusObserverIntegrationSpec extends AnyFunSpec with BeforeAndAfterAl
 
   import PingStatusObserverIntegrationSpec._
 
-  private implicit val awaitTimeout = 2000 millis
+  private implicit val awaitTimeout: FiniteDuration = 2000 millis
   private val httpClientTimeout = 100
   private val httpClient = new DefaultAsyncHttpClient(new DefaultAsyncHttpClientConfig.Builder().setRequestTimeout(httpClientTimeout).build)
 

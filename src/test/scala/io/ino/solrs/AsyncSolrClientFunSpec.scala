@@ -9,12 +9,12 @@ import org.scalatest.concurrent.Eventually.eventually
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 
 import scala.annotation.meta.field
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.concurrent.duration._
 
 class AsyncSolrClientFunSpec extends StandardFunSpec with RunningSolr {
 
-  private implicit val timeout = 1.second
+  private implicit val timeout: FiniteDuration = 1.second
 
   private lazy val solrs = AsyncSolrClient(s"http://localhost:${solrRunner.port}/solr/collection1")
 

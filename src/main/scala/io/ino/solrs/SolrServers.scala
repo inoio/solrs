@@ -11,7 +11,6 @@ import io.ino.solrs.ServerStateChangeObservable.StateChange
 import io.ino.solrs.future.Future
 import io.ino.solrs.future.FutureFactory
 import io.ino.solrs.future.JavaFutureFactory
-import io.ino.solrs.future.ScalaFutureFactory
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.SolrRequest
 import org.apache.solr.client.solrj.SolrServerException
@@ -24,7 +23,6 @@ import org.asynchttpclient.AsyncHttpClient
 import org.asynchttpclient.Response
 import org.slf4j.LoggerFactory
 
-import scala.collection.generic.CanBuildFrom
 import scala.collection.mutable
 import scala.util.Failure
 import scala.util.Success
@@ -61,7 +59,7 @@ object StaticSolrServers {
     new StaticSolrServers(baseUrls.map(SolrServer(_)))
 
   /* Java API */
-  import scala.collection.JavaConverters._
+  import scala.jdk.CollectionConverters._
   def create(baseUrls: java.lang.Iterable[String]): StaticSolrServers =
     apply(baseUrls.asScala.toIndexedSeq)
 }
@@ -366,7 +364,7 @@ object CloudSolrServers {
                           count: Int): Builder = {
       def delegate(collection: String): Seq[SolrQuery] = {
         val res = queriesByCollection(collection)
-        import scala.collection.JavaConverters._
+        import scala.jdk.CollectionConverters._
         res.asScala.toList
       }
       copy(warmupQueries = Some(WarmupQueries(delegate, count)))
@@ -396,7 +394,7 @@ object CloudSolrServers {
                                                             servers: IndexedSeq[ShardReplica])
 
   private[solrs] def getCollections(clusterState: ClusterState): Map[String, CollectionInfo] = {
-    import scala.collection.JavaConverters._
+    import scala.jdk.CollectionConverters._
 
     clusterState.getCollectionsMap.asScala.foldLeft(
       Map.empty[String, CollectionInfo]
@@ -408,7 +406,7 @@ object CloudSolrServers {
   }
 
   private def mapSliceReplicas[A](slices: util.Collection[Slice])(fun: Replica => A): Iterable[A] = {
-    import scala.collection.JavaConverters.collectionAsScalaIterableConverter
+    import scala.jdk.CollectionConverters._
     slices.asScala.flatMap(_.getReplicas.asScala.map(repl => fun(repl)))
   }
 

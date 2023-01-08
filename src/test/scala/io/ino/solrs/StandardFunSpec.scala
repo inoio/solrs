@@ -6,6 +6,9 @@ import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.Future
+import org.apache.solr.client.solrj.ResponseParser
+import org.apache.solr.client.solrj.request.RequestWriter
+import org.asynchttpclient.AsyncHttpClient
 
 /**
  * Default FunSpec mixing in various standard traits, and also ScalaFutureFactory.
@@ -18,8 +21,8 @@ abstract class StandardFunSpec extends AnyFunSpec
   with FutureAwaits
   with NewMockitoSugar {
 
-  protected implicit val futureFactory = ScalaFutureFactory
+  protected implicit val futureFactory: ScalaFutureFactory.type = ScalaFutureFactory
 
-  protected val ascFactory = AsyncSolrClient.ascFactory[Future] _
+  protected val ascFactory: (LoadBalancer, AsyncHttpClient, Boolean, Option[RequestInterceptor], RequestWriter, ResponseParser, Metrics, Option[ServerStateObservation[Future]], RetryPolicy) => AsyncSolrClient[Future] = AsyncSolrClient.ascFactory[Future] _
 
 }

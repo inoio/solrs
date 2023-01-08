@@ -21,7 +21,7 @@ import org.apache.solr.common.SolrDocumentList
 import org.apache.solr.common.SolrInputDocument
 import org.asynchttpclient.AsyncHttpClient
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.compat.java8.FunctionConverters._
 import scala.compat.java8.OptionConverters._
 

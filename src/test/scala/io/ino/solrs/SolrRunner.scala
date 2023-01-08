@@ -29,7 +29,7 @@ class SolrRunner(val port: Int,
 
   import io.ino.solrs.SolrRunner._
 
-  val url = s"http://localhost:$port$context"
+  val url: String = s"http://localhost:$port$context"
   private[solrs] var jetty: JettySolrRunner = _
 
   // init "base" = some temp dir for this run
@@ -39,7 +39,7 @@ class SolrRunner(val port: Int,
   val solrHome: Path = makeSolrHomeDirIn(baseDir)
 
   def start: SolrRunner = {
-    import scala.collection.JavaConverters._
+    import scala.jdk.CollectionConverters._
 
     if (jetty != null) {
       throw new IllegalStateException("Start can only be invoked once. You probably want to use 'stop()' + 'start()'.")

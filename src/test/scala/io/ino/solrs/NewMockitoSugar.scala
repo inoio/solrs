@@ -1,8 +1,7 @@
 package io.ino.solrs
 
+import izumi.reflect.Tag
 import org.mockito.Mockito.{mock => mockitoMock}
-
-import scala.reflect.runtime.universe._
 
 /**
  * Improves over MockitoSugar in that it supports higher kinded types.
@@ -11,9 +10,8 @@ import scala.reflect.runtime.universe._
  */
 trait NewMockitoSugar {
 
-  def mock[T <: AnyRef](implicit tag: TypeTag[T]): T = {
-    val m = tag.mirror
-    mockitoMock(m.runtimeClass(tag.tpe).asInstanceOf[Class[T]])
+  def mock[T <: AnyRef](implicit tag: Tag[T]): T = {
+    mockitoMock(tag.closestClass.asInstanceOf[Class[T]])
   }
 
 }

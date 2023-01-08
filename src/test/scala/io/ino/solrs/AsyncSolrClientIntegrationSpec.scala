@@ -27,12 +27,12 @@ import scala.xml.XML
 
 class AsyncSolrClientIntegrationSpec extends StandardFunSpec with RunningSolr {
 
-  private implicit val patienceConfig = PatienceConfig(
+  private implicit val patienceConfig: PatienceConfig = PatienceConfig(
     timeout = scaled(Span(10000, Millis)),
     interval = scaled(Span(20, Millis))
   )
 
-  private implicit val timeout = 1.second
+  private implicit val timeout: FiniteDuration = 1.second
   private val httpClient = new DefaultAsyncHttpClient()
 
   private lazy val solrUrl = s"http://localhost:${solrRunner.port}/solr/collection1"

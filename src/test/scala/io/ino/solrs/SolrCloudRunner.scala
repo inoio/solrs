@@ -16,7 +16,7 @@ import org.apache.solr.cloud.ZkTestServer
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 // Collection information for SolrCloud
 case class SolrCollection(name: String, replicas: Int = 1, shards: Int = 1)
@@ -137,7 +137,7 @@ class SolrCloudRunner(numServers: Int, collections: List[SolrCollection] = List.
   def solrJClient: CloudSolrClient = miniSolrCloudCluster.getSolrClient
 
   def jettySolrRunners: List[JettySolrRunner] = {
-    import scala.collection.JavaConverters._
+    import scala.jdk.CollectionConverters._
     miniSolrCloudCluster.getJettySolrRunners.asScala.toList
   }
 

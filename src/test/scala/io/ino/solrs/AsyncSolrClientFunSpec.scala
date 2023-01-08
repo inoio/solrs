@@ -8,13 +8,12 @@ import org.apache.solr.client.solrj.beans.Field
 import org.scalatest.concurrent.Eventually.eventually
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 
-import scala.annotation.meta.field
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.concurrent.duration._
 
 class AsyncSolrClientFunSpec extends StandardFunSpec with RunningSolr {
 
-  private implicit val timeout = 1.second
+  private implicit val timeout: FiniteDuration = 1.second
 
   private lazy val solrs = AsyncSolrClient(s"http://localhost:${solrRunner.port}/solr/collection1")
 
@@ -202,9 +201,48 @@ class AsyncSolrClientFunSpec extends StandardFunSpec with RunningSolr {
 
 }
 
+/*
 case class TestBean(@(Field @field) id: String,
                     @(Field @field) name: String,
                     @(Field @field) category: String,
                     @(Field @field) price: Float) {
   def this() = this(null, null, null, 0)
+}
+*/
+
+/* Can be replaced by the version above, once
+  https://github.com/lampepfl/dotty/issues/12492 respectively https://github.com/lampepfl/dotty/pull/16445
+  are released (see https://github.com/lampepfl/dotty/releases)
+ */
+class TestBean(_id: String, _name: String, _category: String, _price: Float) {
+  def this() = this(null, null, null, 0)
+
+  @Field
+  val id: String = _id
+  @Field
+  val name: String = _name
+  @Field
+  val category: String = _category
+  @Field
+  val price: Float = _price
+
+  override def equals(other: Any): Boolean = other match {
+    case that: TestBean =>
+      id == that.id &&
+        name == that.name &&
+        category == that.category &&
+        price == that.price
+    case _ => false
+  }
+
+  override def hashCode(): Int = {
+    val state = Seq(id, name, category, price)
+    state.map(_.hashCode()).foldLeft(0)((a, b) => 31 * a + b)
+  }
+
+}
+
+object TestBean {
+  def apply(id: String, name: String, category: String, price: Float): TestBean =
+    new TestBean(_id = id, _name = name, _category = category, _price = price)
 }

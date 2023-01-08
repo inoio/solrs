@@ -88,7 +88,7 @@ class PerformanceStats(val solrServer: SolrServer, initialPredictedResponseTime:
     // those requests will no longer be available for prediction
     currentRequests.values.foreach { requests =>
       if(requests.size() > currentRequestsSizeCheckLimit) {
-        import scala.collection.JavaConverters._
+        import scala.jdk.CollectionConverters._
         val requestsToRemove = requests.asScala.filter(_.startedAtMillis > currentRequestsRemoveThreshold)
         logger.warn(s"Current requests exceed limit $currentRequestsSizeCheckLimit, removing ${requestsToRemove.size} requests for cleanup.")
         requestsToRemove.foreach(entry => requests.remove(entry))
@@ -145,7 +145,7 @@ class PerformanceStats(val solrServer: SolrServer, initialPredictedResponseTime:
   def dumpStats(queryClass: QueryClass): Unit = {
     val sb = new StringBuilder()
     sb.append(s"====== stats for [${solrServer.baseUrl}][queryClass $queryClass] at ${clock.millis()} millis ======")
-    import scala.collection.JavaConverters._
+    import scala.jdk.CollectionConverters._
     currentRequests(queryClass).asScala.foreach(req => sb.append(s"\n[currentRequest] $req"))
     buckets.foreach { case (sec, bucket) =>
       bucket.averageDuration(queryClass).foreach(duration => sb.append(s"\n[bucket(sec $sec)] $duration"))

@@ -9,12 +9,10 @@ import org.apache.solr.common.cloud.Replica
 import org.apache.solr.common.cloud.Replica.Type.NRT
 import org.apache.solr.common.cloud.Replica.Type.PULL
 import org.apache.solr.common.cloud.Replica.Type.TLOG
-import org.apache.solr.common.params.ShardParams
 import org.apache.solr.common.params.ShardParams.SHARDS_PREFERENCE
 import org.apache.solr.common.params.ShardParams.SHARDS_PREFERENCE_REPLICA_TYPE
 import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 
 import scala.util.Failure
 import scala.util.Success

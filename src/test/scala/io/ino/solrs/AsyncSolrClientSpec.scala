@@ -17,7 +17,7 @@ import scala.util.control.NoStackTrace
 class AsyncSolrClientSpec extends StandardFunSpec {
 
   private val query = new SolrQuery("*:*")
-  private implicit val timeout = 1.second
+  private implicit val timeout: FiniteDuration = 1.second
 
   describe("Solr") {
 

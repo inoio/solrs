@@ -12,10 +12,10 @@ scmInfo := Some(ScmInfo(url("https://github.com/inoio/solrs"), "git@github.com:i
 
 licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.html"))
 
-scalaVersion := "2.12.17"
+scalaVersion := "3.2.1"
 
 // Remember: also update scala versions in .travis.yml!
-crossScalaVersions := Seq("2.12.17", "2.13.10")
+crossScalaVersions := Seq("2.12.17", "2.13.10", "3.2.1")
 
 scalacOptions ++= Seq(
   "-unchecked",
@@ -56,8 +56,14 @@ libraryDependencies ++= Seq(
   "org.scalatestplus"      %% "junit-4-13"        % "3.2.14.0" % "test",
   "com.github.sbt"          % "junit-interface"   % "0.13.3" % Test,
   "org.hamcrest"            % "hamcrest-library"  % "2.2" % "test",
+  "dev.zio"                %% "izumi-reflect"     % "2.2.3" % Test,
   "org.apache.solr"         % "solr-test-framework" % solrVersion % "test" excludeAll(ExclusionRule(organization = "org.apache.logging.log4j")),
   "com.twitter"            %% "util-core"         % "22.12.0" % "optional"
+)
+
+excludeDependencies ++= (
+  if (scalaVersion.value.startsWith("2.12")) Seq()
+  else Seq("org.scala-lang.modules" %% "scala-collection-compat")
 )
 
 // Fork tests so that SolrRunner's shutdown hook kicks in

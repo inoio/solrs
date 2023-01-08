@@ -13,7 +13,7 @@ object Fixtures {
       replicaType: Replica.Type = Replica.Type.NRT,
       isLeader: Boolean = false
     ): ShardReplica = {
-    import scala.collection.JavaConverters.mutableMapAsJavaMapConverter
+    import scala.jdk.CollectionConverters._
     val leaderProps: Map[String, AnyRef] = if(isLeader) Map(ZkStateReader.LEADER_PROP -> true.toString) else Map.empty
     val replicaStatus = status match {
       case Enabled => Replica.State.ACTIVE

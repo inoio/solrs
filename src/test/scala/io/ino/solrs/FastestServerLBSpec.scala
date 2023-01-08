@@ -19,9 +19,7 @@ import org.apache.solr.common.params.ShardParams.SHARDS_PREFERENCE_REPLICA_TYPE
 import org.mockito.ArgumentMatchers.{eq => mockEq}
 import org.mockito.ArgumentMatchers._
 import org.mockito.Mockito._
-import org.scalactic.source.Position
 import org.scalatest.concurrent.Eventually._
-import org.scalatest.enablers.Retrying
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -71,13 +69,13 @@ class FastestServerLBSpec extends StandardFunSpec {
         override def matching(r: SolrRequest[_]): Try[IndexedSeq[SolrServer]] =
           Success(Vector.empty)
       }
-      val cut = newDynamicLB(nonMatchingServers)
+      val cut = newDynamicLB(nonMatchingServers, q, clock)
       cut.solrServer(r) shouldBe a[Failure[_]]
     }
 
     it("should only return active solr servers") {
       val servers = IndexedSeq(SolrServer("host1"), SolrServer("host2"))
-      val cut = newDynamicLB(new StaticSolrServers(servers))
+      val cut = newDynamicLB(new StaticSolrServers(servers), q, clock)
 
       cut.solrServer(r) should be(Success(SolrServer("host1")))
       // we must create some performance stats for host1, so that host2 will be selected
@@ -108,7 +106,7 @@ class FastestServerLBSpec extends StandardFunSpec {
       val cut = newDynamicLB(new StaticSolrServers(servers) {
         override def findLeader(servers: Iterable[SolrServer]): Option[ShardReplica] =
           ShardReplica.findLeader(servers)
-      })
+      }, q, clock)
 
       val r = new UpdateRequest()
 
@@ -141,7 +139,7 @@ class FastestServerLBSpec extends StandardFunSpec {
       val server2 = shardReplica("host2", replicaType = TLOG)
       val server3 = shardReplica("host3", replicaType = PULL)
       val servers = IndexedSeq(server1, server2, server3)
-      val cut = newDynamicLB(new StaticSolrServers(servers))
+      val cut = newDynamicLB(new StaticSolrServers(servers), this.q, clock)
 
       // shards.preference=replica.location:local,replica.type:PULL,replica.type:TLOG
       def q(replicaTypes: Replica.Type*) =
@@ -173,7 +171,7 @@ class FastestServerLBSpec extends StandardFunSpec {
     }
 
     it("should return the fastest server by default") {
-      val cut = newDynamicLB(solrServers)
+      val cut = newDynamicLB(solrServers, q, clock)
 
       when(solrs.doExecute[QueryResponse](any(), any())(any())).thenReturn(delayedResponse(1))
       cut.test(server1)
@@ -191,7 +189,7 @@ class FastestServerLBSpec extends StandardFunSpec {
       * if servers are equally fast then the first one should not get all requests...
       */
     it("should round robin equally fast servers") {
-      val cut = newDynamicLB(solrServers)
+      val cut = newDynamicLB(solrServers, q, clock)
 
       runTests(cut,
                server1,
@@ -220,7 +218,7 @@ class FastestServerLBSpec extends StandardFunSpec {
     }
 
     it("should consider the preferred server if it's one of the fastest servers") {
-      val cut = newDynamicLB(solrServers)
+      val cut = newDynamicLB(solrServers, q, clock)
       val preferred = Success(server2)
 
       runTests(cut,
@@ -252,7 +250,7 @@ class FastestServerLBSpec extends StandardFunSpec {
     }
 
     it("should return the server with a better predicted response time") {
-      val cut = newDynamicLB(solrServers)
+      val cut = newDynamicLB(solrServers, q, clock)
 
       runTests(cut,
                server1,
@@ -297,7 +295,7 @@ class FastestServerLBSpec extends StandardFunSpec {
       */
     it("should allow to quantize / consider (very) similar predicted response times to be equal") {
       // quantize to 5: 0 to 4 = 0, 5 to 9 = 1 etc.
-      val cut = newDynamicLB(solrServers, mapPredictedResponseTime = t => t / 5)
+      val cut = newDynamicLB(solrServers, q, clock, mapPredictedResponseTime = t => t / 5)
 
       runTests(cut,
                server1,
@@ -343,7 +341,7 @@ class FastestServerLBSpec extends StandardFunSpec {
     }
 
     it("should initially test servers to gather performance stats") {
-      val cut = newDynamicLB(solrServers, minDelay = 10 millis)
+      val cut = newDynamicLB(solrServers, q, clock, minDelay = 10 millis)
       solrServers.all.foreach(s =>
         verify(solrs).doExecute[QueryResponse](mockEq(s), hasQuery(q))(any()))
     }
@@ -451,9 +449,7 @@ class FastestServerLBSpec extends StandardFunSpec {
           s =>
             verify(spyClient, atLeastOnce()).doExecute[QueryResponse](mockEq(s),
                                                                       hasQuery(testQuery))(any()))
-      }(PatienceConfig(timeout = maxDelay * 2, interval = maxDelay / 10),
-        Retrying.retryingNatureOfT,
-        Position.here)
+      }
     }
   }
 
@@ -481,6 +477,8 @@ class FastestServerLBSpec extends StandardFunSpec {
   }
 
   private def newDynamicLB(solrServers: SolrServers,
+                           q: SolrQuery,
+                           clock: Clock,
                            minDelay: Duration = 50 millis,
                            mapPredictedResponseTime: Long => Long = identity): FastestServerLB = {
     cut = new FastestServerLB(solrServers,

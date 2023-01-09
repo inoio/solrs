@@ -29,6 +29,7 @@ The github repo is [inoio/solrs](https://github.com/inoio/solrs), for questions 
 
 Each solrs version is compatible with a certain Solr version:
 
+* Solr 9.1.x: solrs 2.7.x
 * Solr 8.11.x: solrs 2.6.x
 * Solr 8.6.x: solrs 2.5.x
 * Solr 7.7.x: solrs 2.4.x
@@ -45,7 +46,7 @@ You must add the library to the dependencies of the build file:
   version="$project.version$"
 }
 
-solrs is published to maven central for scala 2.11 (up to version 2.3.0), 2.12 and 2.13.
+solrs is published to maven central for scala 2.11 (up to version 2.3.0), 2.12, 2.13 and 3.2 (since version 2.6.2) - [search maven central for solrs](https://search.maven.org/search?q=g:io.ino%20AND%20a:solrs*).
 
 ## License
 

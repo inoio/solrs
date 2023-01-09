@@ -14,8 +14,8 @@ import scala.concurrent.duration._
  */
 class CloudSolrServersUninitializedIntegrationSpec extends StandardFunSpec {
 
-  private implicit val awaitTimeout = 2 seconds
-  private implicit val patienceConfig = PatienceConfig(timeout = scaled(Span(1000, Millis)))
+  private implicit val awaitTimeout: FiniteDuration = 2 seconds
+  private implicit val patienceConfig: PatienceConfig = PatienceConfig(timeout = scaled(Span(1000, Millis)))
 
   private var solrRunner: SolrCloudRunner = _
   private def solrServerUrls = solrRunner.solrCoreUrls

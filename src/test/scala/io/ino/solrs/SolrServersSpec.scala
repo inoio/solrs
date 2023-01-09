@@ -11,7 +11,7 @@ import scala.concurrent.duration._
 class SolrServersSpec extends AnyFunSpec with Matchers with FutureAwaits {
 
   private val q = new QueryRequest(new SolrQuery("foo"))
-  private implicit val timeout = 1.second
+  private implicit val timeout: FiniteDuration = 1.second
 
   describe("StaticSolrServers") {
     it("should return consecutive solr servers") {

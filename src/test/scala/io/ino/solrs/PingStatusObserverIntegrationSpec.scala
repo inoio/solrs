@@ -5,7 +5,7 @@ import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
 import java.util.concurrent.{ExecutionException, TimeUnit, TimeoutException}
 import javax.servlet._
 import javax.servlet.http.HttpServletResponse
-import org.apache.solr.client.solrj.impl.HttpSolrClient
+import org.apache.solr.client.solrj.impl.Http2SolrClient
 import org.asynchttpclient.{DefaultAsyncHttpClient, DefaultAsyncHttpClientConfig}
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
@@ -20,18 +20,18 @@ class PingStatusObserverIntegrationSpec extends AnyFunSpec with BeforeAndAfterAl
 
   import PingStatusObserverIntegrationSpec._
 
-  private implicit val awaitTimeout = 2000 millis
+  private implicit val awaitTimeout: FiniteDuration = 2000 millis
   private val httpClientTimeout = 100
   private val httpClient = new DefaultAsyncHttpClient(new DefaultAsyncHttpClientConfig.Builder().setRequestTimeout(httpClientTimeout).build)
 
   protected var solrRunner: SolrRunner = _
-  protected var solrJClient: HttpSolrClient = _
+  protected var solrJClient: Http2SolrClient = _
 
   private lazy val solrUrl = s"http://localhost:${solrRunner.port}/solr/collection1"
 
   override def beforeAll(): Unit = {
     solrRunner = SolrRunner.startOnce(8889, extraFilters = Map(classOf[DebuggingFilter] -> "*"))
-    solrJClient = new HttpSolrClient.Builder(solrUrl).build()
+    solrJClient = new Http2SolrClient.Builder(solrUrl).build()
   }
 
   override def afterAll(): Unit = {

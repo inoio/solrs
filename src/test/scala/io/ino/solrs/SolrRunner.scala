@@ -3,12 +3,13 @@ package io.ino.solrs
 import java.io.File
 import java.nio.file.{Files, Path, Paths}
 import java.util.concurrent.{TimeUnit, TimeoutException}
-
 import javax.servlet.Filter
 import org.apache.commons.io.FileUtils
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.embedded.{JettyConfig, JettySolrRunner}
-import org.apache.solr.client.solrj.impl.HttpSolrClient
+import org.apache.solr.client.solrj.impl.Http2SolrClient
+import org.apache.solr.cloud.MiniSolrCloudCluster.DEFAULT_CLOUD_SOLR_XML
+import org.apache.solr.servlet.SolrDispatchFilter.SOLR_INSTALL_DIR_ATTRIBUTE
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.duration._
@@ -19,7 +20,7 @@ import scala.util.control.NonFatal
   * @param port the desired Jetty port
   * @param context the context to run in (e.g. "/solr")
   * @param extraFilters extra servlet filters to use
-  * @param maybeSolrHome (optional) a Solr home dir to use, tries to locate resource /solr-home in classpath if None
+  * @param maybeSolrHome (optional) a Solr home dir to use, tries to locate resource /solr in classpath if None
   */
 class SolrRunner(val port: Int,
                  val context: String,
@@ -28,7 +29,7 @@ class SolrRunner(val port: Int,
 
   import io.ino.solrs.SolrRunner._
 
-  val url = s"http://localhost:$port$context"
+  val url: String = s"http://localhost:$port$context"
   private[solrs] var jetty: JettySolrRunner = _
 
   // init "base" = some temp dir for this run
@@ -38,16 +39,20 @@ class SolrRunner(val port: Int,
   val solrHome: Path = makeSolrHomeDirIn(baseDir)
 
   def start: SolrRunner = {
-    import scala.collection.JavaConverters._
+    import scala.jdk.CollectionConverters._
 
     if (jetty != null) {
       throw new IllegalStateException("Start can only be invoked once. You probably want to use 'stop()' + 'start()'.")
     }
     logger.info(s"Starting Solr on port $port with Solr home ${solrHome.toAbsolutePath.toString}")
 
+    System.setProperty(SOLR_INSTALL_DIR_ATTRIBUTE, baseDir.toAbsolutePath.toString)
+    System.setProperty("solr.log.dir", baseDir.toAbsolutePath.toString)
     System.setProperty("solr.solr.home", solrHome.toAbsolutePath.toString)
     System.setProperty("solr.default.confdir", solrHome.resolve("/collection1/conf").toString)
     System.setProperty("solr.lock.type", "single")
+    System.setProperty("pkiHandlerPrivateKeyPath", this.getClass.getClassLoader.getResource("cryptokeys/priv_key512_pkcs8.pem").toExternalForm)
+    System.setProperty("pkiHandlerPublicKeyPath", this.getClass.getClassLoader.getResource("cryptokeys/pub_key512.der").toExternalForm)
 
     val jettyConfig = JettyConfig.builder.setContext(context).setPort(port).withFilters(extraFilters.asJava).build
     jetty = new JettySolrRunner(solrHome.toAbsolutePath.toString, jettyConfig)
@@ -61,7 +66,7 @@ class SolrRunner(val port: Int,
   }
 
   def awaitReady(timeout: Duration): SolrRunner = {
-    val solrClient = new HttpSolrClient.Builder(s"http://localhost:$port$context/collection1").build()
+    val solrClient = new Http2SolrClient.Builder(s"http://localhost:$port$context/collection1").build()
 
     def await(left: Duration): SolrRunner = {
       if(left.toMillis <= 0) {
@@ -95,9 +100,10 @@ class SolrRunner(val port: Int,
   }
 
   private def makeSolrHomeDirIn(baseDir: Path): Path = {
-    val solrHomeSourceDir = maybeSolrHome.map(_.toFile).getOrElse(new File(getClass.getResource("/solr-home").toURI))
+    val solrHomeSourceDir = maybeSolrHome.map(_.toFile).getOrElse(new File(getClass.getResource("/solr").toURI))
     val solrHomeTargetInTemp = Files.createDirectories(baseDir.resolve("solrhome"))
     FileUtils.copyDirectory(solrHomeSourceDir, solrHomeTargetInTemp.toFile)
+    Files.write(solrHomeTargetInTemp.resolve("solr.xml"), DEFAULT_CLOUD_SOLR_XML.getBytes)
     solrHomeTargetInTemp
   }
 

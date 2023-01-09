@@ -102,7 +102,7 @@ object RoundRobinLB {
   def apply(baseUrls: IndexedSeq[String]): RoundRobinLB = new RoundRobinLB(StaticSolrServers(baseUrls))
 
   /* Java API */
-  import scala.collection.JavaConverters._
+  import scala.jdk.CollectionConverters._
   def create(baseUrls: java.lang.Iterable[String]): RoundRobinLB = apply(baseUrls.asScala.toIndexedSeq)
 }
 
@@ -502,7 +502,7 @@ import java.lang.management.ManagementFactory
 import javax.management.ObjectName
 import javax.management.openmbean._
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 /**
  * JMX support for FastestServerLB, implementation of FastestServerLBMBean, to be mixed into FastestServerLB.

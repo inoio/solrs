@@ -1,6 +1,7 @@
 package io.ino.solrs.usage
 
 import org.slf4j.LoggerFactory
+import scala.concurrent.Future
 
 class UsageScala1 {
 
@@ -58,7 +59,7 @@ class UsageScalaTwitter1 {
   import org.apache.solr.client.solrj.response.QueryResponse
   import com.twitter.util.Future
 
-  val solr = AsyncSolrClient("http://localhost:8983/solr")
+  val solr: AsyncSolrClient[Future] = AsyncSolrClient("http://localhost:8983/solr")
   val response: Future[QueryResponse] = solr.query(new SolrQuery("scala"))
   response.onSuccess {
     qr => println(s"found ${qr.getResults.getNumFound} docs")
@@ -75,7 +76,7 @@ class UsageScala2 {
   import org.apache.solr.client.solrj.impl.XMLResponseParser
   import org.asynchttpclient.DefaultAsyncHttpClient
 
-  val solr = AsyncSolrClient.Builder("http://localhost:8983/solr")
+  val solr: AsyncSolrClient[Future] = AsyncSolrClient.Builder("http://localhost:8983/solr")
     .withHttpClient(new DefaultAsyncHttpClient())
     .withResponseParser(new XMLResponseParser())
     .build

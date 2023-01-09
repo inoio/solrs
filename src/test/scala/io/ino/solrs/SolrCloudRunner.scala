@@ -5,7 +5,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
-
 import org.apache.commons.io.FileUtils
 import org.apache.solr.client.solrj.embedded.JettyConfig
 import org.apache.solr.client.solrj.embedded.JettySolrRunner
@@ -13,10 +12,11 @@ import org.apache.solr.client.solrj.impl.CloudSolrClient
 import org.apache.solr.client.solrj.request.CollectionAdminRequest
 import org.apache.solr.cloud.MiniSolrCloudCluster
 import org.apache.solr.cloud.ZkTestServer
+import org.apache.solr.servlet.SolrDispatchFilter.SOLR_INSTALL_DIR_ATTRIBUTE
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 // Collection information for SolrCloud
 case class SolrCollection(name: String, replicas: Int = 1, shards: Int = 1)
@@ -29,7 +29,7 @@ case class SolrCollection(name: String, replicas: Int = 1, shards: Int = 1)
   *                          their config must exist below SolrHome (see below). Will be uploaded to ZK and core(s) will be created.
   * @param defaultCollection (optional) the default collection the [[solrJClient]] should query
   * @param maybeZkPort       (optional) the port to start Zookeeper on, a random port is chosen if empty
-  * @param maybeSolrHome     (optional) a Solr home dir to use, tries to locate resource /solr-home in classpath if not specified
+  * @param maybeSolrHome     (optional) a Solr home dir to use, tries to locate resource /solr in classpath if not specified
   *
   */
 class SolrCloudRunner(numServers: Int, collections: List[SolrCollection] = List.empty,
@@ -52,12 +52,29 @@ class SolrCloudRunner(numServers: Int, collections: List[SolrCollection] = List.
   // create a copy of the given (or default) Solr home below "base" directory
   val solrHome: Path = makeSolrHomeDirIn(baseDir)
 
+  // prevent "SolrException: Error occurred while loading solr.xml from zookeeper" ...
+  // "Caused by: org.apache.solr.common.SolrException: solr.install.dir property not initialized"
+  System.setProperty(SOLR_INSTALL_DIR_ATTRIBUTE, baseDir.toAbsolutePath.toString)
+
+  // prevent "RuntimeException: Bad PublicKeyHandler configuration." ...
+  // "Caused by: java.net.MalformedURLException: no protocol: cryptokeys/priv_key512_pkcs8.pem"
+  System.setProperty("pkiHandlerPrivateKeyPath", getClass.getClassLoader.getResource("cryptokeys/priv_key512_pkcs8.pem").toExternalForm)
+  System.setProperty("pkiHandlerPublicKeyPath", getClass.getClassLoader.getResource("cryptokeys/pub_key512.der").toExternalForm)
+
   // avoid confusing ERROR log entry "Missing Java Option solr.log.dir"
   System.setProperty("solr.log.dir", baseDir.toAbsolutePath.toString)
 
   // prevent IOException: 6/invalid_frame_length, see also
   // https://stackoverflow.com/questions/55417706/solr-8-minisolrcloudcluster-with-multiple-servers-gives-java-io-ioexception
   System.setProperty("jetty.testMode", "true")
+
+  // prevent WARNING "maxCnxns is not configured, using default value 0"
+  System.setProperty("zookeeper.maxCnxns", "10")
+
+  // ZkTestServer.run is running ClientBase.waitForServerUp which invokes FourLetterWordMain.send4LetterWord with "stat"
+  // which was refused because by default only "srvr" is enabled (leading to much longer startup times)
+  // "zookeeper.4lw.commands.whitelist" is taken from FourLetterCommands...
+  System.setProperty("zookeeper.4lw.commands.whitelist", "stat")
 
   // shutdown hook clean up for tests that don't call shutdown explicitly
   Runtime.getRuntime.addShutdownHook(new Thread() {
@@ -85,8 +102,9 @@ class SolrCloudRunner(numServers: Int, collections: List[SolrCollection] = List.
     }
 
     timed(s"Starting Mini Solr Cloud cluster with $numServers node(s)") {
+      val formatZkServer = false // default in other MiniSolrCloudCluster constructors, therefore probably a good choice
       miniSolrCloudCluster = new MiniSolrCloudCluster(numServers, solrHome, MiniSolrCloudCluster.DEFAULT_CLOUD_SOLR_XML,
-        new JettyConfig.Builder().build(), zookeeper)
+        new JettyConfig.Builder().build(), zookeeper, formatZkServer)
     }
 
     for (coll <- collections) {
@@ -137,7 +155,7 @@ class SolrCloudRunner(numServers: Int, collections: List[SolrCollection] = List.
   def solrJClient: CloudSolrClient = miniSolrCloudCluster.getSolrClient
 
   def jettySolrRunners: List[JettySolrRunner] = {
-    import scala.collection.JavaConverters._
+    import scala.jdk.CollectionConverters._
     miniSolrCloudCluster.getJettySolrRunners.asScala.toList
   }
 
@@ -169,8 +187,8 @@ class SolrCloudRunner(numServers: Int, collections: List[SolrCollection] = List.
 
   private def makeSolrHomeDirIn(baseDir: Path): Path = {
     val solrHomeSourceDir = maybeSolrHome.map(_.toFile).getOrElse {
-      // read from src/test/resources, because sbt does not copy the symlink solr-home/collection2/conf when copying to target...
-      Paths.get("./src/test/resources/solr-home").toAbsolutePath.normalize().toFile
+      // read from src/test/resources, because sbt does not copy the symlink solr/collection2/conf when copying to target...
+      Paths.get("./src/test/resources/solr").toAbsolutePath.normalize().toFile
     }
     val solrHome = Files.createDirectories(baseDir.resolve("solrhome"))
     BetterFiles.copyDirectory(solrHomeSourceDir.toPath, solrHome)
@@ -208,7 +226,7 @@ object BetterFiles {
   /**
     * Recursively copies the given source directory to the destination directory.
     * In contrast to commons-io or better-files, it supports directories being symbolic links
-    * (as used by solr-home/collection2/conf -> ../collection1/conf/).
+    * (as used by solr/collection2/conf -> ../collection1/conf/).
     * Such symbolic links / directories are completely resolved, i.e. the original link target
     * is copied to the new destination (because SolrZkClient.uploadToZK seems not be able to upload
     * from a symbolic link (conf dir)).

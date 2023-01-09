@@ -3,7 +3,6 @@ package io.ino.solrs
 import java.nio.file.{Files, Paths}
 import io.ino.solrs.Fixtures.shardReplica
 import org.apache.solr.common.cloud.ClusterState
-import org.scalatest._
 import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -44,10 +43,10 @@ class CloudSolrServersSpec extends AnyFunSpec with Matchers {
     }
 
     it("should read all servers from ClusterState with multiple shards") {
-      import scala.collection.JavaConverters._
+      import scala.jdk.CollectionConverters._
 
       val bytes = Files.readAllBytes(Paths.get(this.getClass.getResource("/cluster_status.json").toURI))
-      val cs = ClusterState.load(1, bytes, Set("server1:8983_solr").asJava)
+      val cs = ClusterState.createFromJson(1, bytes, Set("server1:8983_solr").asJava)
 
       val collectionToServers = CloudSolrServers.getCollections(cs)
       collectionToServers("my-collection").servers should contain allOf(

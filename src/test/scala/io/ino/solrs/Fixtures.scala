@@ -1,6 +1,7 @@
 package io.ino.solrs
 
 import org.apache.solr.common.cloud.Replica
+import org.apache.solr.common.cloud.Replica.ReplicaStateProps
 import org.apache.solr.common.cloud.ZkStateReader
 
 import scala.collection.mutable
@@ -13,7 +14,7 @@ object Fixtures {
       replicaType: Replica.Type = Replica.Type.NRT,
       isLeader: Boolean = false
     ): ShardReplica = {
-    import scala.collection.JavaConverters.mutableMapAsJavaMapConverter
+    import scala.jdk.CollectionConverters._
     val leaderProps: Map[String, AnyRef] = if(isLeader) Map(ZkStateReader.LEADER_PROP -> true.toString) else Map.empty
     val replicaStatus = status match {
       case Enabled => Replica.State.ACTIVE
@@ -21,6 +22,7 @@ object Fixtures {
       case Failed => Replica.State.RECOVERY_FAILED
     }
     val replica = new Replica(baseUrl, (mutable.Map[String, AnyRef](
+      ReplicaStateProps.BASE_URL -> baseUrl,
       ZkStateReader.NODE_NAME_PROP -> s"$baseUrl:node_1",
       ZkStateReader.CORE_NAME_PROP -> "core",
       ZkStateReader.STATE_PROP -> replicaStatus.toString,

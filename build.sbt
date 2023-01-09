@@ -51,7 +51,7 @@ libraryDependencies ++= Seq(
   "io.dropwizard.metrics"   % "metrics-core"      % "4.2.15" % "optional",
   "org.slf4j"               % "slf4j-api"         % slf4jVersion,
   "org.slf4j"               % "slf4j-simple"      % slf4jVersion % "test",
-  "org.scalatest"          %% "scalatest"         % "3.2.14" % "test",
+  "org.scalatest"          %% "scalatest"         % "3.2.15" % "test",
   "org.scalatestplus"      %% "mockito-4-6"       % "3.2.15.0" % "test",
   "org.scalatestplus"      %% "junit-4-13"        % "3.2.15.0" % "test",
   "com.github.sbt"          % "junit-interface"   % "0.13.3" % Test,

@@ -12,10 +12,10 @@ scmInfo := Some(ScmInfo(url("https://github.com/inoio/solrs"), "git@github.com:i
 
 licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.html"))
 
-scalaVersion := "3.2.1"
+scalaVersion := "3.2.2"
 
 // Remember: also update scala versions in .travis.yml!
-crossScalaVersions := Seq("2.12.17", "2.13.10", "3.2.1")
+crossScalaVersions := Seq("2.12.17", "2.13.10", "3.2.2")
 
 scalacOptions ++= Seq(
   "-unchecked",
@@ -40,7 +40,7 @@ resolvers ++= Seq(
   "Restlet Repositories" at "https://maven.restlet.org"
 )
 
-val solrVersion = "9.1.0"
+val solrVersion = "9.1.1"
 val slf4jVersion = "1.7.36"
 
 libraryDependencies ++= Seq(
@@ -56,7 +56,7 @@ libraryDependencies ++= Seq(
   "org.scalatestplus"      %% "junit-4-13"        % "3.2.15.0" % "test",
   "com.github.sbt"          % "junit-interface"   % "0.13.3" % Test,
   "org.hamcrest"            % "hamcrest-library"  % "2.2" % "test",
-  "dev.zio"                %% "izumi-reflect"     % "2.2.3" % Test,
+  "dev.zio"                %% "izumi-reflect"     % "2.2.5" % Test,
   "org.apache.solr"         % "solr-test-framework" % solrVersion % "test" excludeAll(ExclusionRule(organization = "org.apache.logging.log4j")),
   "com.twitter"            %% "util-core"         % "22.12.0" % "optional"
 )

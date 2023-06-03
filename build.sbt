@@ -53,7 +53,7 @@ libraryDependencies ++= Seq(
   "org.slf4j"               % "slf4j-simple"      % slf4jVersion % "test",
   "org.scalatest"          %% "scalatest"         % "3.2.16" % "test",
   "org.scalatestplus"      %% "mockito-4-6"       % "3.2.15.0" % "test",
-  "org.scalatestplus"      %% "junit-4-13"        % "3.2.15.0" % "test",
+  "org.scalatestplus"      %% "junit-4-13"        % "3.2.16.0" % "test",
   "com.github.sbt"          % "junit-interface"   % "0.13.3" % Test,
   "org.hamcrest"            % "hamcrest-library"  % "2.2" % "test",
   "dev.zio"                %% "izumi-reflect"     % "2.2.5" % Test,

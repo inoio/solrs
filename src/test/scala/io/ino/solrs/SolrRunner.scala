@@ -6,7 +6,7 @@ import java.util.concurrent.{TimeUnit, TimeoutException}
 import javax.servlet.Filter
 import org.apache.commons.io.FileUtils
 import org.apache.solr.client.solrj.SolrQuery
-import org.apache.solr.client.solrj.embedded.{JettyConfig, JettySolrRunner}
+import org.apache.solr.embedded.{JettyConfig, JettySolrRunner}
 import org.apache.solr.client.solrj.impl.Http2SolrClient
 import org.apache.solr.cloud.MiniSolrCloudCluster.DEFAULT_CLOUD_SOLR_XML
 import org.apache.solr.servlet.SolrDispatchFilter.SOLR_INSTALL_DIR_ATTRIBUTE

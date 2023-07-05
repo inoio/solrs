@@ -6,8 +6,8 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
 import org.apache.commons.io.FileUtils
-import org.apache.solr.client.solrj.embedded.JettyConfig
-import org.apache.solr.client.solrj.embedded.JettySolrRunner
+import org.apache.solr.embedded.JettyConfig
+import org.apache.solr.embedded.JettySolrRunner
 import org.apache.solr.client.solrj.impl.CloudSolrClient
 import org.apache.solr.client.solrj.request.CollectionAdminRequest
 import org.apache.solr.cloud.MiniSolrCloudCluster

@@ -6,7 +6,7 @@ import io.ino.solrs.SolrMatchers.hasBaseUrlOf
 import io.ino.solrs.SolrMatchers.hasQuery
 import io.ino.time.Clock
 import org.apache.solr.client.solrj.SolrQuery
-import org.apache.solr.client.solrj.embedded.JettySolrRunner
+import org.apache.solr.embedded.JettySolrRunner
 import org.apache.solr.client.solrj.impl.CloudSolrClient
 import org.apache.solr.client.solrj.impl.Http2SolrClient
 import org.apache.solr.client.solrj.request.QueryRequest

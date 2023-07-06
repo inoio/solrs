@@ -12,10 +12,10 @@ scmInfo := Some(ScmInfo(url("https://github.com/inoio/solrs"), "git@github.com:i
 
 licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.html"))
 
-scalaVersion := "3.2.2"
+scalaVersion := "3.3.0"
 
 // Remember: also update scala versions in .travis.yml!
-crossScalaVersions := Seq("2.12.17", "2.13.10", "3.2.2")
+crossScalaVersions := Seq("2.12.18", "2.13.11", "3.3.0")
 
 scalacOptions ++= Seq(
   "-unchecked",
@@ -40,7 +40,7 @@ resolvers ++= Seq(
   "Restlet Repositories" at "https://maven.restlet.org"
 )
 
-val solrVersion = "9.1.1"
+val solrVersion = "9.2.1"
 val slf4jVersion = "1.7.36"
 
 libraryDependencies ++= Seq(
@@ -48,15 +48,15 @@ libraryDependencies ++= Seq(
   "org.asynchttpclient"     % "async-http-client" % "2.12.3",
   "org.scala-lang.modules" %% "scala-xml"         % "2.1.0",
   "org.scala-lang.modules" %% "scala-java8-compat"% "1.0.2",
-  "io.dropwizard.metrics"   % "metrics-core"      % "4.2.15" % "optional",
+  "io.dropwizard.metrics"   % "metrics-core"      % "4.2.19" % "optional",
   "org.slf4j"               % "slf4j-api"         % slf4jVersion,
   "org.slf4j"               % "slf4j-simple"      % slf4jVersion % "test",
-  "org.scalatest"          %% "scalatest"         % "3.2.15" % "test",
+  "org.scalatest"          %% "scalatest"         % "3.2.16" % "test",
   "org.scalatestplus"      %% "mockito-4-6"       % "3.2.15.0" % "test",
-  "org.scalatestplus"      %% "junit-4-13"        % "3.2.15.0" % "test",
+  "org.scalatestplus"      %% "junit-4-13"        % "3.2.16.0" % "test",
   "com.github.sbt"          % "junit-interface"   % "0.13.3" % Test,
   "org.hamcrest"            % "hamcrest-library"  % "2.2" % "test",
-  "dev.zio"                %% "izumi-reflect"     % "2.2.5" % Test,
+  "dev.zio"                %% "izumi-reflect"     % "2.3.8" % Test,
   "org.apache.solr"         % "solr-test-framework" % solrVersion % "test" excludeAll(ExclusionRule(organization = "org.apache.logging.log4j")),
   "com.twitter"            %% "util-core"         % "22.12.0" % "optional"
 )

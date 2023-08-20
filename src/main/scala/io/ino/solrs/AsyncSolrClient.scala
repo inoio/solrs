@@ -39,7 +39,6 @@ import org.apache.solr.common.SolrDocumentList
 import org.apache.solr.common.SolrException
 import org.apache.solr.common.SolrException.ErrorCode.BAD_REQUEST
 import org.apache.solr.common.SolrInputDocument
-import org.apache.solr.common.StringUtils
 import org.apache.solr.common.params.CommonParams
 import org.apache.solr.common.params.ModifiableSolrParams
 import org.apache.solr.common.params.SolrParams
@@ -551,10 +550,12 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
   private def doGetByIds(collection: Option[String], ids: Iterable[String], params: Option[SolrParams]): Future[SolrDocumentList] = {
     if (ids == null || ids.isEmpty) throw new IllegalArgumentException("Must provide an identifier of a document to retrieve.")
     val reqParams = queryParams(collection, params)
-    if (StringUtils.isEmpty(reqParams.get(CommonParams.QT))) reqParams.set(CommonParams.QT, "/get")
+    if (isEmpty(reqParams.get(CommonParams.QT))) reqParams.set(CommonParams.QT, "/get")
     reqParams.set("ids", ids.toArray: _*)
     loadBalanceRequest(RequestContext(new QueryRequest(reqParams))).map(_._1).map(_.getResults)
   }
+
+  private def isEmpty(s: String): Boolean = s == null || s.isEmpty
 
   private def loadBalanceRequest[T <: SolrResponse : SolrResponseFactory](requestContext: RequestContext[T]): Future[(T, SolrServer)] = {
     loadBalancer.solrServer(requestContext.r, requestContext.preferred) match {

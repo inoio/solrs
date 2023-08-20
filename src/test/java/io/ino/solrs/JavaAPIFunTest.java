@@ -4,6 +4,7 @@ import static java.util.Arrays.asList;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toList;
 import static org.hamcrest.CoreMatchers.equalTo;
+import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.collection.IsIterableContainingInAnyOrder.containsInAnyOrder;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.*;
@@ -18,6 +19,7 @@ import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.beans.Field;
 import org.apache.solr.client.solrj.impl.Http2SolrClient;
+import org.apache.solr.client.solrj.request.json.DirectJsonQueryRequest;
 import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
@@ -56,6 +58,20 @@ public class JavaAPIFunTest extends JUnitSuite {
     public static void afterClass() throws IOException {
         solr.close();
         solrs.shutdown();
+    }
+
+    @Test
+    public void testExecuteQuery() throws ExecutionException, InterruptedException, IOException, SolrServerException {
+        SolrInputDocument doc1 = newInputDoc("id1", "doc1", "cat1", 10);
+        SolrInputDocument doc2 = newInputDoc("id2", "doc2", "cat2", 20);
+        solr.add(asList(doc1, doc2));
+        solr.commit();
+
+        DirectJsonQueryRequest request = new DirectJsonQueryRequest("{\"query\": \"cat:cat1\"}");
+        SolrResponseFactory<QueryResponse> responseFactory = SolrResponseFactory.queryResponseFactory();
+        SolrDocumentList docs = solrs.execute(request, responseFactory).toCompletableFuture().get().getResults();
+        assertThat(docs.getNumFound(), equalTo(1L));
+        assertThat(docs.get(0).getFieldValue("id"), is("id1"));
     }
 
     @Test

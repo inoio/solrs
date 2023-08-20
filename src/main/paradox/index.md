@@ -29,6 +29,7 @@ The github repo is [inoio/solrs](https://github.com/inoio/solrs), for questions 
 
 Each solrs version is compatible with a certain Solr version:
 
+* Solr 9.2.x: solrs 2.8.x
 * Solr 9.1.x: solrs 2.7.x
 * Solr 8.11.x: solrs 2.6.x
 * Solr 8.6.x: solrs 2.5.x
@@ -42,7 +43,7 @@ You must add the library to the dependencies of the build file:
     
 @@dependency[sbt,Maven,Gradle] {
   group="io.ino"
-  artifact="solrs_2.12"
+  artifact="solrs_2.13"
   version="$project.version$"
 }
 

@@ -9,6 +9,7 @@ import org.apache.commons.io.FileUtils
 import org.apache.solr.embedded.JettyConfig
 import org.apache.solr.embedded.JettySolrRunner
 import org.apache.solr.client.solrj.impl.CloudSolrClient
+import org.apache.solr.client.solrj.impl.Http2SolrClient
 import org.apache.solr.client.solrj.request.CollectionAdminRequest
 import org.apache.solr.cloud.MiniSolrCloudCluster
 import org.apache.solr.cloud.ZkTestServer
@@ -16,6 +17,11 @@ import org.apache.solr.servlet.SolrDispatchFilter.SOLR_INSTALL_DIR_ATTRIBUTE
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
+import java.nio.charset.Charset
+import java.nio.charset.StandardCharsets
+import java.util
+import java.util.Collections
+import java.util.Optional
 import scala.jdk.CollectionConverters._
 
 // Collection information for SolrCloud
@@ -41,7 +47,7 @@ class SolrCloudRunner(numServers: Int, collections: List[SolrCollection] = List.
   import SolrCloudRunner._
 
   @volatile
-  private var zookeeper: ZkTestServer = _
+  private var maybeZookeeper: Option[ZkTestServer] = None
 
   @volatile
   private var miniSolrCloudCluster: MiniSolrCloudCluster = _
@@ -51,6 +57,15 @@ class SolrCloudRunner(numServers: Int, collections: List[SolrCollection] = List.
 
   // create a copy of the given (or default) Solr home below "base" directory
   val solrHome: Path = makeSolrHomeDirIn(baseDir)
+
+  private val maybeSecurityJson: Option[Path] = {
+    val file = solrHome.resolve("security.json").toFile
+    if (file.exists()) {
+      if (maybeZkPort.isDefined)
+        throw new IllegalArgumentException("maybeZkPort is defined and a solrHome with a security.json is chosen - this combination is not supported")
+      Some(file.toPath)
+    } else None
+  }
 
   // prevent "SolrException: Error occurred while loading solr.xml from zookeeper" ...
   // "Caused by: org.apache.solr.common.SolrException: solr.install.dir property not initialized"
@@ -90,21 +105,37 @@ class SolrCloudRunner(numServers: Int, collections: List[SolrCollection] = List.
     if (miniSolrCloudCluster != null) {
       throw new IllegalStateException("Cluster already running.")
     }
-    if (zookeeper != null) {
+    if (maybeZookeeper.isDefined) {
       throw new IllegalStateException("Solr ZK Test Server already running.")
     }
     // scalastyle:on null
 
-    timed("Starting Solr ZK Test Server") {
-      val dataDir = baseDir.resolve("zookeeper/server1/data")
-      zookeeper = maybeZkPort.map(zkPort => new ZkTestServer(dataDir, zkPort)).getOrElse(new ZkTestServer(dataDir))
-      startZk(zookeeper)
+    maybeZkPort.foreach { zkPort =>
+      timed("Starting Solr ZK Test Server") {
+        val dataDir = baseDir.resolve("zookeeper/server1/data")
+        maybeZookeeper = Some(new ZkTestServer(dataDir, zkPort))
+        startZk(maybeZookeeper.get)
+      }
     }
 
     timed(s"Starting Mini Solr Cloud cluster with $numServers node(s)") {
-      val formatZkServer = false // default in other MiniSolrCloudCluster constructors, therefore probably a good choice
-      miniSolrCloudCluster = new MiniSolrCloudCluster(numServers, solrHome, MiniSolrCloudCluster.DEFAULT_CLOUD_SOLR_XML,
-        new JettyConfig.Builder().build(), zookeeper, formatZkServer)
+      miniSolrCloudCluster = (maybeZookeeper, maybeSecurityJson) match {
+        case (None, None) =>
+          new MiniSolrCloudCluster.Builder(numServers, solrHome)
+            .withSolrXml(MiniSolrCloudCluster.DEFAULT_CLOUD_SOLR_XML)
+            .build()
+        case (None, Some(securityJson)) =>
+          new MiniSolrCloudCluster.Builder(numServers, solrHome)
+            .withSolrXml(MiniSolrCloudCluster.DEFAULT_CLOUD_SOLR_XML)
+            .withSecurityJson(securityJson)
+            .build()
+        case (Some(zookeeper), None) =>
+          val formatZkServer = false // default in other MiniSolrCloudCluster constructors, therefore probably a good choice
+          new MiniSolrCloudCluster(numServers, solrHome, MiniSolrCloudCluster.DEFAULT_CLOUD_SOLR_XML,
+            new JettyConfig.Builder().build(), zookeeper, formatZkServer)
+        case (Some(_), Some(_)) =>
+          throw new IllegalArgumentException("This is not supported")
+      }
     }
 
     for (coll <- collections) {
@@ -117,7 +148,7 @@ class SolrCloudRunner(numServers: Int, collections: List[SolrCollection] = List.
       }
       val result = timed(s"Creating collection '$collectionName' with replicas=${coll.replicas} and shards=${coll.shards}") {
         CollectionAdminRequest.createCollection(collectionName, configName, coll.shards, coll.replicas)
-          .process(miniSolrCloudCluster.getSolrClient)
+          .process(solrJClient)
       }
       logger.info(s"Success: ${result.isSuccess}, Status: ${result.getCollectionStatus}")
     }
@@ -128,7 +159,7 @@ class SolrCloudRunner(numServers: Int, collections: List[SolrCollection] = List.
 
     // mutate the MiniSolrCloudCluster's SolrClient instance and set its default collection
     for (coll <- defaultCollection) {
-      miniSolrCloudCluster.getSolrClient.setDefaultCollection(coll)
+      solrJClient.setDefaultCollection(coll)
     }
 
     this
@@ -141,10 +172,10 @@ class SolrCloudRunner(numServers: Int, collections: List[SolrCollection] = List.
       miniSolrCloudCluster.shutdown()
       miniSolrCloudCluster = null
     }
-    if (zookeeper != null) {
+    maybeZookeeper.foreach { zookeeper =>
       logger.info("Shutting down Zookeeper")
       zookeeper.shutdown()
-      zookeeper = null
+      maybeZookeeper = None
     }
     // scalastyle:on null
     scala.util.control.Exception.ignoring(classOf[IOException]) {
@@ -152,21 +183,27 @@ class SolrCloudRunner(numServers: Int, collections: List[SolrCollection] = List.
     }
   }
 
-  def solrJClient: CloudSolrClient = miniSolrCloudCluster.getSolrClient
+  lazy val solrJClient: CloudSolrClient = {
+    val http2ClientBuilder = new Http2SolrClient.Builder().withBasicAuthCredentials("solr", "SolrRocks")
+    new CloudSolrClient.Builder(util.Arrays.asList(miniSolrCloudCluster.getZkServer.getZkAddress()), Optional.empty[String])
+      .withInternalClientBuilder(http2ClientBuilder)
+      .build() // we choose 90 because we run in some harsh envs
+    //miniSolrCloudCluster.getSolrClient
+  }
 
   def jettySolrRunners: List[JettySolrRunner] = {
     import scala.jdk.CollectionConverters._
     miniSolrCloudCluster.getJettySolrRunners.asScala.toList
   }
 
-  def zkAddress: String = zookeeper.getZkAddress
+  def zkAddress: String = miniSolrCloudCluster.getZkServer.getZkAddress()
 
-  def restartZookeeper(): Unit = {
+  def restartZookeeper(): Unit = maybeZookeeper.foreach { zookeeper =>
     logger.info(s"Restarting Zookeeper with zkDir = ${zookeeper.getZkDir} and port = ${zookeeper.getPort}...")
     zookeeper.shutdown()
     logger.info(s"Zookeeper was stopped, starting new one...")
-    zookeeper = new ZkTestServer(zookeeper.getZkDir, zookeeper.getPort)
-    startZk(zookeeper)
+    maybeZookeeper = Some(new ZkTestServer(zookeeper.getZkDir, zookeeper.getPort))
+    startZk(maybeZookeeper.get)
     logger.info(s"New Zookeeper was started")
   }
 
@@ -186,12 +223,12 @@ class SolrCloudRunner(numServers: Int, collections: List[SolrCollection] = List.
   }
 
   private def makeSolrHomeDirIn(baseDir: Path): Path = {
-    val solrHomeSourceDir = maybeSolrHome.map(_.toFile).getOrElse {
+    val solrHomeSourceDir = maybeSolrHome.getOrElse {
       // read from src/test/resources, because sbt does not copy the symlink solr/collection2/conf when copying to target...
-      Paths.get("./src/test/resources/solr").toAbsolutePath.normalize().toFile
+      Paths.get("./src/test/resources/solr").toAbsolutePath.normalize()
     }
     val solrHome = Files.createDirectories(baseDir.resolve("solrhome"))
-    BetterFiles.copyDirectory(solrHomeSourceDir.toPath, solrHome)
+    BetterFiles.copyDirectory(solrHomeSourceDir, solrHome)
     solrHome
   }
 
@@ -257,7 +294,10 @@ object BetterFiles {
         // since SolrZkClient.uploadToZK seems not be able to upload from a symbolic link (conf dir), we're copying
         // the link target directory instead of copying/creating the (relative) symlink.
         // (file.toRealPath resolves the symbolic link)
-        BetterFiles.copyDirectory(file.toRealPath(), targetFile)
+        if (file.toFile.isDirectory)
+          BetterFiles.copyDirectory(file.toRealPath(), targetFile)
+        else
+          Files.copy(file.toRealPath(), targetFile)
         // if we'd like to create the symlink, this would look like this: Files.createSymbolicLink(targetFile, Files.readSymbolicLink(file))
       } else {
         Files.copy(file, targetFile)

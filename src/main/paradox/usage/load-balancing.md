@@ -18,6 +18,17 @@ Java
 Scala
 : @@snip [LoadBalancing.scala](../resources/LoadBalancing.scala) { #round_robin }
 
+By default, update requests are also load balanced. To send update requests to shard leaders,
+you should set `isUpdatesToLeaders = true`. Then still the `isSendToLeaders` property of the update request (default `true`) will be taken into account, i.e. if this would be `false`, then the update request would be load balanced round robin.
+In other words, only if both `RoundRobinLB.isUpdatesToLeaders` and `IsUpdateRequest.isSendToLeaders` are `true`, the
+update request will be sent to the shard leader.
+
+Java
+: @@snip [LoadBalancing.java](../resources/LoadBalancing.java) { #round_robin_update_to_leader }
+
+Scala
+: @@snip [LoadBalancing.scala](../resources/LoadBalancing.scala) { #round_robin_update_to_leader }
+
 ### Fastest Server Load Balancer
 
 The `FastestServerLB` is a statistics based load balancer that classifies servers as "fast" and "slow" servers (based on
@@ -50,6 +61,8 @@ This can be overridden with `initialTestRuns`.
 @@@ note { title=Hint }
 `FastestServerLB` also exports stats via JMX (under object name `io.ino.solrs:type=FastestServerLB`), in case you're interested in this.
 @@@
+
+Similarly as for `RoundRobinLB`, with `isUpdatesToLeaders` you can configure the `FastestServerLB` to send updates to leaders if `IsUpdateRequest.isSendToLeaders` is set to `true` as well.
 
 Here's  a code sample of the `FastestServerLB`:
 

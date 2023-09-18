@@ -64,15 +64,17 @@ class RoundRobinLBSpec extends AnyFunSpec with Matchers {
       cut.solrServer(q) shouldBe a[Failure[_]]
     }
 
-    it("should return the active leader for update requests") {
+    it("should return the active leader for update requests if isUpdatesToLeaders=true and UpdateRequest.sendToLeaders=true") {
       val server1 = shardReplica("host1", isLeader = true)
       val server2 = shardReplica("host2", isLeader = false)
       val servers = IndexedSeq(server1, server2)
-      val cut = new RoundRobinLB(new StaticSolrServers(servers) {
+      val solrServers = new StaticSolrServers(servers) {
         override def findLeader(servers: Iterable[SolrServer]): Option[ShardReplica] = ShardReplica.findLeader(servers)
-      })
+      }
+      val cut = new RoundRobinLB(solrServers, isUpdatesToLeaders = true)
 
       val q = new UpdateRequest()
+      q.setSendToLeaders(true)
 
       cut.solrServer(q) should be (Success(server1))
       cut.solrServer(q) should be (Success(server1))
@@ -81,6 +83,49 @@ class RoundRobinLBSpec extends AnyFunSpec with Matchers {
       servers(0).status = Disabled
       cut.solrServer(q) should be (Success(server2))
       cut.solrServer(q) should be (Success(server2))
+    }
+
+    it("should round robin update requests if isUpdatesToLeaders=true and UpdateRequest.sendToLeaders=false") {
+      val server1 = shardReplica("host1", isLeader = true)
+      val server2 = shardReplica("host2", isLeader = false)
+      val servers = IndexedSeq(server1, server2)
+      val solrServers = new StaticSolrServers(servers) {
+        override def findLeader(servers: Iterable[SolrServer]): Option[ShardReplica] = ShardReplica.findLeader(servers)
+      }
+      val cut = new RoundRobinLB(solrServers, isUpdatesToLeaders = true)
+
+      val q = new UpdateRequest()
+      q.setSendToLeaders(false)
+
+      cut.solrServer(q) should be(Success(server2))
+      cut.solrServer(q) should be(Success(server1))
+      cut.solrServer(q) should be(Success(server2))
+      cut.solrServer(q) should be(Success(server1))
+
+      servers(0).status = Disabled
+      cut.solrServer(q) should be(Success(server2))
+      cut.solrServer(q) should be(Success(server2))
+    }
+
+    it("should round robin update requests by default") {
+      val server1 = shardReplica("host1", isLeader = true)
+      val server2 = shardReplica("host2", isLeader = false)
+      val servers = IndexedSeq(server1, server2)
+      val solrServers = new StaticSolrServers(servers) {
+        override def findLeader(servers: Iterable[SolrServer]): Option[ShardReplica] = ShardReplica.findLeader(servers)
+      }
+      val cut = new RoundRobinLB(solrServers)
+
+      val q = new UpdateRequest()
+
+      cut.solrServer(q) should be(Success(server2))
+      cut.solrServer(q) should be(Success(server1))
+      cut.solrServer(q) should be(Success(server2))
+      cut.solrServer(q) should be(Success(server1))
+
+      servers(0).status = Disabled
+      cut.solrServer(q) should be(Success(server2))
+      cut.solrServer(q) should be(Success(server2))
     }
 
     it("should return replicas matching the given shard preferences / replica type") {

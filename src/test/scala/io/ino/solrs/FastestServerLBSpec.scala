@@ -99,16 +99,17 @@ class FastestServerLBSpec extends StandardFunSpec {
       cut.solrServer(r) shouldBe a[Failure[_]]
     }
 
-    it("should return the active leader for update requests") {
+    it("should return the active leader for update requests if isUpdatesToLeaders=true and UpdateRequest.sendToLeaders=true") {
       val server1 = shardReplica("host1", isLeader = true)
       val server2 = shardReplica("host2", isLeader = false)
       val servers = IndexedSeq(server1, server2)
       val cut = newDynamicLB(new StaticSolrServers(servers) {
         override def findLeader(servers: Iterable[SolrServer]): Option[ShardReplica] =
           ShardReplica.findLeader(servers)
-      }, q, clock)
+      }, q, clock, isUpdatesToLeaders = true)
 
       val r = new UpdateRequest()
+      r.setSendToLeaders(true)
 
       cut.solrServer(r) should be(Success(server1))
       // we must create some performance stats for host1, so that host2 would usually be selected (for non-update requests)
@@ -119,6 +120,93 @@ class FastestServerLBSpec extends StandardFunSpec {
                startResponseTime = 1000,
                endResponseTime = 1000)
       cut.solrServer(r) should be(Success(server1))
+      cut.solrServer(r) should be(Success(server1))
+
+      servers.head.status = Disabled
+      cut.solrServer(r) should be(Success(server2))
+      cut.solrServer(r) should be(Success(server2))
+
+      servers.head.status = Enabled
+      servers(1).status = Failed
+      cut.solrServer(r) should be(Success(server1))
+      cut.solrServer(r) should be(Success(server1))
+
+      servers.head.status = Disabled
+      cut.solrServer(r) shouldBe a[Failure[_]]
+    }
+
+    it("should round robin update requests if isUpdatesToLeaders=true and UpdateRequest.sendToLeaders=false") {
+      val server1 = shardReplica("host1", isLeader = true)
+      val server2 = shardReplica("host2", isLeader = false)
+      val servers = IndexedSeq(server1, server2)
+      val cut = newDynamicLB(new StaticSolrServers(servers) {
+        override def findLeader(servers: Iterable[SolrServer]): Option[ShardReplica] =
+          ShardReplica.findLeader(servers)
+      }, q, clock, isUpdatesToLeaders = true)
+
+      val r = new UpdateRequest()
+      r.setSendToLeaders(false)
+
+      // generate equal stats
+      runTests(cut,
+        server1,
+        fromSecond = 1,
+        toSecond = 5,
+        startResponseTime = 1,
+        endResponseTime = 1)
+      runTests(cut,
+        server2,
+        fromSecond = 1,
+        toSecond = 5,
+        startResponseTime = 1,
+        endResponseTime = 1)
+      cut.updateStats()
+
+      cut.solrServer(r) should be(Success(server1))
+      cut.solrServer(r) should be(Success(server2))
+      cut.solrServer(r) should be(Success(server1))
+
+      servers.head.status = Disabled
+      cut.solrServer(r) should be(Success(server2))
+      cut.solrServer(r) should be(Success(server2))
+
+      servers.head.status = Enabled
+      servers(1).status = Failed
+      cut.solrServer(r) should be(Success(server1))
+      cut.solrServer(r) should be(Success(server1))
+
+      servers.head.status = Disabled
+      cut.solrServer(r) shouldBe a[Failure[_]]
+    }
+
+    it("should round robin update requests by default") {
+      val server1 = shardReplica("host1", isLeader = true)
+      val server2 = shardReplica("host2", isLeader = false)
+      val servers = IndexedSeq(server1, server2)
+      val cut = newDynamicLB(new StaticSolrServers(servers) {
+        override def findLeader(servers: Iterable[SolrServer]): Option[ShardReplica] =
+          ShardReplica.findLeader(servers)
+      }, q, clock)
+
+      val r = new UpdateRequest()
+
+      // generate equal stats
+      runTests(cut,
+        server1,
+        fromSecond = 1,
+        toSecond = 5,
+        startResponseTime = 1,
+        endResponseTime = 1)
+      runTests(cut,
+        server2,
+        fromSecond = 1,
+        toSecond = 5,
+        startResponseTime = 1,
+        endResponseTime = 1)
+      cut.updateStats()
+
+      cut.solrServer(r) should be(Success(server1))
+      cut.solrServer(r) should be(Success(server2))
       cut.solrServer(r) should be(Success(server1))
 
       servers.head.status = Disabled
@@ -480,13 +568,16 @@ class FastestServerLBSpec extends StandardFunSpec {
                            q: SolrQuery,
                            clock: Clock,
                            minDelay: Duration = 50 millis,
-                           mapPredictedResponseTime: Long => Long = identity): FastestServerLB = {
+                           mapPredictedResponseTime: Long => Long = identity,
+                           isUpdatesToLeaders: Boolean = false,
+                          ): FastestServerLB = {
     cut = new FastestServerLB(solrServers,
                               _ => ("collection1", q),
                               minDelay,
                               maxDelay = 30 seconds,
                               initialTestRuns = 1,
                               mapPredictedResponseTime = mapPredictedResponseTime,
+                              isUpdatesToLeaders = isUpdatesToLeaders,
                               clock = clock) {
       override protected def scheduleTests(): Unit = ()
       override protected def scheduleUpdateStats(): Unit = ()

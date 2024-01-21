@@ -720,7 +720,7 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
 
   @throws[RemoteSolrException]
   private def validateResponse(response: Response, responseParser: ResponseParser)(implicit server: SolrServer): Unit = {
-    validateMimeType(responseParser.getContentType, response)
+    validateMimeType(responseParser.getContentTypes.asScala, response)
 
     val httpStatus = response.getStatusCode
     if(httpStatus >= 400) {
@@ -731,30 +731,33 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
   }
 
   @throws[RemoteSolrException]
-  protected def validateMimeType(expectedContentType: String, response: Response): Unit = {
-    if (expectedContentType != null) {
-      val expectedMimeType = getMimeType(expectedContentType).map(_.toLowerCase(Locale.ROOT)).getOrElse("")
-      val actualMimeType = getMimeType(response.getContentType).map(_.toLowerCase(Locale.ROOT)).getOrElse("")
-      if (expectedMimeType != actualMimeType) {
-        var msg = s"Expected mime type [$expectedMimeType] but got [$actualMimeType]."
-        var encoding: String = getResponseEncoding(response)
-        try {
-          // might be solved with responseParser.processResponse (like it's done for 4xx codes)
-          msg = msg + "\n" + IOUtils.toString(response.getResponseBodyAsStream, encoding)
-        }
-        catch {
-          case e: IOException =>
-            metrics.countRemoteException
-            throw new RemoteSolrException(response.getStatusCode, s"$msg Unfortunately could not parse response (for debugging) with encoding $encoding", e)
-        }
-        metrics.countRemoteException
-        throw new RemoteSolrException(response.getStatusCode, msg, null)
+  protected def validateMimeType(supportedContentTypes: Iterable[String], response: Response): Unit = {
+    val actualMimeType = getMimeType(response.getContentType).map(_.toLowerCase(Locale.ROOT)).getOrElse("")
+    val matchingMimeType = supportedContentTypes.find { supportedContentType =>
+        val expectedMimeType = getMimeType(supportedContentType).map(_.toLowerCase(Locale.ROOT)).getOrElse("")
+        expectedMimeType == actualMimeType
+    }
+
+    if (matchingMimeType.isEmpty) {
+      var msg = s"Expected a mime type of [${supportedContentTypes.mkString(", ")}] but got [$actualMimeType]."
+      val encoding: String = getResponseEncoding(response)
+      try {
+        // might be solved with responseParser.processResponse (like it's done for 4xx codes)
+        msg = msg + "\n" + IOUtils.toString(response.getResponseBodyAsStream, encoding)
       }
+      catch {
+        case e: IOException =>
+          metrics.countRemoteException
+          throw new RemoteSolrException(response.getStatusCode, s"$msg Unfortunately could not parse response (for debugging) with encoding $encoding", e)
+      }
+      metrics.countRemoteException
+      throw new RemoteSolrException(response.getStatusCode, msg, null)
+
     }
   }
 
   protected def getResponseEncoding(response: Response): String = {
-    var encoding = response.getHeader("Content-Encoding")
+    val encoding = response.getHeader("Content-Encoding")
     if (encoding == null) "UTF-8" else encoding
   }
 

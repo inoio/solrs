@@ -32,7 +32,7 @@
 <span class="home-icon">⌂</span>solrs - async solr client for java/scala
 </a>
 <div class="version-number">
-2.8.0
+2.9.0
 </div>
 </div>
 <select class="supergroup" name="Language"><option class="group" value="group-scala">Scala</option><option class="group" value="group-java">Java</option></select>
@@ -76,7 +76,7 @@ C16.952,7,17,6.553,17,6c0-0.553-0.048-1-0.6-1H3.6C3.048,5,3,5.447,3,6C3,6.553,3.
 <span class="home-icon">⌂</span>solrs - async solr client for java/scala
 </a>
 <div class="version-number">
-2.8.0
+2.9.0
 </div>
 </div>
 <select class="supergroup" name="Language"><option class="group" value="group-scala">Scala</option><option class="group" value="group-java">Java</option></select>
@@ -121,17 +121,34 @@ C16.952,7,17,6.553,17,6c0-0.553-0.048-1-0.6-1H3.6C3.048,5,3,5.447,3,6C3,6.553,3.
 <dl>
   <dt>Java</dt>
   <dd>
-  <pre class="prettyprint"><button class="snippet-button copy-snippet" title="Copy snippet to clipboard">copy</button><a class="snippet-button go-to-source" href="https://github.com/inoio/solrs/tree/v2.8.0/src/main/paradox/resources/LoadBalancing.java#L12-L16" target="_blank" title="Go to snippet source">source</a><code class="language-java">RoundRobinLB lb = RoundRobinLB.create(asList(
+  <pre class="prettyprint"><button class="snippet-button copy-snippet" title="Copy snippet to clipboard">copy</button><a class="snippet-button go-to-source" href="https://github.com/inoio/solrs/tree/v2.9.0/src/main/paradox/resources/LoadBalancing.java#L12-L16" target="_blank" title="Go to snippet source">source</a><code class="language-java">RoundRobinLB lb = RoundRobinLB.create(asList(
   &quot;http://localhost:8983/solr/collection1&quot;,
   &quot;http://localhost:8984/solr/collection1&quot;
 ));
 JavaAsyncSolrClient solr = JavaAsyncSolrClient.builder(lb).build();</code></pre></dd>
   <dt>Scala</dt>
   <dd>
-  <pre class="prettyprint"><button class="snippet-button copy-snippet" title="Copy snippet to clipboard">copy</button><a class="snippet-button go-to-source" href="https://github.com/inoio/solrs/tree/v2.8.0/src/main/paradox/resources/LoadBalancing.scala#L11-L15" target="_blank" title="Go to snippet source">source</a><code class="language-scala">val lb = RoundRobinLB(IndexedSeq(
+  <pre class="prettyprint"><button class="snippet-button copy-snippet" title="Copy snippet to clipboard">copy</button><a class="snippet-button go-to-source" href="https://github.com/inoio/solrs/tree/v2.9.0/src/main/paradox/resources/LoadBalancing.scala#L11-L15" target="_blank" title="Go to snippet source">source</a><code class="language-scala">val lb = RoundRobinLB(IndexedSeq(
   &quot;http://localhost:8983/solr/collection1&quot;,
   &quot;http://localhost:8984/solr/collection1&quot;
 ))
+val solr = AsyncSolrClient.Builder(lb).build</code></pre></dd>
+</dl>
+<p>By default, update requests are also load balanced. To send update requests to shard leaders, you should set <code>isUpdatesToLeaders = true</code>. Then still the <code>isSendToLeaders</code> property of the update request (default <code>true</code>) will be taken into account, i.e. if this would be <code>false</code>, then the update request would be load balanced round robin. In other words, only if both <code>RoundRobinLB.isUpdatesToLeaders</code> and <code>IsUpdateRequest.isSendToLeaders</code> are <code>true</code>, the update request will be sent to the shard leader.</p>
+<dl>
+  <dt>Java</dt>
+  <dd>
+  <pre class="prettyprint"><button class="snippet-button copy-snippet" title="Copy snippet to clipboard">copy</button><a class="snippet-button go-to-source" href="https://github.com/inoio/solrs/tree/v2.9.0/src/main/paradox/resources/LoadBalancing.java#L20-L24" target="_blank" title="Go to snippet source">source</a><code class="language-java">RoundRobinLB lb = RoundRobinLB.create(asList(
+        &quot;http://localhost:8983/solr/collection1&quot;,
+        &quot;http://localhost:8984/solr/collection1&quot;
+), /* isUpdatesToLeaders */ true);
+JavaAsyncSolrClient solr = JavaAsyncSolrClient.builder(lb).build();</code></pre></dd>
+  <dt>Scala</dt>
+  <dd>
+  <pre class="prettyprint"><button class="snippet-button copy-snippet" title="Copy snippet to clipboard">copy</button><a class="snippet-button go-to-source" href="https://github.com/inoio/solrs/tree/v2.9.0/src/main/paradox/resources/LoadBalancing.scala#L19-L23" target="_blank" title="Go to snippet source">source</a><code class="language-scala">val lb = RoundRobinLB(IndexedSeq(
+  &quot;http://localhost:8983/solr/collection1&quot;,
+  &quot;http://localhost:8984/solr/collection1&quot;
+), isUpdatesToLeaders = true)
 val solr = AsyncSolrClient.Builder(lb).build</code></pre></dd>
 </dl>
 <h3><a href="#fastest-server-load-balancer" name="fastest-server-load-balancer" class="anchor"><span class="anchor-link"></span></a>Fastest Server Load Balancer</h3>
@@ -148,11 +165,12 @@ val solr = AsyncSolrClient.Builder(lb).build</code></pre></dd>
 <p>Because nobody likes log spamming and burning CPU time while everybody else is sleeping, the test query is not executed with a fixed rate.<br/> For &ldquo;fast&rdquo; servers test queries are run whenever a request comes in, with a lower bound of <code>minDelay</code> (default: 100 millis). With high traffic this leads to high resolution statistics so that e.g. sub-second GC pauses should be detected.<br/> For &ldquo;slow&rdquo; servers (response time &gt; average) tests are run with a fixed <code>maxDelay</code> (default: 10 seconds), this is also the case for &ldquo;fast&rdquo; servers when there are no users queries in the meantime.</p>
 <p>To have initial stats, after the <code>FastestServerLB</code> was created it runs the test queries several times (default: 10). This can be overridden with <code>initialTestRuns</code>.</p><div class="callout note "><div class="callout-title">Hint</div>
 <p><code>FastestServerLB</code> also exports stats via JMX (under object name <code>io.ino.solrs:type=FastestServerLB</code>), in case you&rsquo;re interested in this.</p></div>
+<p>Similarly as for <code>RoundRobinLB</code>, with <code>isUpdatesToLeaders</code> you can configure the <code>FastestServerLB</code> to send updates to leaders if <code>IsUpdateRequest.isSendToLeaders</code> is set to <code>true</code> as well.</p>
 <p>Here&rsquo;s a code sample of the <code>FastestServerLB</code>:</p>
 <dl>
   <dt>Java</dt>
   <dd>
-  <pre class="prettyprint"><button class="snippet-button copy-snippet" title="Copy snippet to clipboard">copy</button><a class="snippet-button go-to-source" href="https://github.com/inoio/solrs/tree/v2.8.0/src/main/paradox/resources/LoadBalancing.java#L2-L31" target="_blank" title="Go to snippet source">source</a><code class="language-java">import io.ino.solrs.*;
+  <pre class="prettyprint"><button class="snippet-button copy-snippet" title="Copy snippet to clipboard">copy</button><a class="snippet-button go-to-source" href="https://github.com/inoio/solrs/tree/v2.9.0/src/main/paradox/resources/LoadBalancing.java#L2-L40" target="_blank" title="Go to snippet source">source</a><code class="language-java">import io.ino.solrs.*;
 import static java.util.Arrays.asList;
 import scala.Tuple2;
 import static java.util.concurrent.TimeUnit.*;
@@ -167,11 +185,12 @@ FastestServerLB&lt;?&gt; lb = FastestServerLB.builder(servers, collectionAndTest
         .withMinDelay(50, MILLISECONDS)
         .withMaxDelay(5, SECONDS)
         .withInitialTestRuns(50)
+        .withUpdatesToLeaders(true)
         .build();
 JavaAsyncSolrClient solr = JavaAsyncSolrClient.builder(lb).build();</code></pre></dd>
   <dt>Scala</dt>
   <dd>
-  <pre class="prettyprint"><button class="snippet-button copy-snippet" title="Copy snippet to clipboard">copy</button><a class="snippet-button go-to-source" href="https://github.com/inoio/solrs/tree/v2.8.0/src/main/paradox/resources/LoadBalancing.scala#L2-L28" target="_blank" title="Go to snippet source">source</a><code class="language-scala">import io.ino.solrs._
+  <pre class="prettyprint"><button class="snippet-button copy-snippet" title="Copy snippet to clipboard">copy</button><a class="snippet-button go-to-source" href="https://github.com/inoio/solrs/tree/v2.9.0/src/main/paradox/resources/LoadBalancing.scala#L2-L42" target="_blank" title="Go to snippet source">source</a><code class="language-scala">import io.ino.solrs._
 import io.ino.solrs.future.ScalaFutureFactory.Implicit
 import scala.concurrent.duration._
 
@@ -182,12 +201,18 @@ val lb = {
   ))
   val col1TestQuery = &quot;collection1&quot; -&gt; new SolrQuery(&quot;*:*&quot;).setRows(0)
   def collectionAndTestQuery(server: SolrServer) = col1TestQuery
-  new FastestServerLB(servers, collectionAndTestQuery, minDelay = 50 millis, maxDelay = 5 seconds, initialTestRuns = 50)
+  new FastestServerLB(
+    servers,
+    collectionAndTestQuery,
+    minDelay = 50 millis,
+    maxDelay = 5 seconds,
+    initialTestRuns = 50,
+    isUpdatesToLeaders = true)
 }
 val solr = AsyncSolrClient.Builder(lb).build</code></pre></dd>
 </dl>
 <div class="source-github">
-The source code for this page can be found <a href="https://github.com/inoio/solrs/tree/v2.8.0/src/main/paradox/usage/load-balancing.md">here</a>.
+The source code for this page can be found <a href="https://github.com/inoio/solrs/tree/v2.9.0/src/main/paradox/usage/load-balancing.md">here</a>.
 </div>
 
 <div class="nav-next">
@@ -246,7 +271,7 @@ The source code for this page can be found <a href="https://github.com/inoio/sol
 
 <!--
 <div class="copyright">
-<span class="text">&copy; 2023</span>
+<span class="text">&copy; 2024</span>
 <a href="https://www.example.com" class="logo">logo</a>
 </div>
 -->
@@ -271,7 +296,7 @@ The source code for this page can be found <a href="https://github.com/inoio/sol
 <script type="text/javascript" src="../lib/prettify/prettify.js"></script>
 <script type="text/javascript" src="../lib/prettify/lang-scala.js"></script>
 <script type="text/javascript">jQuery(function(){window.prettyPrint && prettyPrint()});</script>
-<script type="text/javascript">jQuery(function(jq){initOldVersionWarnings(jq, '2.8.0', 'https://github.com/inoio/solrs')});</script>
+<script type="text/javascript">jQuery(function(jq){initOldVersionWarnings(jq, '2.9.0', 'https://github.com/inoio/solrs')});</script>
 
 
 </html>

@@ -6,10 +6,12 @@ import org.asynchttpclient.DefaultAsyncHttpClient
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.SolrRequest
 import org.apache.solr.client.solrj.SolrResponse
+import org.apache.solr.client.solrj.impl.BinaryResponseParser
+import org.apache.solr.client.solrj.impl.BinaryResponseParser.BINARY_CONTENT_TYPE
+import org.apache.solr.client.solrj.impl.BinaryResponseParser.BINARY_CONTENT_TYPE_V2
 import org.apache.solr.client.solrj.impl.{NoOpResponseParser, XMLResponseParser}
 import org.apache.solr.client.solrj.request.{GenericSolrRequest, QueryRequest}
 import org.apache.solr.client.solrj.response.QueryResponse
-import org.mockito.ArgumentMatcher._
 import org.mockito.ArgumentMatchers.anyLong
 import org.mockito.Mockito.verify
 import org.scalatest.concurrent.Eventually._
@@ -18,6 +20,7 @@ import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.time.Millis
 import org.scalatest.time.Span
 
+import java.util
 import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -123,7 +126,9 @@ class AsyncSolrClientIntegrationSpec extends StandardFunSpec with RunningSolr {
       null,
         new SolrQuery("cat:cat1").add("wt", "xml")
       )
-      request.setResponseParser(new NoOpResponseParser)
+      request.setResponseParser(new NoOpResponseParser {
+        override def getContentTypes: util.Collection[String] = asList("application/xml")
+      })
 
       val response = solr.execute(request)
 
@@ -151,7 +156,9 @@ class AsyncSolrClientIntegrationSpec extends StandardFunSpec with RunningSolr {
       awaitReady(response)
       a [RemoteSolrException] should be thrownBy await(response)
       // embedded Jetty returns 404 with text/html response with error message in body
-      (the [RemoteSolrException] thrownBy await(response)).getMessage should include ("Expected mime type [] but got [text/html]")
+      val mimeTypesRegex = s"($BINARY_CONTENT_TYPE, $BINARY_CONTENT_TYPE_V2|$BINARY_CONTENT_TYPE_V2, $BINARY_CONTENT_TYPE)"
+      (the [RemoteSolrException] thrownBy await(response)).getMessage should include regex "Expected a mime type of " +
+        s"\\[$mimeTypesRegex\\] but got \\[text/html\\]"
 
       solr.shutdown()
     }

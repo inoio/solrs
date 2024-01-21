@@ -48,7 +48,7 @@ libraryDependencies ++= Seq(
   "org.asynchttpclient"     % "async-http-client" % "2.12.3",
   "org.scala-lang.modules" %% "scala-xml"         % "2.2.0",
   "org.scala-lang.modules" %% "scala-java8-compat"% "1.0.2",
-  "io.dropwizard.metrics"   % "metrics-core"      % "4.2.20" % "optional",
+  "io.dropwizard.metrics"   % "metrics-core"      % "4.2.24" % "optional",
   "org.slf4j"               % "slf4j-api"         % slf4jVersion,
   "org.slf4j"               % "slf4j-simple"      % slf4jVersion % "test",
   "org.scalatest"          %% "scalatest"         % "3.2.17" % "test",
@@ -70,6 +70,9 @@ excludeDependencies ++= (
 Test / fork := true
 enablePlugins(ParadoxSitePlugin)
 Paradox / sourceDirectory := sourceDirectory.value / "main" / "paradox"
+
+// prevent linter warning "there's a key that's not used by any other settings/tasks"
+Global / excludeLintKeys += Paradox / sourceDirectory
 
 enablePlugins(GhpagesPlugin)
 git.remoteRepo := scmInfo.value.get.connection
@@ -97,6 +100,8 @@ ThisBuild / publishTo := {
   else
     Some("releases" at nexus + "service/local/staging/deploy/maven2")
 }
+
+ThisBuild / versionScheme := Some("early-semver")
 
 publishMavenStyle := true
 

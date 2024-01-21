@@ -1,10 +1,8 @@
 package io.ino.solrs
 
 import java.io.{ByteArrayInputStream, IOException}
-import java.util.Arrays.asList
 import java.util.Locale
 import java.util.concurrent.{ScheduledExecutorService, TimeUnit}
-
 import io.ino.solrs.AsyncSolrClient.Builder
 import io.ino.solrs.HttpUtils._
 import io.ino.solrs.RetryDecision.Result
@@ -39,7 +37,6 @@ import org.apache.solr.common.SolrDocumentList
 import org.apache.solr.common.SolrException
 import org.apache.solr.common.SolrException.ErrorCode.BAD_REQUEST
 import org.apache.solr.common.SolrInputDocument
-import org.apache.solr.common.StringUtils
 import org.apache.solr.common.params.CommonParams
 import org.apache.solr.common.params.ModifiableSolrParams
 import org.apache.solr.common.params.SolrParams
@@ -50,6 +47,7 @@ import org.asynchttpclient.AsyncHttpClient
 import org.asynchttpclient.Response
 import org.slf4j.LoggerFactory
 
+import java.io.ByteArrayOutputStream
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 import scala.util.Failure
@@ -184,6 +182,13 @@ object AsyncSolrClient {
       setOnAsyncSolrClientAwares(res)
       res
     }
+  }
+
+  /*
+   * A hack to get access to the protected internal buffer and avoid an additional copy
+   */
+  private[AsyncSolrClient] class BAOS extends ByteArrayOutputStream {
+    def getbuf(): Array[Byte] = buf
   }
 
 }
@@ -551,10 +556,12 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
   private def doGetByIds(collection: Option[String], ids: Iterable[String], params: Option[SolrParams]): Future[SolrDocumentList] = {
     if (ids == null || ids.isEmpty) throw new IllegalArgumentException("Must provide an identifier of a document to retrieve.")
     val reqParams = queryParams(collection, params)
-    if (StringUtils.isEmpty(reqParams.get(CommonParams.QT))) reqParams.set(CommonParams.QT, "/get")
+    if (isEmpty(reqParams.get(CommonParams.QT))) reqParams.set(CommonParams.QT, "/get")
     reqParams.set("ids", ids.toArray: _*)
     loadBalanceRequest(RequestContext(new QueryRequest(reqParams))).map(_._1).map(_.getResults)
   }
+
+  private def isEmpty(s: String): Boolean = s == null || s.isEmpty
 
   private def loadBalanceRequest[T <: SolrResponse : SolrResponseFactory](requestContext: RequestContext[T]): Future[(T, SolrServer)] = {
     loadBalancer.solrServer(requestContext.r, requestContext.preferred) match {
@@ -628,7 +635,7 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
         val req = if (r.getMethod == POST) httpClient.preparePost(fullQueryUrl) else httpClient.preparePut(fullQueryUrl)
 
         // AsyncHttpClient needs InputStream, need to adapt the writer
-        val baos = new BinaryRequestWriter.BAOS()
+        val baos = new AsyncSolrClient.BAOS()
         contentWriter.write(baos)
         val is = new ByteArrayInputStream(baos.getbuf(), 0, baos.size())
 

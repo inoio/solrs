@@ -40,7 +40,7 @@ resolvers ++= Seq(
   "Restlet Repositories" at "https://maven.restlet.org"
 )
 
-val solrVersion = "9.2.1"
+val solrVersion = "9.4.1"
 val slf4jVersion = "2.0.11"
 
 libraryDependencies ++= Seq(
@@ -48,7 +48,7 @@ libraryDependencies ++= Seq(
   "org.asynchttpclient"     % "async-http-client" % "2.12.3",
   "org.scala-lang.modules" %% "scala-xml"         % "2.2.0",
   "org.scala-lang.modules" %% "scala-java8-compat"% "1.0.2",
-  "io.dropwizard.metrics"   % "metrics-core"      % "4.2.20" % "optional",
+  "io.dropwizard.metrics"   % "metrics-core"      % "4.2.24" % "optional",
   "org.slf4j"               % "slf4j-api"         % slf4jVersion,
   "org.slf4j"               % "slf4j-simple"      % slf4jVersion % "test",
   "org.scalatest"          %% "scalatest"         % "3.2.17" % "test",
@@ -58,7 +58,7 @@ libraryDependencies ++= Seq(
   "org.hamcrest"            % "hamcrest-library"  % "2.2" % "test",
   "dev.zio"                %% "izumi-reflect"     % "2.3.8" % Test,
   "org.apache.solr"         % "solr-test-framework" % solrVersion % "test" excludeAll(ExclusionRule(organization = "org.apache.logging.log4j")),
-  "com.twitter"            %% "util-core"         % "22.12.0" % "optional"
+  "com.twitter"            %% "util-core"         % "23.11.0" % "optional"
 )
 
 excludeDependencies ++= (
@@ -70,6 +70,9 @@ excludeDependencies ++= (
 Test / fork := true
 enablePlugins(ParadoxSitePlugin)
 Paradox / sourceDirectory := sourceDirectory.value / "main" / "paradox"
+
+// prevent linter warning "there's a key that's not used by any other settings/tasks"
+Global / excludeLintKeys += Paradox / sourceDirectory
 
 enablePlugins(GhpagesPlugin)
 git.remoteRepo := scmInfo.value.get.connection
@@ -97,6 +100,8 @@ ThisBuild / publishTo := {
   else
     Some("releases" at nexus + "service/local/staging/deploy/maven2")
 }
+
+ThisBuild / versionScheme := Some("early-semver")
 
 publishMavenStyle := true
 

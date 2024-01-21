@@ -1,10 +1,8 @@
 package io.ino.solrs
 
 import java.io.{ByteArrayInputStream, IOException}
-import java.util.Arrays.asList
 import java.util.Locale
 import java.util.concurrent.{ScheduledExecutorService, TimeUnit}
-
 import io.ino.solrs.AsyncSolrClient.Builder
 import io.ino.solrs.HttpUtils._
 import io.ino.solrs.RetryDecision.Result
@@ -49,6 +47,7 @@ import org.asynchttpclient.AsyncHttpClient
 import org.asynchttpclient.Response
 import org.slf4j.LoggerFactory
 
+import java.io.ByteArrayOutputStream
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 import scala.util.Failure
@@ -183,6 +182,13 @@ object AsyncSolrClient {
       setOnAsyncSolrClientAwares(res)
       res
     }
+  }
+
+  /*
+   * A hack to get access to the protected internal buffer and avoid an additional copy
+   */
+  private[AsyncSolrClient] class BAOS extends ByteArrayOutputStream {
+    def getbuf(): Array[Byte] = buf
   }
 
 }
@@ -629,7 +635,7 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
         val req = if (r.getMethod == POST) httpClient.preparePost(fullQueryUrl) else httpClient.preparePut(fullQueryUrl)
 
         // AsyncHttpClient needs InputStream, need to adapt the writer
-        val baos = new BinaryRequestWriter.BAOS()
+        val baos = new AsyncSolrClient.BAOS()
         contentWriter.write(baos)
         val is = new ByteArrayInputStream(baos.getbuf(), 0, baos.size())
 

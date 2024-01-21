@@ -101,6 +101,8 @@ ThisBuild / publishTo := {
     Some("releases" at nexus + "service/local/staging/deploy/maven2")
 }
 
+ThisBuild / versionScheme := Some("early-semver")
+
 publishMavenStyle := true
 
 Test / publishArtifact := false

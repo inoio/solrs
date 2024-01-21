@@ -1,1 +1,1 @@
-version := "2.10.1-SNAPSHOT"
+version := "2.11.0"

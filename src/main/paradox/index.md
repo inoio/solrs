@@ -29,6 +29,7 @@ The github repo is [inoio/solrs](https://github.com/inoio/solrs), for questions 
 
 Each solrs version is compatible with a certain Solr version:
 
+* Solr 9.4.x: solrs 2.11.x
 * Solr 9.3.x: solrs 2.10.x
 * Solr 9.2.x: solrs 2.8.x, 2.9.x
 * Solr 9.1.x: solrs 2.7.x

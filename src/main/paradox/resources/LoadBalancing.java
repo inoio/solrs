@@ -16,6 +16,14 @@ class RoundRobin {
   JavaAsyncSolrClient solr = JavaAsyncSolrClient.builder(lb).build();
   // #round_robin
 
+  // #round_robin_update_to_leader
+  RoundRobinLB lb = RoundRobinLB.create(asList(
+          "http://localhost:8983/solr/collection1",
+          "http://localhost:8984/solr/collection1"
+  ), /* isUpdatesToLeaders */ true);
+  JavaAsyncSolrClient solr = JavaAsyncSolrClient.builder(lb).build();
+  // #round_robin_update_to_leader
+
   // #fastest_server
   StaticSolrServers servers = StaticSolrServers.create(Arrays.asList(
     "http://localhost:8983/solr/collection1",
@@ -27,6 +35,7 @@ class RoundRobin {
           .withMinDelay(50, MILLISECONDS)
           .withMaxDelay(5, SECONDS)
           .withInitialTestRuns(50)
+          .withUpdatesToLeaders(true)
           .build();
   JavaAsyncSolrClient solr = JavaAsyncSolrClient.builder(lb).build();
   // #fastest_server

@@ -50,6 +50,9 @@ trait LoadBalancer extends RequestInterceptor {
     f(solrServer, q)
   }
 
+  protected def isUpdateToLeader(r: SolrRequest[_], servers: IndexedSeq[SolrServer]): Boolean =
+    r.isInstanceOf[IsUpdateRequest] && r.asInstanceOf[IsUpdateRequest].isSendToLeaders && solrServers.findLeader(servers).isDefined
+
   def shutdown(): Unit = {
     // empty default
   }
@@ -71,7 +74,11 @@ class SingleServerLB(val server: SolrServer) extends LoadBalancer {
   override val solrServers: SolrServers = new StaticSolrServers(IndexedSeq(server))
 }
 
-class RoundRobinLB(override val solrServers: SolrServers) extends LoadBalancer {
+class RoundRobinLB(override val solrServers: SolrServers,
+                   isUpdatesToLeaders: Boolean) extends LoadBalancer {
+
+  /* Java API for default isUpdatesToLeaders = false */
+  def this(solrServers: SolrServers) = this(solrServers, isUpdatesToLeaders = false)
 
   private final val idx = new AtomicInteger(1)
 
@@ -85,7 +92,7 @@ class RoundRobinLB(override val solrServers: SolrServers) extends LoadBalancer {
       Failure(NoSolrServersAvailableException(matching))
     } else if(preferred.isDefined && servers.exists(_.baseUrl == preferred.get.baseUrl)) {
       Success(preferred.get)
-    } else if (r.isInstanceOf[IsUpdateRequest] && solrServers.findLeader(servers).isDefined) {
+    } else if (isUpdatesToLeaders && isUpdateToLeader(r, servers)) {
       solrServers.findLeader(servers).toTry("no leader found")
     } else {
       val preferred = filterByShardPreference(r, servers)
@@ -98,12 +105,17 @@ class RoundRobinLB(override val solrServers: SolrServers) extends LoadBalancer {
 
 }
 object RoundRobinLB {
-  def apply(solrServers: SolrServers): RoundRobinLB = new RoundRobinLB(solrServers)
-  def apply(baseUrls: IndexedSeq[String]): RoundRobinLB = new RoundRobinLB(StaticSolrServers(baseUrls))
+  def apply(solrServers: SolrServers): RoundRobinLB = apply(solrServers, isUpdatesToLeaders = false)
+  def apply(solrServers: SolrServers,
+            isUpdatesToLeaders: Boolean): RoundRobinLB = new RoundRobinLB(solrServers, isUpdatesToLeaders)
+  def apply(baseUrls: IndexedSeq[String],
+            isUpdatesToLeaders: Boolean = false): RoundRobinLB = new RoundRobinLB(StaticSolrServers(baseUrls), isUpdatesToLeaders)
 
   /* Java API */
   import scala.jdk.CollectionConverters._
-  def create(baseUrls: java.lang.Iterable[String]): RoundRobinLB = apply(baseUrls.asScala.toIndexedSeq)
+  def create(baseUrls: java.lang.Iterable[String]): RoundRobinLB = create(baseUrls, isUpdatesToLeaders = false)
+  def create(baseUrls: java.lang.Iterable[String],
+             isUpdatesToLeaders: Boolean): RoundRobinLB = apply(baseUrls.asScala.toIndexedSeq, isUpdatesToLeaders)
 }
 
 /**
@@ -152,6 +164,8 @@ object RoundRobinLB {
  *                          also add some fix value to allow normal deviation).
  * @param mapPredictedResponseTime a function that's applied to the predicted response time. This can e.g. be used to
  *                                 quantize the time so that minor differences are ignored.
+ * @param isUpdatesToLeaders if set to `true`, updates are sent to shard leader if `IsUpdateRequest.isSendToLeaders` is `true`
+  *                         as well.
  * @param clock the clock to get the current time from. The tests using the maxDelay are
  *              run using a scheduled executor, therefore this interval uses the system clock
  */
@@ -164,6 +178,7 @@ class FastestServerLB[F[_]](override val solrServers: SolrServers,
                             filterFastServers: Long => ((SolrServer, Long)) => Boolean =
                             average => { case (_, duration) => duration <= average * 1.1 + 5 },
                             val mapPredictedResponseTime: Long => Long = identity,
+                            isUpdatesToLeaders: Boolean = false,
                             clock: Clock = Clock.systemDefault)
                            (implicit futureFactory: FutureFactory[F]) extends LoadBalancer with AsyncSolrClientAware[F] with FastestServerLBJmxSupport[F] {
 
@@ -270,7 +285,7 @@ class FastestServerLB[F[_]](override val solrServers: SolrServers,
     val servers = matching.filter(_.isEnabled)
     if(servers.isEmpty) {
       Failure(NoSolrServersAvailableException(matching))
-    } else if (r.isInstanceOf[IsUpdateRequest] && solrServers.findLeader(servers).isDefined) {
+    } else if (isUpdatesToLeaders && isUpdateToLeader(r, servers)) {
       solrServers.findLeader(servers).toTry("no leader found")
     } else {
       val preferredReplicas = filterByShardPreference(r, servers)
@@ -417,6 +432,7 @@ object FastestServerLB {
                        case (_, duration) => duration <= average * 1.1 + 5
                      },
                      mapPredictedResponseTime: Long => Long = identity,
+                     isUpdatesToLeaders: Boolean = false,
                      clock: Clock = Clock.systemDefault) {
 
     /** The minimum delay between the response of a test and the start of the next test (to limit test frequency) */
@@ -442,6 +458,9 @@ object FastestServerLB {
     /** A function that's applied to the predicted response time. This can e.g. be used to quantize the time so that minor differences are ignored. */
     def withMapPredictedResponseTime(mapPredictedResponseTime: JFunction[JLong, JLong]): Builder = copy(mapPredictedResponseTime = input => mapPredictedResponseTime(input))
 
+    /** If set to `true`, update requests will be sent to shard leaders if `IsUpdateRequest.isSendToLeaders` is `true` as well. Default is `false` */
+    def withUpdatesToLeaders(isUpdatesToLeaders: Boolean): Builder = copy(isUpdatesToLeaders = isUpdatesToLeaders)
+
     /** The clock to get the current time from. */
     def withClock(clock: Clock): Builder = copy(clock = clock)
 
@@ -455,6 +474,7 @@ object FastestServerLB {
       initialTestRuns,
       filterFastServers,
       mapPredictedResponseTime,
+      isUpdatesToLeaders,
       clock
     )
 

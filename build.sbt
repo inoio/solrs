@@ -12,10 +12,10 @@ scmInfo := Some(ScmInfo(url("https://github.com/inoio/solrs"), "git@github.com:i
 
 licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.html"))
 
-scalaVersion := "3.3.0"
+scalaVersion := "3.3.1"
 
 // Remember: also update scala versions in .travis.yml!
-crossScalaVersions := Seq("2.12.18", "2.13.11", "3.3.0")
+crossScalaVersions := Seq("2.12.18", "2.13.12", "3.3.1")
 
 scalacOptions ++= Seq(
   "-unchecked",
@@ -41,19 +41,19 @@ resolvers ++= Seq(
 )
 
 val solrVersion = "9.3.0"
-val slf4jVersion = "2.0.7"
+val slf4jVersion = "2.0.9"
 
 libraryDependencies ++= Seq(
   "org.apache.solr"         % "solr-solrj"        % solrVersion,
   "org.asynchttpclient"     % "async-http-client" % "2.12.3",
   "org.scala-lang.modules" %% "scala-xml"         % "2.2.0",
   "org.scala-lang.modules" %% "scala-java8-compat"% "1.0.2",
-  "io.dropwizard.metrics"   % "metrics-core"      % "4.2.19" % "optional",
+  "io.dropwizard.metrics"   % "metrics-core"      % "4.2.24" % "optional",
   "org.slf4j"               % "slf4j-api"         % slf4jVersion,
   "org.slf4j"               % "slf4j-simple"      % slf4jVersion % "test",
-  "org.scalatest"          %% "scalatest"         % "3.2.16" % "test",
+  "org.scalatest"          %% "scalatest"         % "3.2.17" % "test",
   "org.scalatestplus"      %% "mockito-4-6"       % "3.2.15.0" % "test",
-  "org.scalatestplus"      %% "junit-4-13"        % "3.2.16.0" % "test",
+  "org.scalatestplus"      %% "junit-4-13"        % "3.2.17.0" % "test",
   "com.github.sbt"          % "junit-interface"   % "0.13.3" % Test,
   "org.hamcrest"            % "hamcrest-library"  % "2.2" % "test",
   "dev.zio"                %% "izumi-reflect"     % "2.3.8" % Test,
@@ -70,6 +70,9 @@ excludeDependencies ++= (
 Test / fork := true
 enablePlugins(ParadoxSitePlugin)
 Paradox / sourceDirectory := sourceDirectory.value / "main" / "paradox"
+
+// prevent linter warning "there's a key that's not used by any other settings/tasks"
+Global / excludeLintKeys += Paradox / sourceDirectory
 
 enablePlugins(GhpagesPlugin)
 git.remoteRepo := scmInfo.value.get.connection

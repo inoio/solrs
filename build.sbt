@@ -71,6 +71,9 @@ Test / fork := true
 enablePlugins(ParadoxSitePlugin)
 Paradox / sourceDirectory := sourceDirectory.value / "main" / "paradox"
 
+// prevent linter warning "there's a key that's not used by any other settings/tasks"
+Global / excludeLintKeys += Paradox / sourceDirectory
+
 enablePlugins(GhpagesPlugin)
 git.remoteRepo := scmInfo.value.get.connection
 

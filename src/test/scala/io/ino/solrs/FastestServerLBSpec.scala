@@ -63,6 +63,13 @@ class FastestServerLBSpec extends StandardFunSpec {
 
   describe("FastestServerLB") {
 
+    it("should support multiple instances") {
+      val servers = IndexedSeq(SolrServer("host1"))
+      this.cut = newDynamicLB(new StaticSolrServers(servers), q, clock)
+      val cut2 = newDynamicLB(new StaticSolrServers(servers), q, clock)
+      cut2.shutdown()
+    }
+
     it("should return a Failure if no solr server matches") {
       val nonMatchingServers = new SolrServers {
         override def all: Seq[SolrServer] = Nil

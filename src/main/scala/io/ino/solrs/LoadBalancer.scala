@@ -5,7 +5,6 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.function.IntUnaryOperator
-
 import io.ino.solrs.LoadBalancer.NoSolrServersAvailableException
 import io.ino.solrs.ServerStateChangeObservable.Removed
 import io.ino.solrs.ServerStateChangeObservable.StateChange
@@ -23,8 +22,11 @@ import org.apache.solr.client.solrj.SolrResponse
 import org.apache.solr.client.solrj.request.IsUpdateRequest
 import org.apache.solr.client.solrj.request.QueryRequest
 import org.apache.solr.client.solrj.response.QueryResponse
+import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
+import javax.management.InstanceAlreadyExistsException
+import javax.management.InstanceNotFoundException
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
 import scala.concurrent.duration._
@@ -183,8 +185,6 @@ class FastestServerLB[F[_]](override val solrServers: SolrServers,
                            (implicit futureFactory: FutureFactory[F]) extends LoadBalancer with AsyncSolrClientAware[F] with FastestServerLBJmxSupport[F] {
 
   import FastestServerLB._
-
-  private val logger = LoggerFactory.getLogger(getClass)
 
   private var client: AsyncSolrClient[F] = _
 
@@ -532,12 +532,24 @@ trait FastestServerLBJmxSupport[F[_]] extends FastestServerLBMBean { self: Faste
   import FastestServerLB._
   import FastestServerLBJmxSupport._
 
+  protected val logger: Logger = LoggerFactory.getLogger(getClass)
+
+  private lazy val objectName = newObjectName()
+
   def initJmx(): Unit = {
-    ManagementFactory.getPlatformMBeanServer.registerMBean(this, ObjName)
+    try {
+      ManagementFactory.getPlatformMBeanServer.registerMBean(this, objectName)
+    } catch {
+        case e: InstanceAlreadyExistsException => logger.warn("Error while registering MBean", e)
+    }
   }
 
   def shutdownJmx(): Unit = {
-    ManagementFactory.getPlatformMBeanServer.unregisterMBean(ObjName)
+    try {
+      ManagementFactory.getPlatformMBeanServer.unregisterMBean(objectName)
+    } catch {
+      case e: InstanceNotFoundException => logger.warn("Error while unregistering MBean", e)
+    }
   }
 
   override def averagesPerSecond(collection: String): TabularData = {
@@ -615,6 +627,7 @@ trait FastestServerLBJmxSupport[F[_]] extends FastestServerLBMBean { self: Faste
 
 object FastestServerLBJmxSupport {
 
-  val ObjName = new ObjectName("io.ino.solrs:type=FastestServerLB")
+  private val instanceCounter = new AtomicInteger(0)
+  def newObjectName(): ObjectName = new ObjectName(s"io.ino.solrs:type=FastestServerLB,instance=${instanceCounter.getAndIncrement()}")
 
 }

@@ -12,10 +12,10 @@ scmInfo := Some(ScmInfo(url("https://github.com/inoio/solrs"), "git@github.com:i
 
 licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.html"))
 
-scalaVersion := "3.3.1"
+scalaVersion := "3.3.3"
 
 // Remember: also update scala versions in .travis.yml!
-crossScalaVersions := Seq("2.12.18", "2.13.12", "3.3.1")
+crossScalaVersions := Seq("2.12.19", "2.13.13", "3.3.3")
 
 scalacOptions ++= Seq(
   "-unchecked",
@@ -41,7 +41,7 @@ resolvers ++= Seq(
 )
 
 val solrVersion = "9.5.0"
-val slf4jVersion = "2.0.11"
+val slf4jVersion = "2.0.12"
 
 libraryDependencies ++= Seq(
   "org.apache.solr"         % "solr-solrj"        % solrVersion,
@@ -51,9 +51,9 @@ libraryDependencies ++= Seq(
   "io.dropwizard.metrics"   % "metrics-core"      % "4.2.25" % "optional",
   "org.slf4j"               % "slf4j-api"         % slf4jVersion,
   "org.slf4j"               % "slf4j-simple"      % slf4jVersion % "test",
-  "org.scalatest"          %% "scalatest"         % "3.2.17" % "test",
+  "org.scalatest"          %% "scalatest"         % "3.2.18" % "test",
   "org.scalatestplus"      %% "mockito-4-6"       % "3.2.15.0" % "test",
-  "org.scalatestplus"      %% "junit-4-13"        % "3.2.17.0" % "test",
+  "org.scalatestplus"      %% "junit-4-13"        % "3.2.18.0" % "test",
   "com.github.sbt"          % "junit-interface"   % "0.13.3" % Test,
   "org.hamcrest"            % "hamcrest-library"  % "2.2" % "test",
   "dev.zio"                %% "izumi-reflect"     % "2.3.8" % Test,

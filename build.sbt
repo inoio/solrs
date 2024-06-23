@@ -12,10 +12,10 @@ scmInfo := Some(ScmInfo(url("https://github.com/inoio/solrs"), "git@github.com:i
 
 licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.html"))
 
-scalaVersion := "3.3.3"
+scalaVersion := "3.4.1"
 
 // Remember: also update scala versions in .travis.yml!
-crossScalaVersions := Seq("2.12.19", "2.13.13", "3.3.3")
+crossScalaVersions := Seq("2.12.19", "2.13.13", "3.4.1")
 
 scalacOptions ++= Seq(
   "-unchecked",
@@ -41,12 +41,12 @@ resolvers ++= Seq(
 )
 
 val solrVersion = "9.4.1"
-val slf4jVersion = "2.0.12"
+val slf4jVersion = "2.0.13"
 
 libraryDependencies ++= Seq(
   "org.apache.solr"         % "solr-solrj"        % solrVersion,
   "org.asynchttpclient"     % "async-http-client" % "2.12.3",
-  "org.scala-lang.modules" %% "scala-xml"         % "2.2.0",
+  "org.scala-lang.modules" %% "scala-xml"         % "2.3.0",
   "org.scala-lang.modules" %% "scala-java8-compat"% "1.0.2",
   "io.dropwizard.metrics"   % "metrics-core"      % "4.2.25" % "optional",
   "org.slf4j"               % "slf4j-api"         % slf4jVersion,

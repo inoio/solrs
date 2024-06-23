@@ -58,7 +58,7 @@ libraryDependencies ++= Seq(
   "org.hamcrest"            % "hamcrest-library"  % "2.2" % "test",
   "dev.zio"                %% "izumi-reflect"     % "2.3.8" % Test,
   "org.apache.solr"         % "solr-test-framework" % solrVersion % "test" excludeAll(ExclusionRule(organization = "org.apache.logging.log4j")),
-  "com.twitter"            %% "util-core"         % "23.11.0" % "optional"
+  "com.twitter"            %% "util-core"         % "24.2.0" % "optional"
 )
 
 excludeDependencies ++= (

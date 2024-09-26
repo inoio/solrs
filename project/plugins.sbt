@@ -2,7 +2,7 @@ ThisBuild / libraryDependencySchemes ++= Seq(
   "org.scala-lang.modules" %% "scala-xml" % VersionScheme.Always
 )
 
-addSbtPlugin("org.scoverage" % "sbt-scoverage" % "2.1.1")
+addSbtPlugin("org.scoverage" % "sbt-scoverage" % "2.2.1")
 addSbtPlugin("com.github.sbt" % "sbt-site-paradox" % "1.7.0")
 addSbtPlugin("com.github.sbt" % "sbt-ghpages" % "0.8.0")
 // use a newer version of paradox (site would pull in automatically an older version)

@@ -15,7 +15,7 @@ licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.
 scalaVersion := "3.4.3"
 
 // Remember: also update scala versions in .travis.yml!
-crossScalaVersions := Seq("2.12.20", "2.13.14", "3.4.3")
+crossScalaVersions := Seq("2.12.20", "2.13.15", "3.4.3")
 
 scalacOptions ++= Seq(
   "-unchecked",

@@ -24,6 +24,7 @@ jobs:
         java-version: '11'
         distribution: 'temurin'
         cache: 'sbt'
+    - uses: sbt/setup-sbt@v1
     - name: Run tests
       # "+ test" runs tests with all scala versions
       run: sbt "+ test"

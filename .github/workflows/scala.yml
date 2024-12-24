@@ -45,6 +45,7 @@ jobs:
     - name: Setup key
       shell: bash
       run: echo "${{ secrets.GPG_PRIVATE_KEY }}" > key.gpg && gpg --import key.gpg
+    - uses: sbt/setup-sbt@v1
     - name: Publish
       env:
         OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}

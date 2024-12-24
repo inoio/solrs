@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - uses: sbt/setup-sbt@v1
       - uses: scalacenter/sbt-dependency-submission@v2.0.1
         with:
           ## Optional: Define the working directory of your build.

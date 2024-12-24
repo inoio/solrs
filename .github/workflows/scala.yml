@@ -80,6 +80,7 @@ jobs:
         git config --global user.email "oss@inoio.de";
       if: env.is_release == '1'
       shell: bash
+    - uses: sbt/setup-sbt@v1
     - name: Push site
       if: env.is_release == '1'
       run: sbt ghpagesPushSite

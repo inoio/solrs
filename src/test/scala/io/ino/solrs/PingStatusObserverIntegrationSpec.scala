@@ -1,6 +1,7 @@
 package io.ino.solrs
 
 import java.net.ConnectException
+import java.time.{Duration => JavaDuration}
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
 import java.util.concurrent.{ExecutionException, TimeUnit, TimeoutException}
 import javax.servlet._
@@ -21,7 +22,7 @@ class PingStatusObserverIntegrationSpec extends AnyFunSpec with BeforeAndAfterAl
   import PingStatusObserverIntegrationSpec._
 
   private implicit val awaitTimeout: FiniteDuration = 2000 millis
-  private val httpClientTimeout = 100
+  private val httpClientTimeout = JavaDuration.ofMillis(100)
   private val httpClient = new DefaultAsyncHttpClient(new DefaultAsyncHttpClientConfig.Builder().setRequestTimeout(httpClientTimeout).build)
 
   protected var solrRunner: SolrRunner = _
@@ -94,7 +95,7 @@ class PingStatusObserverIntegrationSpec extends AnyFunSpec with BeforeAndAfterAl
       solrServers(0).status should be (Enabled)
 
       responseDelayMillis.set(5000)
-      val httpClientConfig = new DefaultAsyncHttpClientConfig.Builder().setReadTimeout(100).build()
+      val httpClientConfig = new DefaultAsyncHttpClientConfig.Builder().setReadTimeout(JavaDuration.ofMillis(100)).build()
       val asyncHttpClient = new DefaultAsyncHttpClient(httpClientConfig)
       try {
 
@@ -135,7 +136,7 @@ class PingStatusObserverIntegrationSpec extends AnyFunSpec with BeforeAndAfterAl
 
   private def enable(solrUrl: String, timeoutInMillis: Long = 600) = pingAction(solrUrl, "enable", timeoutInMillis)
   private def disable(solrUrl: String) = pingAction(solrUrl, "disable")
-  private def pingAction(solrUrl: String, action: String, timeoutInMillis: Long = httpClientTimeout * 2) =
+  private def pingAction(solrUrl: String, action: String, timeoutInMillis: Long = httpClientTimeout.toMillis * 2) =
     httpClient.prepareGet(s"$solrUrl/admin/ping?action=$action").execute().get(timeoutInMillis, TimeUnit.MILLISECONDS)
 
 }

@@ -604,7 +604,7 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
     ).getOrElse(monitoredRequest(solrServer, r))
   }
 
-  private[solrs] def doExecute[T <: SolrResponse : SolrResponseFactory](solrServer: SolrServer, r: SolrRequest[_ <: T]): Future[T] = {
+  private[solrs] def doExecute[T <: SolrResponse](solrServer: SolrServer, r: SolrRequest[_ <: T])(implicit srf: SolrResponseFactory[T]): Future[T] = {
 
     val wparams = new ModifiableSolrParams(r.getParams)
     if (responseParser != null && r.getResponseParser == null) {

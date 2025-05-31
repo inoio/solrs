@@ -32,7 +32,7 @@
 <span class="home-icon">⌂</span>solrs - async solr client for java/scala
 </a>
 <div class="version-number">
-2.13.0
+2.13.1
 </div>
 </div>
 <select class="supergroup" name="Language"><option class="group" value="group-scala">Scala</option><option class="group" value="group-java">Java</option></select>
@@ -76,7 +76,7 @@ C16.952,7,17,6.553,17,6c0-0.553-0.048-1-0.6-1H3.6C3.048,5,3,5.447,3,6C3,6.553,3.
 <span class="home-icon">⌂</span>solrs - async solr client for java/scala
 </a>
 <div class="version-number">
-2.13.0
+2.13.1
 </div>
 </div>
 <select class="supergroup" name="Language"><option class="group" value="group-scala">Scala</option><option class="group" value="group-java">Java</option></select>
@@ -115,7 +115,7 @@ C16.952,7,17,6.553,17,6c0-0.553-0.048-1-0.6-1H3.6C3.048,5,3,5.447,3,6C3,6.553,3.
 <div class="small-12 large-9 column" id="docs">
 <h2><a href="#request-interception" name="request-interception" class="anchor"><span class="anchor-link"></span></a>Request Interception</h2>
 <p>Solrs allows to intercept queries sent to Solr, here&rsquo;s an example that shows how to log details about each request:</p>
-<pre class="prettyprint"><button class="snippet-button copy-snippet" title="Copy snippet to clipboard">copy</button><a class="snippet-button go-to-source" href="https://github.com/inoio/solrs/tree/v2.13.0/src/main/paradox/resources/RequestInterception.scala#L7-L21" target="_blank" title="Go to snippet source">source</a><code class="language-scala">val loggingInterceptor = new RequestInterceptor {
+<pre class="prettyprint"><button class="snippet-button copy-snippet" title="Copy snippet to clipboard">copy</button><a class="snippet-button go-to-source" href="https://github.com/inoio/solrs/tree/v2.13.1/src/main/paradox/resources/RequestInterception.scala#L7-L21" target="_blank" title="Go to snippet source">source</a><code class="language-scala">val loggingInterceptor = new RequestInterceptor {
   override def interceptQuery(f: (SolrServer, SolrQuery) =&gt; Future[QueryResponse])
                              (solrServer: SolrServer, q: SolrQuery): Future[QueryResponse] = {
     val start = System.currentTimeMillis()
@@ -131,7 +131,7 @@ val solr = AsyncSolrClient.Builder(&quot;http://localhost:8983/solr/collection1&
   .withRequestInterceptor(loggingInterceptor)
   .build</code></pre>
 <div class="source-github">
-The source code for this page can be found <a href="https://github.com/inoio/solrs/tree/v2.13.0/src/main/paradox/usage/request-interception.md">here</a>.
+The source code for this page can be found <a href="https://github.com/inoio/solrs/tree/v2.13.1/src/main/paradox/usage/request-interception.md">here</a>.
 </div>
 
 <div class="nav-next">
@@ -201,7 +201,7 @@ The source code for this page can be found <a href="https://github.com/inoio/sol
 <script type="text/javascript" src="../lib/prettify/prettify.js"></script>
 <script type="text/javascript" src="../lib/prettify/lang-scala.js"></script>
 <script type="text/javascript">jQuery(function(){window.prettyPrint && prettyPrint()});</script>
-<script type="text/javascript">jQuery(function(jq){initOldVersionWarnings(jq, '2.13.0', 'https://github.com/inoio/solrs')});</script>
+<script type="text/javascript">jQuery(function(jq){initOldVersionWarnings(jq, '2.13.1', 'https://github.com/inoio/solrs')});</script>
 
 
 </html>

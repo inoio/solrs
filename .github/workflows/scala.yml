@@ -51,7 +51,16 @@ jobs:
         CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
         CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
       # "+ test" runs tests with all scala versions
-      run: sbt "+ publishSigned" sonaUpload
+      run: sbt "+ publishSigned"
+    - name: Check release
+      run: echo "is_release=$(grep -v SNAPSHOT version.sbt | wc -l)" >> $GITHUB_ENV
+      shell: bash
+    - name: Upload release
+      if: env.is_release == '1'
+      env:
+        CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+        CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
+      run: sbt "+ sonaUpload"
 
   push_site:
     # only run if publish was successful

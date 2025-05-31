@@ -48,10 +48,10 @@ jobs:
     - uses: sbt/setup-sbt@v1
     - name: Publish
       env:
-        OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
-        OSSRH_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
+        CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+        CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
       # "+ test" runs tests with all scala versions
-      run: sbt "+ publishSigned"
+      run: sbt "+ publishSigned" sonaUpload
 
   push_site:
     # only run if publish was successful

@@ -52,16 +52,17 @@ jobs:
     - name: Publish snapshot
       if: env.is_release != '1'
       env:
-        CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
-        CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
+        SONATYPE_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+        SONATYPE_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
       # "+ test" runs tests with all scala versions
-      run: sbt "+ publishSigned"
+      run: sbt +publishSigned
     - name: Publish release
       if: env.is_release == '1'
       env:
-        CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
-        CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
-      run: sbt -v -debug +publishSigned +sonaUpload
+        # use sbt default env vars according to https://github.com/sbt/sbt/issues/8146
+        SONATYPE_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+        SONATYPE_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
+      run: sbt +publishSigned +sonaUpload
 
   push_site:
     # only run if publish was successful

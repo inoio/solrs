@@ -61,7 +61,7 @@ jobs:
       env:
         CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
         CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
-      run: sbt -v +publishSigned +sonaUpload
+      run: sbt -vvv +publishSigned +sonaUpload
 
   push_site:
     # only run if publish was successful

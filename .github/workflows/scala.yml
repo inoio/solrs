@@ -46,21 +46,22 @@ jobs:
       shell: bash
       run: echo "${{ secrets.GPG_PRIVATE_KEY }}" > key.gpg && gpg --import key.gpg
     - uses: sbt/setup-sbt@v1
-    - name: Publish
+    - name: Check release
+      run: echo "is_release=$(grep -v SNAPSHOT version.sbt | wc -l)" >> $GITHUB_ENV
+      shell: bash
+    - name: Publish snapshot
+      if: env.is_release != '1'
       env:
         CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
         CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
       # "+ test" runs tests with all scala versions
       run: sbt "+ publishSigned"
-    - name: Check release
-      run: echo "is_release=$(grep -v SNAPSHOT version.sbt | wc -l)" >> $GITHUB_ENV
-      shell: bash
-    - name: Upload release
+    - name: Publish release
       if: env.is_release == '1'
       env:
         CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
         CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
-      run: sbt sonaUpload
+      run: sbt "+ publishSigned" sonaUpload
 
   push_site:
     # only run if publish was successful

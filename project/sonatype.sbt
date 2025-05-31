@@ -1,6 +1,6 @@
 credentials += Credentials(
-  "Sonatype Nexus Repository Manager",
-  "oss.sonatype.org",
-  sys.env.getOrElse("OSSRH_USERNAME", ""),
-  sys.env.getOrElse("OSSRH_PASSWORD", "")
+  "Central Publisher Portal",
+  "central.sonatype.com",
+  sys.env.getOrElse("CENTRAL_USERNAME", ""),
+  sys.env.getOrElse("CENTRAL_PASSWORD", "")
 )

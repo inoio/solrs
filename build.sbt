@@ -56,7 +56,7 @@ libraryDependencies ++= Seq(
   "org.scalatestplus"      %% "junit-4-13"        % "3.2.19.1" % "test",
   "com.github.sbt"          % "junit-interface"   % "0.13.3" % Test,
   "org.hamcrest"            % "hamcrest-library"  % "3.0" % "test",
-  "dev.zio"                %% "izumi-reflect"     % "3.0.3" % Test,
+  "dev.zio"                %% "izumi-reflect"     % "3.0.4" % Test,
   "org.apache.solr"         % "solr-test-framework" % solrVersion % "test" excludeAll(ExclusionRule(organization = "org.apache.logging.log4j")),
   "com.twitter"            %% "util-core"         % "24.2.0" % "optional"
 )

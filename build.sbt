@@ -12,10 +12,10 @@ scmInfo := Some(ScmInfo(url("https://github.com/inoio/solrs"), "git@github.com:i
 
 licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.html"))
 
-scalaVersion := "3.7.0"
+scalaVersion := "3.7.2"
 
 // Remember: also update scala versions in .travis.yml!
-crossScalaVersions := Seq("2.12.20", "2.13.16", "3.7.0")
+crossScalaVersions := Seq("2.12.20", "2.13.16", "3.7.2")
 
 scalacOptions ++= Seq(
   "-unchecked",

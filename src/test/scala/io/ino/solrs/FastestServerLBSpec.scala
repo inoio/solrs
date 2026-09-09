@@ -5,7 +5,7 @@ import io.ino.solrs.Fixtures.shardReplica
 import io.ino.solrs.SolrMatchers.hasQuery
 import io.ino.time.Clock
 import io.ino.time.Clock.MutableClock
-import org.apache.solr.client.solrj.SolrQuery
+import org.apache.solr.client.solrj.request.SolrQuery
 import org.apache.solr.client.solrj.SolrRequest
 import org.apache.solr.client.solrj.request.QueryRequest
 import org.apache.solr.client.solrj.request.UpdateRequest

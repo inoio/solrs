@@ -17,7 +17,7 @@ object SolrResponseFactory {
     }
 
   implicit val queryResponseFactory: SolrResponseFactory[QueryResponse] =
-    instance(_ => new QueryResponse(null))
+    instance(_ => new QueryResponse())
 
   implicit val simpleSolrResponseFactory: SolrResponseFactory[SimpleSolrResponse] =
     instance(_ => new SimpleSolrResponse)

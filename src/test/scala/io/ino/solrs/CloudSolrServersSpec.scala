@@ -6,6 +6,8 @@ import org.apache.solr.common.cloud.ClusterState
 import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.matchers.should.Matchers
 
+import java.time.Instant
+
 
 /**
  * Test that starts ZK, solrRunners and our Class Under Test before all tests.
@@ -46,7 +48,7 @@ class CloudSolrServersSpec extends AnyFunSpec with Matchers {
       import scala.jdk.CollectionConverters._
 
       val bytes = Files.readAllBytes(Paths.get(this.getClass.getResource("/cluster_status.json").toURI))
-      val cs = ClusterState.createFromJson(1, bytes, Set("server1:8983_solr").asJava)
+      val cs = ClusterState.createFromJson(1, bytes, Set("server1:8983_solr").asJava, Instant.EPOCH, null)
 
       val collectionToServers = CloudSolrServers.getCollections(cs)
       collectionToServers("my-collection").servers should contain allOf(

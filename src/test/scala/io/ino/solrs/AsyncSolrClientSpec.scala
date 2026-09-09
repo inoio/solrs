@@ -3,7 +3,7 @@ package io.ino.solrs
 import java.net.ConnectException
 
 import org.asynchttpclient.DefaultAsyncHttpClient
-import org.apache.solr.client.solrj.SolrQuery
+import org.apache.solr.client.solrj.request.SolrQuery
 import org.asynchttpclient.AsyncHandler
 import org.asynchttpclient.AsyncHttpClient
 import org.asynchttpclient.Request

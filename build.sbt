@@ -15,7 +15,7 @@ licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.
 scalaVersion := "3.7.0"
 
 // Remember: also update scala versions in .travis.yml!
-crossScalaVersions := Seq("2.12.20", "2.13.16", "3.7.0")
+crossScalaVersions := Seq("2.12.20", "2.13.18", "3.7.0")
 
 scalacOptions ++= Seq(
   "-unchecked",
@@ -40,11 +40,13 @@ resolvers ++= Seq(
   "Restlet Repositories" at "https://maven.restlet.org"
 )
 
-val solrVersion = "9.8.1"
+val solrVersion = "10.0.0"
 val slf4jVersion = "2.0.17"
 
 libraryDependencies ++= Seq(
   "org.apache.solr"         % "solr-solrj"        % solrVersion,
+  "org.apache.solr"         % "solr-solrj-streaming" % solrVersion,
+  "org.apache.solr"          % "solr-solrj-zookeeper" % solrVersion,
   "org.asynchttpclient"     % "async-http-client" % "3.0.2",
   "org.scala-lang.modules" %% "scala-xml"         % "2.4.0",
   "org.scala-lang.modules" %% "scala-java8-compat"% "1.0.2",
@@ -59,6 +61,14 @@ libraryDependencies ++= Seq(
   "dev.zio"                %% "izumi-reflect"     % "3.0.10" % Test,
   "org.apache.solr"         % "solr-test-framework" % solrVersion % "test" excludeAll(ExclusionRule(organization = "org.apache.logging.log4j")),
   "com.twitter"            %% "util-core"         % "24.2.0" % "optional"
+)
+
+dependencyOverrides ++= Seq(
+  "com.fasterxml.jackson.dataformat" % "jackson-dataformat-smile" % "2.22.2",
+  "com.fasterxml.jackson.dataformat" % "jackson-dataformat-cbor" % "2.22.2",
+  "com.fasterxml.jackson.core" % "jackson-annotations" % "2.22",
+  "com.fasterxml.jackson.core" % "jackson-databind" % "2.22.2",
+  "com.fasterxml.jackson.core" % "jackson-core" % "2.22.2"
 )
 
 excludeDependencies ++= (

@@ -4,7 +4,7 @@ import java.util.concurrent.TimeUnit._
 import io.ino.solrs.PerformanceStats.EvictingArray
 import io.ino.time.Clock
 import io.ino.time.Clock.MutableClock
-import org.apache.solr.client.solrj.SolrQuery
+import org.apache.solr.client.solrj.request.SolrQuery
 import org.apache.solr.client.solrj.response.QueryResponse
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.funspec.AnyFunSpec

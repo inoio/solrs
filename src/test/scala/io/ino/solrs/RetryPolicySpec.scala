@@ -3,7 +3,7 @@ package io.ino.solrs
 import io.ino.solrs.LoadBalancer.NoSolrServersAvailableException
 import io.ino.solrs.RetryPolicy._
 import io.ino.solrs.RetryDecision.Result
-import org.apache.solr.client.solrj.SolrQuery
+import org.apache.solr.client.solrj.request.SolrQuery
 import org.apache.solr.client.solrj.SolrRequest
 import org.apache.solr.client.solrj.request.QueryRequest
 import org.scalatest.funspec.AnyFunSpec

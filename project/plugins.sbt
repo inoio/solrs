@@ -3,7 +3,7 @@ ThisBuild / libraryDependencySchemes ++= Seq(
 )
 
 addSbtPlugin("org.scoverage" % "sbt-scoverage" % "2.4.4")
-addSbtPlugin("com.github.sbt" % "sbt-site-paradox" % "1.7.0")
+addSbtPlugin("com.github.sbt" % "sbt-site-paradox" % "1.8.0")
 addSbtPlugin("com.github.sbt" % "sbt-ghpages" % "0.10.0")
 // use a newer version of paradox (site would pull in automatically an older version)
 addSbtPlugin("com.lightbend.paradox" % "sbt-paradox" % "0.11.0")

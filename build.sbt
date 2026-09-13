@@ -45,15 +45,15 @@ val slf4jVersion = "2.0.17"
 
 libraryDependencies ++= Seq(
   "org.apache.solr"         % "solr-solrj"        % solrVersion,
-  "org.asynchttpclient"     % "async-http-client" % "3.0.2",
+  "org.asynchttpclient"     % "async-http-client" % "3.0.13",
   "org.scala-lang.modules" %% "scala-xml"         % "2.4.0",
   "org.scala-lang.modules" %% "scala-java8-compat"% "1.0.2",
   "io.dropwizard.metrics"   % "metrics-core"      % "4.2.32" % "optional",
   "org.slf4j"               % "slf4j-api"         % slf4jVersion,
   "org.slf4j"               % "slf4j-simple"      % slf4jVersion % "test",
-  "org.scalatest"          %% "scalatest"         % "3.2.19" % "test",
+  "org.scalatest"          %% "scalatest"         % "3.2.20" % "test",
   "org.scalatestplus"      %% "mockito-4-6"       % "3.2.15.0" % "test",
-  "org.scalatestplus"      %% "junit-4-13"        % "3.2.19.1" % "test",
+  "org.scalatestplus"      %% "junit-4-13"        % "3.2.20.0" % "test",
   "com.github.sbt"          % "junit-interface"   % "0.13.3" % Test,
   "org.hamcrest"            % "hamcrest-library"  % "3.0" % "test",
   "dev.zio"                %% "izumi-reflect"     % "3.0.10" % Test,

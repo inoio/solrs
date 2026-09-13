@@ -52,7 +52,7 @@ libraryDependencies ++= Seq(
   "org.slf4j"               % "slf4j-api"         % slf4jVersion,
   "org.slf4j"               % "slf4j-simple"      % slf4jVersion % "test",
   "org.scalatest"          %% "scalatest"         % "3.2.20" % "test",
-  "org.scalatestplus"      %% "mockito-4-6"       % "3.2.18.0" % "test",
+  "org.scalatestplus"      %% "mockito-5-23"      % "3.2.20.0" % "test",
   "org.scalatestplus"      %% "junit-4-13"        % "3.2.20.0" % "test",
   "com.github.sbt"          % "junit-interface"   % "0.13.3" % Test,
   "org.hamcrest"            % "hamcrest-library"  % "3.0" % "test",

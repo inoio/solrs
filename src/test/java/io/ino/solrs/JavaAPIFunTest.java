@@ -15,10 +15,10 @@ import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.solr.client.solrj.SolrClient;
-import org.apache.solr.client.solrj.SolrQuery;
+import org.apache.solr.client.solrj.request.SolrQuery;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.beans.Field;
-import org.apache.solr.client.solrj.impl.Http2SolrClient;
+import org.apache.solr.client.solrj.impl.HttpJdkSolrClient;
 import org.apache.solr.client.solrj.request.json.DirectJsonQueryRequest;
 import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.common.SolrDocument;
@@ -45,7 +45,7 @@ public class JavaAPIFunTest extends JUnitSuite {
     public static void beforeClass() {
         solrRunner = SolrRunner.startOnce(8888).awaitReady(10, SECONDS);
         String url = "http://localhost:" + solrRunner.port() + "/solr/collection1";
-        solr = new Http2SolrClient.Builder(url).build();
+        solr = new HttpJdkSolrClient.Builder(url).build();
         solrs = JavaAsyncSolrClient.create(url);
     }
 

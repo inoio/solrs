@@ -1,7 +1,7 @@
 package io.ino.solrs
 
 import java.util.concurrent.atomic.AtomicBoolean
-import org.apache.solr.client.solrj.SolrQuery
+import org.apache.solr.client.solrj.request.SolrQuery
 import org.apache.solr.client.solrj.impl.CloudSolrClient
 import org.apache.solr.client.solrj.request.CollectionAdminRequest
 import org.scalatest.Assertion

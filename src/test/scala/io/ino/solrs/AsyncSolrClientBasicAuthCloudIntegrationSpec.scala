@@ -1,6 +1,6 @@
 package io.ino.solrs
 
-import org.apache.solr.client.solrj.SolrQuery
+import org.apache.solr.client.solrj.request.SolrQuery
 import org.apache.solr.client.solrj.impl.CloudSolrClient
 import org.asynchttpclient.DefaultAsyncHttpClient
 import org.asynchttpclient.DefaultAsyncHttpClientConfig

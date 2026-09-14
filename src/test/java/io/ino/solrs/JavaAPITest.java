@@ -1,7 +1,7 @@
 package io.ino.solrs;
 
-import org.apache.solr.client.solrj.SolrQuery;
-import org.apache.solr.client.solrj.impl.XMLResponseParser;
+import org.apache.solr.client.solrj.request.SolrQuery;
+import org.apache.solr.client.solrj.response.XMLResponseParser;
 import org.apache.solr.client.solrj.response.QueryResponse;
 import org.asynchttpclient.DefaultAsyncHttpClient;
 import org.junit.BeforeClass;

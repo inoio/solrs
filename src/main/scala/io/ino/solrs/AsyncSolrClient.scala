@@ -11,27 +11,14 @@ import io.ino.solrs.future.Future
 import io.ino.solrs.future.FutureFactory
 import org.apache.commons.io.IOUtils
 import org.apache.solr.client.solrj.beans.DocumentObjectBinder
-import org.apache.solr.client.solrj.impl.BinaryRequestWriter
-import org.apache.solr.client.solrj.impl.BinaryResponseParser
-import org.apache.solr.client.solrj.impl.StreamingBinaryResponseParser
 import org.apache.solr.client.solrj.request.AbstractUpdateRequest.ACTION.COMMIT
 import org.apache.solr.client.solrj.request.AbstractUpdateRequest.ACTION.OPTIMIZE
-import org.apache.solr.client.solrj.request.QueryRequest
-import org.apache.solr.client.solrj.request.RequestWriter
-import org.apache.solr.client.solrj.request.SolrPing
-import org.apache.solr.client.solrj.request.UpdateRequest
-import org.apache.solr.client.solrj.response.QueryResponse
-import org.apache.solr.client.solrj.response.SolrPingResponse
-import org.apache.solr.client.solrj.response.UpdateResponse
-import org.apache.solr.client.solrj.ResponseParser
-import org.apache.solr.client.solrj.SolrQuery
-import org.apache.solr.client.solrj.SolrRequest
+import org.apache.solr.client.solrj.request.{JavaBinRequestWriter, QueryRequest, RequestWriter, SolrPing, SolrQuery, UpdateRequest}
+import org.apache.solr.client.solrj.response.{JavaBinResponseParser, QueryResponse, ResponseParser, SolrPingResponse, StreamingJavaBinResponseParser, StreamingResponseCallback, UpdateResponse}
+import org.apache.solr.client.solrj.{SolrRequest, SolrResponse, SolrServerException}
 import org.apache.solr.client.solrj.SolrRequest.METHOD
 import org.apache.solr.client.solrj.SolrRequest.METHOD.GET
 import org.apache.solr.client.solrj.SolrRequest.METHOD.POST
-import org.apache.solr.client.solrj.SolrResponse
-import org.apache.solr.client.solrj.SolrServerException
-import org.apache.solr.client.solrj.StreamingResponseCallback
 import org.apache.solr.common.SolrDocument
 import org.apache.solr.common.SolrDocumentList
 import org.apache.solr.common.SolrException
@@ -146,9 +133,9 @@ object AsyncSolrClient {
 
     protected def createHttpClient: AsyncHttpClient = new DefaultAsyncHttpClient()
 
-    protected def createRequestWriter: RequestWriter = new BinaryRequestWriter
+    protected def createRequestWriter: RequestWriter = new JavaBinRequestWriter
 
-    protected def createResponseParser: ResponseParser = new BinaryResponseParser
+    protected def createResponseParser: ResponseParser = new JavaBinResponseParser
 
     protected def createMetrics: Metrics = NoopMetrics
 
@@ -204,8 +191,8 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
                                        httpClient: AsyncHttpClient,
                                        shutdownHttpClient: Boolean,
                                        requestInterceptor: Option[RequestInterceptor] = None,
-                                       requestWriter: RequestWriter = new BinaryRequestWriter,
-                                       responseParser: ResponseParser = new BinaryResponseParser,
+                                       requestWriter: RequestWriter = new JavaBinRequestWriter,
+                                       responseParser: ResponseParser = new JavaBinResponseParser,
                                        metrics: Metrics = NoopMetrics,
                                        serverStateObservation: Option[ServerStateObservation[F]] = None,
                                        retryPolicy: RetryPolicy = RetryPolicy.TryOnce)(implicit futureFactory: FutureFactory[F]) {
@@ -510,7 +497,7 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
     *         from the server
     */
   def queryAndStreamResponse(collection: Option[String] = None, q: SolrParams, callback: StreamingResponseCallback): F[QueryResponse] = {
-    val parser = new StreamingBinaryResponseParser(callback)
+    val parser = new StreamingJavaBinResponseParser(callback)
     val req = new QueryRequest(queryParams(collection, Some(q)))
     req.setStreamingResponseCallback(callback)
     req.setResponseParser(parser)
@@ -609,7 +596,6 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
     val wparams = new ModifiableSolrParams(r.getParams)
     if (responseParser != null && r.getResponseParser == null) {
       wparams.set(CommonParams.WT, responseParser.getWriterType)
-      wparams.set(CommonParams.VERSION, responseParser.getVersion)
     }
 
     implicit val s: SolrServer = solrServer
@@ -676,7 +662,7 @@ class AsyncSolrClient[F[_]] protected (private[solrs] val loadBalancer: LoadBala
   }
 
   protected def getPath(request: SolrRequest[_ <: SolrResponse]): String = {
-    val path = requestWriter.getPath(request)
+    val path = request.getPath
     if (path != null && path.startsWith("/")) path else DEFAULT_PATH
   }
 

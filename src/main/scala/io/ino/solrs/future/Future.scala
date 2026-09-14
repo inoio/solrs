@@ -118,7 +118,7 @@ private[solrs] object FutureFactory {
                                               futureFactory: FutureFactory[X]): Future[M[A]] = {
     in.foldLeft(futureFactory.successful(cbf(in))) { (fr, fa) =>
       for (r <- fr; a <- fa.asInstanceOf[Future[A]]) yield r += a
-    } map (_.result())
+    }.map(_.result())
   }
 
 }

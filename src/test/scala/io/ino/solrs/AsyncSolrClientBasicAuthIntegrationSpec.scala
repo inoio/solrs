@@ -1,20 +1,16 @@
 package io.ino.solrs
 
-import org.apache.solr.client.solrj.SolrQuery
-import org.apache.solr.client.solrj.impl.Http2SolrClient
+import org.apache.solr.client.solrj.impl.HttpJdkSolrClient
+import org.apache.solr.client.solrj.request.SolrQuery
 import org.asynchttpclient.DefaultAsyncHttpClient
 import org.asynchttpclient.DefaultAsyncHttpClientConfig
 import org.asynchttpclient.Realm
 import org.asynchttpclient.Realm.AuthScheme
 import org.scalatest.concurrent.Eventually
-import org.scalatest.concurrent.Eventually.eventually
 import org.scalatest.concurrent.IntegrationPatience
 
-import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.Arrays.asList
-import java.util.concurrent.Executors
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -24,7 +20,7 @@ class AsyncSolrClientBasicAuthIntegrationSpec extends StandardFunSpec with Event
   private var solrs: AsyncSolrClient[Future] = _
 
   private var solrRunner: SolrRunner = _
-  private var solrJClient: Http2SolrClient = _
+  private var solrJClient: HttpJdkSolrClient = _
 
   private val collection1 = "collection1"
 
@@ -36,7 +32,7 @@ class AsyncSolrClientBasicAuthIntegrationSpec extends StandardFunSpec with Event
       // read from src/test/resources, because sbt might not copy the symlink solr/collection1/conf when copying to target...
       maybeSolrHome = Some(Paths.get("./src/test/resources/solr-basic-auth").toAbsolutePath.normalize())
     )
-    solrJClient = new Http2SolrClient.Builder("http://localhost:" + solrRunner.port + "/solr/collection1")
+    solrJClient = new HttpJdkSolrClient.Builder("http://localhost:" + solrRunner.port + "/solr/collection1")
       .withBasicAuthCredentials("solr", "SolrRocks") // from https://solr.apache.org/guide/8_10/basic-authentication-plugin.html
       .build()
   }

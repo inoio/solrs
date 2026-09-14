@@ -8,8 +8,7 @@ import java.util.concurrent.TimeUnit
 import org.apache.commons.io.FileUtils
 import org.apache.solr.embedded.JettyConfig
 import org.apache.solr.embedded.JettySolrRunner
-import org.apache.solr.client.solrj.impl.CloudSolrClient
-import org.apache.solr.client.solrj.impl.Http2SolrClient
+import org.apache.solr.client.solrj.impl.{CloudSolrClient, HttpJdkSolrClient}
 import org.apache.solr.client.solrj.request.CollectionAdminRequest
 import org.apache.solr.cloud.MiniSolrCloudCluster
 import org.apache.solr.cloud.ZkTestServer
@@ -159,7 +158,7 @@ class SolrCloudRunner(numServers: Int, collections: List[SolrCollection] = List.
 
     // mutate the MiniSolrCloudCluster's SolrClient instance and set its default collection
     for (coll <- defaultCollection) {
-      solrJClient.setDefaultCollection(coll)
+      //solrJClient.setDefaultCollection(coll)
     }
 
     this
@@ -184,9 +183,10 @@ class SolrCloudRunner(numServers: Int, collections: List[SolrCollection] = List.
   }
 
   lazy val solrJClient: CloudSolrClient = {
-    val http2ClientBuilder = new Http2SolrClient.Builder().withBasicAuthCredentials("solr", "SolrRocks")
+    val HttpJdkClientBuilder = new HttpJdkSolrClient.Builder().withBasicAuthCredentials("solr", "SolrRocks")
     new CloudSolrClient.Builder(util.Arrays.asList(miniSolrCloudCluster.getZkServer.getZkAddress()), Optional.empty[String])
-      .withInternalClientBuilder(http2ClientBuilder)
+      .withInternalClientBuilder(HttpJdkClientBuilder)
+      .withDefaultCollection(defaultCollection.getOrElse(""))
       .build() // we choose 90 because we run in some harsh envs
     //miniSolrCloudCluster.getSolrClient
   }

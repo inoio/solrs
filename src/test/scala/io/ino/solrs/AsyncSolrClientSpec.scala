@@ -33,7 +33,7 @@ class AsyncSolrClientSpec extends StandardFunSpec {
 
     it("should return failed future on AHC IOException") {
       val ahc = new DefaultAsyncHttpClient()
-      val ahcSpy = spy(ahc)
+      val ahcSpy = spy[DefaultAsyncHttpClient](ahc)
       val solr = AsyncSolrClient.Builder("http://localhost:12345/solr").withHttpClient(ahcSpy).build
 
       val ex = new RuntimeException("Unexpected?!") with NoStackTrace

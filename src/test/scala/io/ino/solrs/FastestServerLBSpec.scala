@@ -563,7 +563,7 @@ class FastestServerLBSpec extends StandardFunSpec {
     var spyClient: AsyncSolrClient = null
     val realClient: AsyncSolrClient = new AsyncSolrClient.Builder(cut, ascFactory) {
       override protected def setOnAsyncSolrClientAwares(solr: AsyncSolrClient): Unit = {
-        spyClient = spy(solr)
+        spyClient = spy[AsyncSolrClient](solr)
         mockRequests(spyClient)
         super.setOnAsyncSolrClientAwares(spyClient)
       }

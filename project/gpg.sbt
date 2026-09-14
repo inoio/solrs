@@ -1,4 +1,4 @@
-addSbtPlugin("com.github.sbt" % "sbt-pgp" % "2.3.1")
+addSbtPlugin("com.github.sbt" % "sbt-pgp" % "2.3.2")
 
 credentials += Credentials(
   "GnuPG Key ID",

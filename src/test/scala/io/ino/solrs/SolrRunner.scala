@@ -1,9 +1,10 @@
 package io.ino.solrs
 
+import jakarta.servlet.Filter
+
 import java.io.File
 import java.nio.file.{Files, Path, Paths}
 import java.util.concurrent.{TimeUnit, TimeoutException}
-//import javax.servlet.Filter
 import org.apache.commons.io.FileUtils
 import org.apache.solr.client.solrj.impl.HttpJdkSolrClient
 import org.apache.solr.client.solrj.request.SolrQuery
@@ -23,8 +24,7 @@ import scala.util.control.NonFatal
   * @param maybeSolrHome (optional) a Solr home dir to use, tries to locate resource /solr in classpath if None
   */
 class SolrRunner(val port: Int,
-                 //val context: String,
-                 //extraFilters: Map[Class[_ <: Filter], String],
+                 extraFilters: Map[Class[_ <: Filter], String],
                  maybeSolrHome: Option[Path]) {
 
   import io.ino.solrs.SolrRunner._
@@ -54,7 +54,7 @@ class SolrRunner(val port: Int,
     System.setProperty("pkiHandlerPrivateKeyPath", this.getClass.getClassLoader.getResource("cryptokeys/priv_key512_pkcs8.pem").toExternalForm)
     System.setProperty("pkiHandlerPublicKeyPath", this.getClass.getClassLoader.getResource("cryptokeys/pub_key512.der").toExternalForm)
 
-    val jettyConfig = JettyConfig.builder.setPort(port)/*.withFilters(extraFilters.asJava)*/.build
+    val jettyConfig = JettyConfig.builder.setPort(port).withFilters(extraFilters.asJava).build
     jetty = new JettySolrRunner(solrHome.toAbsolutePath.toString, jettyConfig)
     startJetty(jetty)
 
@@ -127,25 +127,26 @@ object SolrRunner {
   private val logger: Logger = LoggerFactory.getLogger(classOf[SolrRunner])
   private var solrRunners: Map[Int,SolrRunner] = Map.empty
 
-  //val DefaultContext = "/solr"
-  //val DefaultExtraFilters: Map[Class[_ <: Filter], String] = Map.empty
+  val DefaultExtraFilters: Map[Class[_ <: Filter], String] = Map.empty
 
   // start with default parameters set, for Java API
-  def start(port: Int): SolrRunner = start(port/*, DefaultContext, DefaultExtraFilters*/, None)
+  def start(port: Int): SolrRunner = start(port, DefaultExtraFilters, None)
 
   def start(port: Int,
-            maybeSolrHome: Option[Path] = None): SolrRunner = new SolrRunner(port/*, context, extraFilters*/, maybeSolrHome).start
+            extraFilters: Map[Class[_ <: Filter], String] = DefaultExtraFilters,
+            maybeSolrHome: Option[Path] = None): SolrRunner = new SolrRunner(port, extraFilters, maybeSolrHome).start
 
-  def startOnce(port: Int): SolrRunner = startOnce(port, None)
+  def startOnce(port: Int): SolrRunner = startOnce(port, DefaultExtraFilters, None)
 
   /**
     * Starts Solr Jetty or returns a previously started instance.
     * Also registers a shutdown hook to shutdown Solr Jetty when the JVM exits.
     */
   def startOnce(port: Int,
+                extraFilters: Map[Class[_ <: Filter], String] = Map.empty,
                 maybeSolrHome: Option[Path] = None): SolrRunner = {
     solrRunners.getOrElse(port, {
-      val solrRunner = start(port, maybeSolrHome)
+      val solrRunner = start(port, extraFilters, maybeSolrHome)
       solrRunners += port -> solrRunner
 
       Runtime.getRuntime.addShutdownHook(new Thread() {

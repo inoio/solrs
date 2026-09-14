@@ -1,10 +1,12 @@
 package io.ino.solrs
 
+import jakarta.servlet.http.HttpServletResponse
+import jakarta.servlet.{Filter, FilterChain, FilterConfig, ServletRequest, ServletResponse}
+
 import java.net.ConnectException
 import java.time.{Duration => JavaDuration}
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
 import java.util.concurrent.{ExecutionException, TimeUnit, TimeoutException}
-
 import org.apache.solr.client.solrj.impl.HttpJdkSolrClient
 import org.asynchttpclient.{DefaultAsyncHttpClient, DefaultAsyncHttpClientConfig}
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
@@ -30,7 +32,7 @@ class PingStatusObserverIntegrationSpec extends AnyFunSpec with BeforeAndAfterAl
   private lazy val solrUrl = s"http://localhost:${solrRunner.port}/solr/collection1"
 
   override def beforeAll(): Unit = {
-    solrRunner = SolrRunner.startOnce(8889)
+    solrRunner = SolrRunner.startOnce(8889, extraFilters = Map(classOf[DebuggingFilter] -> "*"))
     solrJClient = new HttpJdkSolrClient.Builder(solrUrl).build()
   }
 
@@ -68,7 +70,7 @@ class PingStatusObserverIntegrationSpec extends AnyFunSpec with BeforeAndAfterAl
       solrServers(0).status should be (Disabled)
     }
 
-    ignore("should disable server on status != 200") {
+    it("should disable server on status != 200") {
       await(pingStatusObserver.checkServerStatus())
       solrServers(0).status should be (Enabled)
 
@@ -88,7 +90,7 @@ class PingStatusObserverIntegrationSpec extends AnyFunSpec with BeforeAndAfterAl
 
     }
 
-    ignore("should disable server on read timeout") {
+    it("should disable server on read timeout") {
 
       await(pingStatusObserver.checkServerStatus())
       solrServers(0).status should be (Enabled)
@@ -148,7 +150,7 @@ object PingStatusObserverIntegrationSpec {
   // whether DebuggingFilter should always return 404
   private val doReturn404 = new AtomicBoolean(false)
 
-  /*class DebuggingFilter extends Filter {
+  class DebuggingFilter extends Filter {
 
     private val isOn: AtomicBoolean = new AtomicBoolean(false)
 
@@ -166,6 +168,6 @@ object PingStatusObserverIntegrationSpec {
         }
       }
     }
-  }*/
+  }
 
 }

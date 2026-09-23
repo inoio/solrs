@@ -155,12 +155,6 @@ class SolrCloudRunner(numServers: Int, collections: List[SolrCollection] = List.
     for ((url, idx) <- solrCoreUrls.zipWithIndex) {
       logger.info(s"Jetty core #$idx running at $url")
     }
-
-    // mutate the MiniSolrCloudCluster's SolrClient instance and set its default collection
-    for (coll <- defaultCollection) {
-      //solrJClient.setDefaultCollection(coll)
-    }
-
     this
   }
 
@@ -185,7 +179,7 @@ class SolrCloudRunner(numServers: Int, collections: List[SolrCollection] = List.
   lazy val solrJClient: CloudSolrClient = {
     val HttpJdkClientBuilder = new HttpJdkSolrClient.Builder().withBasicAuthCredentials("solr", "SolrRocks")
     new CloudSolrClient.Builder(util.Arrays.asList(miniSolrCloudCluster.getZkServer.getZkAddress()), Optional.empty[String])
-      .withInternalClientBuilder(HttpJdkClientBuilder)
+      .withHttpClientBuilder(HttpJdkClientBuilder)
       .withDefaultCollection(defaultCollection.getOrElse(""))
       .build() // we choose 90 because we run in some harsh envs
     //miniSolrCloudCluster.getSolrClient

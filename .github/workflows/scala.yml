@@ -67,15 +67,17 @@ jobs:
   push_site:
     # only run if publish was successful
     needs: [ publish ]
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
       with:
         fetch-depth: 0
-    - uses: webfactory/ssh-agent@v0.7.0
-      with:
-        ssh-private-key: ${{ secrets.DEPLOY_KEY }}
+    - name: Configure GitHub token for sbt-ghpages
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      run: git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/inoio/solrs.git".insteadOf "git@github.com:inoio/solrs.git"
     # only update/publish docs for non-SNAPSHOT versions
     - run: echo "is_release=$(grep -v SNAPSHOT version.sbt | wc -l)" >> $GITHUB_ENV
       shell: bash

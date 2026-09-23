@@ -1,7 +1,7 @@
 # solrs - async solr client for java/scala
 
 [![Build Status](https://github.com/inoio/solrs/actions/workflows/scala.yml/badge.svg)](https://github.com/inoio/solrs/actions/workflows/scala.yml)
-[![Maven Central](https://img.shields.io/maven-central/v/io.ino/solrs_2.12.svg)](http://search.maven.org/#search%7Cga%7C1%7Cg%3A%22io.ino%22%20AND%20a%3Asolrs*_2.12)
+[![Maven Central](https://img.shields.io/maven-central/v/io.ino/solrs_2.13.svg)](http://search.maven.org/#search%7Cga%7C1%7Cg%3A%22io.ino%22%20AND%20a%3Asolrs*_2.13)
 [![Join the chat at https://gitter.im/inoio/solrs](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/inoio/solrs)
 
 This is a java/scala solr client providing an interface like SolrJ, just asynchronously / non-blocking

@@ -3,15 +3,15 @@ package io.ino.solrs
 import java.util.Arrays.asList
 import java.util.concurrent.Executors
 import org.asynchttpclient.DefaultAsyncHttpClient
-import org.apache.solr.client.solrj.SolrQuery
+import org.apache.solr.client.solrj.request.SolrQuery
 import org.apache.solr.client.solrj.SolrRequest
 import org.apache.solr.client.solrj.SolrResponse
-import org.apache.solr.client.solrj.impl.BinaryResponseParser
-import org.apache.solr.client.solrj.impl.BinaryResponseParser.BINARY_CONTENT_TYPE
-import org.apache.solr.client.solrj.impl.BinaryResponseParser.BINARY_CONTENT_TYPE_V2
-import org.apache.solr.client.solrj.impl.{NoOpResponseParser, XMLResponseParser}
+import org.apache.solr.client.solrj.response.JavaBinResponseParser.JAVABIN_CONTENT_TYPE
+import org.apache.solr.client.solrj.response.JavaBinResponseParser.JAVABIN_CONTENT_TYPE_V2
+import org.apache.solr.client.solrj.response.{QueryResponse, ResponseParser, XMLResponseParser}
 import org.apache.solr.client.solrj.request.{GenericSolrRequest, QueryRequest}
-import org.apache.solr.client.solrj.response.QueryResponse
+import org.apache.solr.common.SolrException
+import org.apache.solr.common.util.NamedList
 import org.mockito.ArgumentMatchers.anyLong
 import org.mockito.Mockito.verify
 import org.scalatest.concurrent.Eventually._
@@ -20,6 +20,7 @@ import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.time.Millis
 import org.scalatest.time.Span
 
+import java.io.{IOException, InputStream, InputStreamReader, Reader, StringWriter}
 import java.util
 import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -126,13 +127,24 @@ class AsyncSolrClientIntegrationSpec extends StandardFunSpec with RunningSolr {
       null,
         new SolrQuery("cat:cat1").add("wt", "xml")
       )
-      request.setResponseParser(new NoOpResponseParser {
-        override def getContentTypes: util.Collection[String] = asList("application/xml")
+      request.setResponseParser(new ResponseParser() {
+        override def getContentTypes  = new util.HashSet[String](asList("application/xml"))
+        @throws[IOException]
+        override def processResponse(body: InputStream, encoding: String): NamedList[AnyRef] = {
+          val writer = new StringWriter
+          new InputStreamReader(body, if (encoding == null) "UTF-8"
+          else encoding).transferTo(writer)
+          val output = writer.toString
+          val list = new NamedList[AnyRef]
+          list.add("response", output)
+          list
+        }
+        override def getWriterType = "test"
       })
 
       val response = solr.execute(request)
 
-      var xml = XML.loadString(await(response).getResponse.get("response").toString)
+      val xml = XML.loadString(await(response).getResponse.get("response").toString)
 
       (xml \ "result" \ "@numFound").text.toInt should be (2)
 
@@ -156,7 +168,7 @@ class AsyncSolrClientIntegrationSpec extends StandardFunSpec with RunningSolr {
       awaitReady(response)
       a [RemoteSolrException] should be thrownBy await(response)
       // embedded Jetty returns 404 with text/html response with error message in body
-      val mimeTypesRegex = s"($BINARY_CONTENT_TYPE, $BINARY_CONTENT_TYPE_V2|$BINARY_CONTENT_TYPE_V2, $BINARY_CONTENT_TYPE)"
+      val mimeTypesRegex = s"($JAVABIN_CONTENT_TYPE, $JAVABIN_CONTENT_TYPE_V2|$JAVABIN_CONTENT_TYPE_V2, $JAVABIN_CONTENT_TYPE)"
       (the [RemoteSolrException] thrownBy await(response)).getMessage should include regex "Expected a mime type of " +
         s"\\[$mimeTypesRegex\\] but got \\[text/html\\]"
 

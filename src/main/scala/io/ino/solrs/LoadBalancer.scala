@@ -16,11 +16,9 @@ import io.ino.solrs.future.FutureFactory
 import io.ino.solrs.future.JavaFutureFactory
 import io.ino.time.Clock
 import io.ino.time.Units.Millisecond
-import org.apache.solr.client.solrj.SolrQuery
+import org.apache.solr.client.solrj.request.{QueryRequest, SolrQuery, UpdateRequest}
 import org.apache.solr.client.solrj.SolrRequest
 import org.apache.solr.client.solrj.SolrResponse
-import org.apache.solr.client.solrj.request.IsUpdateRequest
-import org.apache.solr.client.solrj.request.QueryRequest
 import org.apache.solr.client.solrj.response.QueryResponse
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -52,8 +50,8 @@ trait LoadBalancer extends RequestInterceptor {
     f(solrServer, q)
   }
 
-  protected def isUpdateToLeader(r: SolrRequest[_], servers: IndexedSeq[SolrServer]): Boolean =
-    r.isInstanceOf[IsUpdateRequest] && r.asInstanceOf[IsUpdateRequest].isSendToLeaders && solrServers.findLeader(servers).isDefined
+  protected def isUpdateToLeader(r: SolrRequest[?], servers: IndexedSeq[SolrServer]): Boolean =
+    r.isInstanceOf[UpdateRequest] && r.asInstanceOf[UpdateRequest].isSendToLeaders && solrServers.findLeader(servers).isDefined
 
   def shutdown(): Unit = {
     // empty default

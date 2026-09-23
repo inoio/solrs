@@ -5,7 +5,7 @@ import io.ino.solrs.Fixtures.shardReplica
 import io.ino.solrs.SolrMatchers.hasQuery
 import io.ino.time.Clock
 import io.ino.time.Clock.MutableClock
-import org.apache.solr.client.solrj.SolrQuery
+import org.apache.solr.client.solrj.request.SolrQuery
 import org.apache.solr.client.solrj.SolrRequest
 import org.apache.solr.client.solrj.request.QueryRequest
 import org.apache.solr.client.solrj.request.UpdateRequest
@@ -563,7 +563,7 @@ class FastestServerLBSpec extends StandardFunSpec {
     var spyClient: AsyncSolrClient = null
     val realClient: AsyncSolrClient = new AsyncSolrClient.Builder(cut, ascFactory) {
       override protected def setOnAsyncSolrClientAwares(solr: AsyncSolrClient): Unit = {
-        spyClient = spy(solr)
+        spyClient = spy[AsyncSolrClient](solr)
         mockRequests(spyClient)
         super.setOnAsyncSolrClientAwares(spyClient)
       }

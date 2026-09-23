@@ -3,7 +3,7 @@ package io.ino.solrs
 import java.net.ConnectException
 
 import org.asynchttpclient.DefaultAsyncHttpClient
-import org.apache.solr.client.solrj.SolrQuery
+import org.apache.solr.client.solrj.request.SolrQuery
 import org.asynchttpclient.AsyncHandler
 import org.asynchttpclient.AsyncHttpClient
 import org.asynchttpclient.Request
@@ -33,7 +33,7 @@ class AsyncSolrClientSpec extends StandardFunSpec {
 
     it("should return failed future on AHC IOException") {
       val ahc = new DefaultAsyncHttpClient()
-      val ahcSpy = spy(ahc)
+      val ahcSpy = spy[DefaultAsyncHttpClient](ahc)
       val solr = AsyncSolrClient.Builder("http://localhost:12345/solr").withHttpClient(ahcSpy).build
 
       val ex = new RuntimeException("Unexpected?!") with NoStackTrace

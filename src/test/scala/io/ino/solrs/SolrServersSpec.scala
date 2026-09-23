@@ -1,6 +1,6 @@
 package io.ino.solrs
 
-import org.apache.solr.client.solrj.SolrQuery
+import org.apache.solr.client.solrj.request.SolrQuery
 import org.apache.solr.client.solrj.request.QueryRequest
 import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.matchers.should.Matchers

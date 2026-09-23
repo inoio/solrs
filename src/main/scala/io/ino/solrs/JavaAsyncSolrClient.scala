@@ -3,18 +3,13 @@ package io.ino.solrs
 import java.util
 import java.util.Optional
 import java.util.concurrent.CompletionStage
-
 import io.ino.solrs.AsyncSolrClient.Builder
 import io.ino.solrs.future.FutureFactory
 import io.ino.solrs.future.JavaFutureFactory
 import org.apache.solr.client.solrj.SolrRequest.METHOD
 import org.apache.solr.client.solrj._
-import org.apache.solr.client.solrj.impl.BinaryRequestWriter
-import org.apache.solr.client.solrj.impl.BinaryResponseParser
-import org.apache.solr.client.solrj.request.RequestWriter
-import org.apache.solr.client.solrj.response.QueryResponse
-import org.apache.solr.client.solrj.response.SolrPingResponse
-import org.apache.solr.client.solrj.response.UpdateResponse
+import org.apache.solr.client.solrj.request.{JavaBinRequestWriter, RequestWriter, SolrQuery}
+import org.apache.solr.client.solrj.response.{JavaBinResponseParser, QueryResponse, ResponseParser, SolrPingResponse, StreamingResponseCallback, UpdateResponse}
 import org.apache.solr.common.params.SolrParams
 import org.apache.solr.common.SolrDocument
 import org.apache.solr.common.SolrDocumentList
@@ -42,8 +37,8 @@ class JavaAsyncSolrClient(override private[solrs] val loadBalancer: LoadBalancer
                           httpClient: AsyncHttpClient,
                           shutdownHttpClient: Boolean,
                           requestInterceptor: Option[RequestInterceptor] = None,
-                          requestWriter: RequestWriter = new BinaryRequestWriter,
-                          responseParser: ResponseParser = new BinaryResponseParser,
+                          requestWriter: RequestWriter = new JavaBinRequestWriter,
+                          responseParser: ResponseParser = new JavaBinResponseParser,
                           metrics: Metrics = NoopMetrics,
                           serverStateObservation: Option[ServerStateObservation[CompletionStage]] = None,
                           retryPolicy: RetryPolicy = RetryPolicy.TryOnce)

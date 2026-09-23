@@ -5,10 +5,10 @@ import io.ino.solrs.CloudSolrServers.WarmupQueries
 import io.ino.solrs.SolrMatchers.hasBaseUrlOf
 import io.ino.solrs.SolrMatchers.hasQuery
 import io.ino.time.Clock
-import org.apache.solr.client.solrj.SolrQuery
+import org.apache.solr.client.solrj.request.SolrQuery
 import org.apache.solr.embedded.JettySolrRunner
 import org.apache.solr.client.solrj.impl.CloudSolrClient
-import org.apache.solr.client.solrj.impl.Http2SolrClient
+import org.apache.solr.client.solrj.impl.HttpJdkSolrClient
 import org.apache.solr.client.solrj.request.QueryRequest
 import org.apache.solr.client.solrj.response.QueryResponse
 import org.apache.solr.common.SolrInputDocument
@@ -147,7 +147,7 @@ class CloudSolrServersIntegrationSpec extends StandardFunSpec {
       // we only want to query these replicas, i.e. route the request to them
 
       def serverContainsDoc(url: String, id: String): Boolean = {
-        val client = new Http2SolrClient.Builder(url).build()
+        val client = new HttpJdkSolrClient.Builder(url).build()
         // restrict search to exactly this shard replica
         client.query(new SolrQuery(s"""id:"$id"""").setParam(SHARDS, url)).getResults.getNumFound > 0
       }

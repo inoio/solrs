@@ -1,5 +1,5 @@
 import io.ino.solrs.JavaAsyncSolrClient;
-import org.apache.solr.client.solrj.SolrQuery;
+import org.apache.solr.client.solrj.request.SolrQuery;
 import org.apache.solr.client.solrj.response.QueryResponse;
 import java.util.concurrent.CompletionStage;
 

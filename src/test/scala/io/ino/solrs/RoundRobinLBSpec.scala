@@ -1,7 +1,7 @@
 package io.ino.solrs
 
 import io.ino.solrs.Fixtures.shardReplica
-import org.apache.solr.client.solrj.SolrQuery
+import org.apache.solr.client.solrj.request.SolrQuery
 import org.apache.solr.client.solrj.SolrRequest
 import org.apache.solr.client.solrj.request.QueryRequest
 import org.apache.solr.client.solrj.request.UpdateRequest

@@ -1,6 +1,6 @@
 import io.ino.solrs.AsyncSolrClient
 import io.ino.solrs.future.TwitterFutureFactory.Implicit
-import org.apache.solr.client.solrj.SolrQuery
+import org.apache.solr.client.solrj.request.SolrQuery
 import org.apache.solr.client.solrj.response.QueryResponse
 import com.twitter.util.Future
 

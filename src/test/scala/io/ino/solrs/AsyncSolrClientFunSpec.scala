@@ -2,7 +2,7 @@ package io.ino.solrs
 
 import java.util.Arrays.asList
 
-import org.apache.solr.client.solrj.SolrQuery
+import org.apache.solr.client.solrj.request.SolrQuery
 import org.apache.solr.client.solrj.SolrRequest.METHOD.POST
 import org.apache.solr.client.solrj.beans.Field
 import org.scalatest.concurrent.Eventually.eventually

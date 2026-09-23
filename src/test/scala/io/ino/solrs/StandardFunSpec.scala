@@ -6,8 +6,8 @@ import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.Future
-import org.apache.solr.client.solrj.ResponseParser
 import org.apache.solr.client.solrj.request.RequestWriter
+import org.apache.solr.client.solrj.response.ResponseParser
 import org.asynchttpclient.AsyncHttpClient
 
 /**

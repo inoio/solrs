@@ -11,7 +11,7 @@ import io.ino.solrs.ServerStateChangeObservable.StateChange
 import io.ino.solrs.future.Future
 import io.ino.solrs.future.FutureFactory
 import io.ino.solrs.future.JavaFutureFactory
-import org.apache.solr.client.solrj.SolrQuery
+import org.apache.solr.client.solrj.request.SolrQuery
 import org.apache.solr.client.solrj.SolrRequest
 import org.apache.solr.client.solrj.SolrServerException
 import org.apache.solr.client.solrj.request.QueryRequest
@@ -394,14 +394,13 @@ object CloudSolrServers {
                                                             servers: IndexedSeq[ShardReplica])
 
   private[solrs] def getCollections(clusterState: ClusterState): Map[String, CollectionInfo] = {
-    import scala.jdk.CollectionConverters._
-
-    clusterState.getCollectionsMap.asScala.foldLeft(
+    import scala.jdk.StreamConverters._
+    clusterState.collectionStream().toScala(LazyList).foldLeft(
       Map.empty[String, CollectionInfo]
     ) {
-      case (res, (name, collection)) =>
+      case (res, collection) =>
         val servers = mapSliceReplicas(collection.getSlices)(repl => ShardReplica(repl.getCoreUrl, repl)).toIndexedSeq
-        res.updated(name, CollectionInfo(collection, servers))
+        res.updated(collection.getName, CollectionInfo(collection, servers))
     }
   }
 

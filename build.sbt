@@ -41,7 +41,7 @@ resolvers ++= Seq(
 )
 
 val solrVersion = "10.0.0"
-val slf4jVersion = "2.0.19"
+val slf4jVersion = "2.0.20"
 
 libraryDependencies ++= Seq(
   "org.apache.solr"         % "solr-solrj"        % solrVersion,

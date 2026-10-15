@@ -12,10 +12,10 @@ scmInfo := Some(ScmInfo(url("https://github.com/inoio/solrs"), "git@github.com:i
 
 licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.html"))
 
-scalaVersion := "3.7.0"
+scalaVersion := "3.10.0"
 
 // Remember: also update scala versions in .travis.yml!
-crossScalaVersions := Seq("2.13.18", "3.7.0")
+crossScalaVersions := Seq("2.13.18", "3.10.0")
 
 scalacOptions ++= Seq(
   "-unchecked",
@@ -41,13 +41,13 @@ resolvers ++= Seq(
 )
 
 val solrVersion = "10.0.0"
-val slf4jVersion = "2.0.19"
+val slf4jVersion = "2.0.20"
 
 libraryDependencies ++= Seq(
   "org.apache.solr"         % "solr-solrj"        % solrVersion,
   "org.apache.solr"         % "solr-solrj-streaming" % solrVersion,
   "org.apache.solr"          % "solr-solrj-zookeeper" % solrVersion,
-  "org.asynchttpclient"     % "async-http-client" % "3.0.13",
+  "org.asynchttpclient"     % "async-http-client" % "3.0.14",
   "org.scala-lang.modules" %% "scala-xml"         % "2.5.0",
   "org.scala-lang.modules" %% "scala-java8-compat"% "1.0.2",
   "io.dropwizard.metrics"   % "metrics-core"      % "4.2.40" % "optional",
@@ -58,17 +58,17 @@ libraryDependencies ++= Seq(
   "org.scalatestplus"      %% "junit-4-13"        % "3.2.20.0" % "test",
   "com.github.sbt"          % "junit-interface"   % "0.13.3" % Test,
   "org.hamcrest"            % "hamcrest-library"  % "3.0" % "test",
-  "dev.zio"                %% "izumi-reflect"     % "3.0.10" % Test,
+  "dev.zio"                %% "izumi-reflect"     % "3.0.11" % Test,
   "org.apache.solr"         % "solr-test-framework" % solrVersion % "test" excludeAll(ExclusionRule(organization = "org.apache.logging.log4j")),
   "com.twitter"            %% "util-core"         % "24.2.0" % "optional"
 )
 
 dependencyOverrides ++= Seq(
-  "com.fasterxml.jackson.dataformat" % "jackson-dataformat-smile" % "2.22.2",
-  "com.fasterxml.jackson.dataformat" % "jackson-dataformat-cbor" % "2.22.2",
+  "com.fasterxml.jackson.dataformat" % "jackson-dataformat-smile" % "2.22.3",
+  "com.fasterxml.jackson.dataformat" % "jackson-dataformat-cbor" % "2.22.3",
   "com.fasterxml.jackson.core" % "jackson-annotations" % "2.22",
-  "com.fasterxml.jackson.core" % "jackson-databind" % "2.22.2",
-  "com.fasterxml.jackson.core" % "jackson-core" % "2.22.2"
+  "com.fasterxml.jackson.core" % "jackson-databind" % "2.22.3",
+  "com.fasterxml.jackson.core" % "jackson-core" % "2.22.3"
 )
 
 excludeDependencies ++= (

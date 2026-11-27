@@ -47,7 +47,7 @@ libraryDependencies ++= Seq(
   "org.apache.solr"         % "solr-solrj"        % solrVersion,
   "org.apache.solr"         % "solr-solrj-streaming" % solrVersion,
   "org.apache.solr"          % "solr-solrj-zookeeper" % solrVersion,
-  "org.asynchttpclient"     % "async-http-client" % "3.0.14",
+  "org.asynchttpclient"     % "async-http-client" % "3.0.15",
   "org.scala-lang.modules" %% "scala-xml"         % "2.5.0",
   "org.scala-lang.modules" %% "scala-java8-compat"% "1.0.2",
   "io.dropwizard.metrics"   % "metrics-core"      % "4.2.40" % "optional",
